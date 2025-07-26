@@ -3,16 +3,24 @@
   "version": "1.0.50",
   "private": true,
   "scripts": {
-    "test": "bun test",
+    "test": "vitest",
+    "test:game": "vitest src/plugins/__tests__/websocket.game-scenario.test.ts",
+    "test:all-websocket": "vitest src/plugins/__tests__/websocket.*.test.ts",
+    "test:watch": "vitest --watch",
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
     "@generale/types": "workspace:*",
     "elysia": "latest",
+    "@elysiajs/cors": "latest",
+    "@elysiajs/swagger": "latest",
     "fast-json-patch": "^3.1.1"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "vitest": "^1.0.0",
+    "ws": "^8.14.0",
+    "@types/ws": "^8.5.0"
   },
   "module": "src/index.js"
 }

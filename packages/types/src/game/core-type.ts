@@ -30,6 +30,7 @@ export enum PlayerStatus {
 }
 
 export type PlayerId = string;
+export type GameId = string;
 
 export enum PlayerOperationType {
     Move = 'MOVE',
