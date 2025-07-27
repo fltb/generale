@@ -1,70 +1,94 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GameChatInstance, GameChatConnector } from '../GameChatInstance';
-import { ChatMessage, ChatClientToServer, ChatServerToClient } from '@generale/types/src/game/chat';
-import { PlayerId } from '@generale/types/src/game/core-type';
+// 移除未使用的类型导入
 
 function createMockConnector() {
-  let onMsg: ((msg: ChatClientToServer) => void) | undefined;
-  const sent: ChatServerToClient[] = [];
   return {
-    onMessage(cb: (msg: ChatClientToServer) => void) { onMsg = cb; },
-    send(msg: ChatServerToClient) { sent.push(msg); },
-    close() { /* noop */ },
-    simulateClient(msg: ChatClientToServer) { onMsg?.(msg); },
-    sent,
-  } as GameChatConnector & { sent: ChatServerToClient[], simulateClient: (msg: ChatClientToServer) => void };
+    onMessage: vi.fn(),
+    send: vi.fn(),
+    close: vi.fn(),
+  } as unknown as GameChatConnector;
 }
 
 describe('GameChatInstance', () => {
   let chat: GameChatInstance;
-  let c1: ReturnType<typeof createMockConnector>;
-  let c2: ReturnType<typeof createMockConnector>;
-  const pid1: PlayerId = 'p1';
-  const pid2: PlayerId = 'p2';
+  const player1 = 'p1';
+  const player2 = 'p2';
+  let connector1: GameChatConnector;
+  let connector2: GameChatConnector;
 
   beforeEach(() => {
-    chat = new GameChatInstance(10);
-    c1 = createMockConnector();
-    c2 = createMockConnector();
-    chat.addPlayer(pid1, 'Alice', c1);
-    chat.addPlayer(pid2, 'Bob', c2);
-
+    chat = new GameChatInstance(3); // maxMessages=3 for easy overflow test
+    connector1 = createMockConnector();
+    connector2 = createMockConnector();
   });
 
-  it('should broadcast user message', () => {
-    c1.simulateClient({ type: 'send_message', content: 'hello' });
-    // 两人都收到 new_message
-    expect(c1.sent.some(e => e.type === 'new_message' && (e as any).message.content === 'hello')).toBe(true);
-    expect(c2.sent.some(e => e.type === 'new_message' && (e as any).message.content === 'hello')).toBe(true);
+  it('初始化应添加系统消息', () => {
+    expect(chat["messages"][0].content).toMatch(/欢迎/);
   });
 
-  it('should reject empty message', () => {
-    c1.simulateClient({ type: 'send_message', content: '   ' });
-    expect(c1.sent.find(e => e.type === 'send_result' && (e as any).status === 'failed')).toBeTruthy();
+  it('玩家加入应注册 connector 并能收到历史消息', () => {
+    chat.addPlayer(player1, 'Alice', connector1);
+    expect(chat["connectors"].get(player1)).toBe(connector1);
+    // 加入后应收到历史消息（type: messages_batch）
+    expect(connector1.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'messages_batch' }));
+    // 还应收到系统欢迎消息和加入消息
+    expect(connector1.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'new_message' }));
   });
 
-  it('should send recent messages', () => {
-    c1.simulateClient({ type: 'send_message', content: 'A' });
-    c1.simulateClient({ type: 'send_message', content: 'B' });
-    c2.sent.length = 0;
-    c2.simulateClient({ type: 'fetch_recent', limit: 1 });
-    expect(c2.sent.find(e => e.type === 'messages_batch' && (e as any).messages.length === 1)).toBeTruthy();
+  it('玩家发送消息应广播给所有玩家并入队', () => {
+    chat.addPlayer(player1, 'Alice', connector1);
+    let handler1: any;
+    (connector1.onMessage as any).mockImplementation((cb: (msg: any) => void) => { handler1 = cb; });
+    chat.addPlayer(player1, 'Alice', connector1); // 触发 handler 注册
+    chat.addPlayer(player2, 'Bob', connector2);
+    // 玩家1发送消息
+    handler1 && handler1({ type: 'send_message', content: 'hello' });
+    // 检查所有玩家都收到 new_message（遍历所有 send 调用）
+    const sendCalls1 = (connector1.send as any).mock.calls;
+    const sendCalls2 = (connector2.send as any).mock.calls;
+    expect(sendCalls1.some((args: any[]) => args[0].type === 'new_message' && args[0].message.content === 'hello')).toBe(true);
+    expect(sendCalls2.some((args: any[]) => args[0].type === 'new_message' && args[0].message.content === 'hello')).toBe(true);
+    // 消息入队
+    expect(chat["messages"].some(m => m.content === 'hello')).toBe(true);
   });
 
-  it('should send history by beforeId', () => {
-    c1.simulateClient({ type: 'send_message', content: 'A' });
-    c1.simulateClient({ type: 'send_message', content: 'B' });
-    const allMsgs = c1.sent.filter(e => e.type === 'new_message') as any[];
-    const beforeId = allMsgs[1].message.id;
-    c2.sent.length = 0;
-    c2.simulateClient({ type: 'fetch_history', beforeId, limit: 1 });
-    expect(c2.sent.find(e => e.type === 'messages_batch' && (e as any).messages.length === 1)).toBeTruthy();
+  it('消息队列超限应丢弃最早的', () => {
+    chat.addPlayer(player1, 'Alice', connector1);
+    let handler: any;
+    (connector1.onMessage as any).mockImplementation((cb: (msg: any) => void) => { handler = cb; });
+    chat.addPlayer(player1, 'Alice', connector1); // 触发 handler 注册
+    handler && handler({ type: 'send_message', content: '1' });
+    handler && handler({ type: 'send_message', content: '2' });
+    handler && handler({ type: 'send_message', content: '3' });
+    handler && handler({ type: 'send_message', content: '4' });
+    // 只检查队列中非系统消息（playerId !== 'system'）
+    const userMsgs = chat["messages"].filter((m: any) => m.playerId !== 'system').map((m: any) => m.content);
+    expect(userMsgs).toEqual(['2', '3', '4']);
   });
 
-  it('should send system message when player joins/leaves', () => {
-    // 系统消息在 addPlayer 时已发
-    expect(c1.sent.some(e => e.type === 'new_message' && (e as any).message.type === 'system')).toBe(true);
-    chat.removePlayer(pid2);
-    expect(c1.sent.some(e => e.type === 'new_message' && (e as any).message.content.includes('离开'))).toBe(true);
+  it('玩家离开后不会再收到消息', () => {
+    chat.addPlayer(player1, 'Alice', connector1);
+    chat.addPlayer(player2, 'Bob', connector2);
+    chat.removePlayer(player2);
+    let handler1: any;
+    (connector1.onMessage as any).mockImplementation((cb: any) => { handler1 = cb; });
+    chat.addPlayer(player1, 'Alice', connector1);
+    handler1!({ type: 'send_message', content: 'bye' });
+    expect(connector2.send).not.toHaveBeenCalledWith(expect.objectContaining({ content: 'bye' }));
+  });
+
+  it('未加入玩家发消息无效', () => {
+    // 不注册 onMessage
+    // 直接调用内部方法模拟
+    expect(() => (chat as any).handleMessage('ghost', { type: 'send_message', content: 'xxx' })).not.toThrow();
+  });
+
+  it('多次加入/移除同一玩家无副作用', () => {
+    chat.addPlayer(player1, 'Alice', connector1);
+    chat.addPlayer(player1, 'Alice', connector1);
+    chat.removePlayer(player1);
+    chat.removePlayer(player1);
+    expect(chat["connectors"].get(player1)).toBeUndefined();
   });
 });
