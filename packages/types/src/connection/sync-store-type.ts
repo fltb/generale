@@ -84,7 +84,10 @@ export type SyncedStateServerStateUpdatePayload<T> =
 
 export enum SyncedStateServerEventType {
     STATE_UPDATE = "state-update",
-    ACTION_RESULT = "action-result"
+    ACTION_RESULT = "action-result",
+    KICKED = "kicked",
+    DISBANDED = "disbanded",
+    GAME_STARTED = "game-started"
 }
 
 export type SyncedStateServerEvent<T> = {

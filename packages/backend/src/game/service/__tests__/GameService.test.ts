@@ -1,331 +1,408 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { GameService, GameServiceConfig } from '../GameService';
-import { PlayerId } from '@generale/types';
-import { createMockPlayer, waitForAsync, createTestGameSettings } from './test-utils';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { GameService, GameServiceConfig, GamePhase } from '../GameService';
+import { GameId, PlayerId } from '@generale/types';
 
-// Local type definition for testing
-type GameId = string;
+// Mock the websocket plugin
+vi.mock('../../../plugins/websocket', () => ({
+  registerDomainHandler: vi.fn(),
+  unregisterDomainHandler: vi.fn(),
+  DomainHandler: {}
+}));
+
+// Mock PreGameInstance
+vi.mock('../../instance/PreGameInstance', () => ({
+  PreGameInstance: vi.fn().mockImplementation(() => ({
+    getState: vi.fn().mockReturnValue({
+      gameId: 'test-game',
+      hostId: 'player1',
+      players: [
+        { id: 'player1', name: 'Player 1', ready: true },
+        { id: 'player2', name: 'Player 2', ready: true }
+      ],
+      gameSetting: { speed: 1.0, tileGrowth: 1, tileConsume: 1 },
+      mapSetting: { type: 'random', width: 20, height: 20, tileFrequency: {} },
+      teamCount: 2,
+      playerLimit: 8,
+      started: false
+    }),
+    addPlayer: vi.fn().mockReturnValue(true),
+    destroy: vi.fn()
+  }))
+}));
+
+// Mock GameInstance
+vi.mock('../../instance/GameInstance', () => ({
+  GameInstance: vi.fn().mockImplementation(() => ({
+    getState: vi.fn().mockReturnValue({
+      status: 'Playing',
+      players: []
+    })
+  }))
+}));
+
+// Mock GameChatInstance
+vi.mock('../../instance/GameChatInstance', () => ({
+  GameChatInstance: vi.fn().mockImplementation(() => ({
+    addPlayer: vi.fn(),
+    removePlayer: vi.fn(),
+    sendMessage: vi.fn()
+  }))
+}));
 
 describe('GameService', () => {
-    let gameService: GameService;
-    let config: GameServiceConfig;
+  let gameService: GameService;
+  let config: GameServiceConfig;
+  const gameId: GameId = 'test-game-123';
+  const player1Id: PlayerId = 'player1';
+  const player2Id: PlayerId = 'player2';
 
+  beforeEach(() => {
+    config = {
+      gameId,
+      maxPlayers: 4,
+      chatMaxMessages: 100
+    };
+    gameService = new GameService(config);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('初始化', () => {
+    it('应该正确初始化 GameService', () => {
+      expect(gameService.getGameId()).toBe(gameId);
+      expect(gameService.getPhase()).toBe(GamePhase.PREGAME);
+      expect(gameService.getPlayerCount()).toBe(0);
+      expect(gameService.getPlayers()).toEqual([]);
+    });
+
+    it('应该使用默认配置', () => {
+      const minimalConfig = { gameId: 'test' };
+      const service = new GameService(minimalConfig);
+      expect(service.getGameId()).toBe('test');
+    });
+  });
+
+  describe('玩家连接管理', () => {
+    it('错误阶段尝试建立错误 sub-connector 应返回错误', () => {
+      const sendToConnectionMock = vi.spyOn(gameService as any, 'sendToConnection');
+      const playerId = player1Id;
+      const connectionId = 'conn-test';
+      const domainPregame = `pregame-${gameId}`;
+      const domainGame = `game-${gameId}`;
+      const domainChat = `chat-${gameId}`;
+
+      // 1. INGAME 阶段尝试 pregame
+      gameService.onOpen(connectionId, { playerId, playerName: 'Player 1' });
+      gameService.startGame();
+      sendToConnectionMock.mockClear();
+      const res1 = gameService.handleSubConnectorOpen(domainPregame, connectionId);
+      expect(res1).toBe(false);
+      expect(sendToConnectionMock).toHaveBeenCalledWith(connectionId, domainPregame, expect.objectContaining({ error: 'SUBCONNECTOR_PHASE_MISMATCH' }));
+
+      // 2. PREGAME 阶段尝试 game
+      gameService = new GameService(config);
+      const sendToConnectionMock2 = vi.spyOn(gameService as any, 'sendToConnection');
+      const conn2 = 'conn-2';
+      gameService.onOpen(conn2, { playerId, playerName: 'Player 1' });
+      const res2 = gameService.handleSubConnectorOpen(domainGame, conn2);
+      expect(res2).toBe(false);
+      expect(sendToConnectionMock2).toHaveBeenCalledWith(conn2, domainGame, expect.objectContaining({ error: 'SUBCONNECTOR_PHASE_MISMATCH' }));
+
+      // 3. ENDED 阶段尝试 pregame/game
+      gameService = new GameService(config);
+      const sendToConnectionMock3 = vi.spyOn(gameService as any, 'sendToConnection');
+      const conn3 = 'conn-3';
+      gameService.onOpen(conn3, { playerId, playerName: 'Player 1' });
+      (gameService as any).phase = GamePhase.ENDED;
+      const res3a = gameService.handleSubConnectorOpen(domainPregame, conn3);
+      expect(res3a).toBe(false);
+      expect(sendToConnectionMock3).toHaveBeenCalledWith(conn3, domainPregame, expect.objectContaining({ error: 'SUBCONNECTOR_PHASE_MISMATCH' }));
+      const res3b = gameService.handleSubConnectorOpen(domainGame, conn3);
+      expect(res3b).toBe(false);
+      expect(sendToConnectionMock3).toHaveBeenCalledWith(conn3, domainGame, expect.objectContaining({ error: 'SUBCONNECTOR_PHASE_MISMATCH' }));
+
+      // 4. DISBANDED 阶段尝试任何域名
+      gameService = new GameService(config);
+      const sendToConnectionMock4 = vi.spyOn(gameService as any, 'sendToConnection');
+      const conn4 = 'conn-4';
+      gameService.onOpen(conn4, { playerId, playerName: 'Player 1' });
+      (gameService as any).phase = GamePhase.DISBANDED;
+      const res4a = gameService.handleSubConnectorOpen(domainPregame, conn4);
+      const res4b = gameService.handleSubConnectorOpen(domainGame, conn4);
+      const res4c = gameService.handleSubConnectorOpen(domainChat, conn4);
+      expect(res4a).toBe(false);
+      expect(res4b).toBe(false);
+      expect(res4c).toBe(false);
+      expect(sendToConnectionMock4).toHaveBeenCalledWith(conn4, domainPregame, expect.objectContaining({ error: 'SUBCONNECTOR_PHASE_MISMATCH' }));
+      expect(sendToConnectionMock4).toHaveBeenCalledWith(conn4, domainGame, expect.objectContaining({ error: 'SUBCONNECTOR_PHASE_MISMATCH' }));
+      expect(sendToConnectionMock4).toHaveBeenCalledWith(conn4, domainChat, expect.objectContaining({ error: 'SUBCONNECTOR_PHASE_MISMATCH' }));
+    });
+
+    it('玩家在 pregame 阶段建立连接，应建立 pregame 和 chat connector', () => {
+      const connectionId = 'conn-pregame';
+      const playerId = player1Id;
+      const playerName = 'Player 1';
+      gameService.onOpen(connectionId, { playerId, playerName });
+      const playerConnection = (gameService as any).players.get(playerId);
+      expect(playerConnection.pregameConnector).toBeDefined();
+      expect(playerConnection.chatConnector).toBeDefined();
+      expect(playerConnection.gameConnector).toBeUndefined();
+    });
+
+    it('玩家在 game 阶段建立连接，应建立 game 和 chat connector', () => {
+      // 先进入 pregame 阶段并添加玩家
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      gameService.onOpen('conn-2', { playerId: player2Id, playerName: 'Player 2' });
+      gameService.startGame();
+      // 新玩家尝试在 game 阶段建立连接
+      const connectionId = 'conn-game';
+      const playerId = 'player3';
+      const playerName = 'Player 3';
+      gameService.onOpen(connectionId, { playerId, playerName });
+      const playerConnection = (gameService as any).players.get(playerId);
+      expect(playerConnection.gameConnector).toBeDefined();
+      expect(playerConnection.chatConnector).toBeDefined();
+      expect(playerConnection.pregameConnector).toBeUndefined();
+    });
+    it('应该处理玩家连接', () => {
+      const connectionId = 'conn-123';
+      
+      // 模拟玩家连接
+      gameService.onOpen(connectionId, { playerId: player1Id, playerName: 'Player 1' });
+      
+      expect(gameService.hasPlayer(player1Id)).toBe(true);
+      expect(gameService.getPlayerCount()).toBe(1);
+      expect(gameService.getPlayers()).toContain(player1Id);
+    });
+
+    it('应该处理多个玩家连接', () => {
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      gameService.onOpen('conn-2', { playerId: player2Id, playerName: 'Player 2' });
+      
+      expect(gameService.getPlayerCount()).toBe(2);
+      expect(gameService.hasPlayer(player1Id)).toBe(true);
+      expect(gameService.hasPlayer(player2Id)).toBe(true);
+    });
+
+    it('应该处理连接关闭', () => {
+      const connectionId = 'conn-123';
+      gameService.onOpen(connectionId, { playerId: player1Id, playerName: 'Player 1' });
+      
+      expect(gameService.hasPlayer(player1Id)).toBe(true);
+      
+      gameService.onClose(connectionId);
+      
+      expect(gameService.hasPlayer(player1Id)).toBe(false);
+      expect(gameService.getPlayerCount()).toBe(0);
+    });
+  });
+
+  describe('游戏阶段管理', () => {
     beforeEach(() => {
-        config = {
-            maxPlayersPerGame: 4,
-            gameTimeout: 300000, // 5 minutes
-            heartbeatInterval: 30000 // 30 seconds
-        };
-        gameService = new GameService(config);
+      // 添加玩家到游戏
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      gameService.onOpen('conn-2', { playerId: player2Id, playerName: 'Player 2' });
     });
 
-    afterEach(() => {
-        gameService.destroy();
+    it('应该能够开始游戏', () => {
+      expect(gameService.getPhase()).toBe(GamePhase.PREGAME);
+      
+      gameService.startGame();
+      
+      expect(gameService.getPhase()).toBe(GamePhase.INGAME);
     });
 
-    describe('Player Connection Management', () => {
-        it('should connect a player successfully', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-
-            await gameService.connectPlayer(playerId, ws as any);
-
-            expect(ws.subscribers).toContain(`player-${playerId}`);
-        });
-
-        it('should disconnect existing connection when player reconnects', async () => {
-            const { playerId, ws: ws1 } = createMockPlayer('player1' as PlayerId);
-            const { ws: ws2 } = createMockPlayer('player1' as PlayerId);
-
-            await gameService.connectPlayer(playerId, ws1 as any);
-            await gameService.connectPlayer(playerId, ws2 as any);
-
-            // First connection should be replaced
-            expect(ws2.subscribers).toContain(`player-${playerId}`);
-        });
-
-        it('should handle player disconnect', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-
-            await gameService.connectPlayer(playerId, ws as any);
-            ws.simulateClose();
-
-            await waitForAsync(100);
-            // Connection should be marked for cleanup
-        });
+    it('应该只能从 PREGAME 阶段开始游戏', () => {
+      gameService.startGame();
+      expect(gameService.getPhase()).toBe(GamePhase.INGAME);
+      
+      // 尝试再次开始游戏应该失败
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      gameService.startGame();
+      expect(consoleSpy).toHaveBeenCalled();
+      
+      consoleSpy.mockRestore();
     });
 
-    describe('Game Creation and Management', () => {
-        it('should create a new game successfully', async () => {
-            const { playerId, ws } = createMockPlayer('host' as PlayerId);
-            const settings = createTestGameSettings();
-
-            await gameService.connectPlayer(playerId, ws as any);
-            const gameId = await gameService.createGame(playerId, settings);
-
-            expect(gameId).toBeDefined();
-            expect(typeof gameId).toBe('string');
-            expect(gameId.startsWith('game_')).toBe(true);
-
-            // Should have created pregame and chat sub connectors
-            const pregameMessages = ws.getMessagesByDomain('pregame');
-            const chatMessages = ws.getMessagesByDomain('chat');
-            
-            expect(pregameMessages.length).toBeGreaterThan(0);
-            expect(chatMessages.length).toBeGreaterThan(0);
-        });
-
-        it('should allow players to join a game', async () => {
-            const { playerId: hostId, ws: hostWs } = createMockPlayer('host' as PlayerId);
-            const { playerId: playerId, ws: playerWs } = createMockPlayer('player1' as PlayerId);
-            const settings = createTestGameSettings();
-
-            // Host creates game
-            await gameService.connectPlayer(hostId, hostWs as any);
-            const gameId = await gameService.createGame(hostId, settings);
-
-            // Player joins game
-            await gameService.connectPlayer(playerId, playerWs as any);
-            await gameService.joinGame(playerId, gameId);
-
-            // Both players should receive updates
-            const hostPregameMessages = hostWs.getMessagesByDomain('pregame');
-            const playerPregameMessages = playerWs.getMessagesByDomain('pregame');
-            
-            expect(hostPregameMessages.length).toBeGreaterThan(0);
-            expect(playerPregameMessages.length).toBeGreaterThan(0);
-        });
-
-        it('should reject joining full game', async () => {
-            const { playerId: hostId, ws: hostWs } = createMockPlayer('host' as PlayerId);
-            const settings = { ...createTestGameSettings(), maxPlayers: 2 };
-
-            await gameService.connectPlayer(hostId, hostWs as any);
-            const gameId = await gameService.createGame(hostId, settings);
-
-            // Fill the game
-            const { playerId: player1Id, ws: player1Ws } = createMockPlayer('player1' as PlayerId);
-            await gameService.connectPlayer(player1Id, player1Ws as any);
-            await gameService.joinGame(player1Id, gameId);
-
-            // Try to add one more player (should fail)
-            const { playerId: player2Id, ws: player2Ws } = createMockPlayer('player2' as PlayerId);
-            await gameService.connectPlayer(player2Id, player2Ws as any);
-            
-            await expect(gameService.joinGame(player2Id, gameId)).rejects.toThrow('Game is full');
-        });
-
-        it('should reject joining non-existent game', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-            const fakeGameId = 'fake_game_id' as GameId;
-
-            await gameService.connectPlayer(playerId, ws as any);
-            
-            await expect(gameService.joinGame(playerId, fakeGameId)).rejects.toThrow('Game not found');
-        });
+    it('应该能够结束游戏', () => {
+      gameService.startGame();
+      expect(gameService.getPhase()).toBe(GamePhase.INGAME);
+      
+      const result = { winner: 'player1' };
+      gameService.endGame(result);
+      
+      expect(gameService.getPhase()).toBe(GamePhase.ENDED);
     });
 
-    describe('Game Phase Transitions', () => {
-        it('should transition from pregame to game phase', async () => {
-            const { playerId: hostId, ws: hostWs } = createMockPlayer('host' as PlayerId);
-            const { playerId: playerId, ws: playerWs } = createMockPlayer('player1' as PlayerId);
-            const settings = createTestGameSettings();
-
-            // Setup game with 2 players
-            await gameService.connectPlayer(hostId, hostWs as any);
-            const gameId = await gameService.createGame(hostId, settings);
-            
-            await gameService.connectPlayer(playerId, playerWs as any);
-            await gameService.joinGame(playerId, gameId);
-
-            // Clear previous messages
-            hostWs.clearMessages();
-            playerWs.clearMessages();
-
-            // Simulate player ready and game start
-            // This would normally be triggered by PreGameInstance
-            // For testing, we'll simulate the internal flow
-            
-            // The actual game start would be triggered by PreGameInstance
-            // when all players are ready
-        });
+    it('应该只能从 INGAME 阶段结束游戏', () => {
+      expect(gameService.getPhase()).toBe(GamePhase.PREGAME);
+      
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      gameService.endGame();
+      expect(consoleSpy).toHaveBeenCalled();
+      expect(gameService.getPhase()).toBe(GamePhase.PREGAME);
+      
+      consoleSpy.mockRestore();
     });
 
-    describe('Reconnection Handling', () => {
-        it('should handle player reconnection to existing game', async () => {
-            const { playerId, ws: ws1 } = createMockPlayer('player1' as PlayerId);
-            const settings = createTestGameSettings();
+    it('应该能够解散游戏', () => {
+      gameService.disbandGame();
+      
+      expect(gameService.getPhase()).toBe(GamePhase.DISBANDED);
+      expect(gameService.getPlayerCount()).toBe(0);
+    });
+  });
 
-            // Create game
-            await gameService.connectPlayer(playerId, ws1 as any);
-            const gameId = await gameService.createGame(playerId, settings);
-            expect(gameId).toBeDefined();
-
-            // Simulate disconnect
-            ws1.simulateClose();
-            await waitForAsync(100);
-
-            // Reconnect with new WebSocket
-            const { ws: ws2 } = createMockPlayer('player1' as PlayerId);
-            await gameService.connectPlayer(playerId, ws2 as any);
-
-            // Should rejoin the existing game
-            const pregameMessages = ws2.getMessagesByDomain('pregame');
-            const chatMessages = ws2.getMessagesByDomain('chat');
-            
-            expect(pregameMessages.length).toBeGreaterThan(0);
-            expect(chatMessages.length).toBeGreaterThan(0);
-        });
+  describe('事件回调', () => {
+    it('应该触发游戏开始回调', () => {
+      const onGameStartCallback = vi.fn();
+      gameService.onGameStart(onGameStartCallback);
+      
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      gameService.startGame();
+      
+      expect(onGameStartCallback).toHaveBeenCalled();
     });
 
-    describe('SubConnector Management', () => {
-        it('should create and manage sub connectors correctly', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-            const settings = createTestGameSettings();
-
-            await gameService.connectPlayer(playerId, ws as any);
-            const gameId = await gameService.createGame(playerId, settings);
-            expect(gameId).toBeDefined();
-
-            // Should have created pregame and chat connectors
-            const pregameMessages = ws.getMessagesByDomain('pregame');
-            const chatMessages = ws.getMessagesByDomain('chat');
-            
-            expect(pregameMessages.length).toBeGreaterThan(0);
-            expect(chatMessages.length).toBeGreaterThan(0);
-        });
-
-        it('should clean up sub connectors on disconnect', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-            const settings = createTestGameSettings();
-
-            await gameService.connectPlayer(playerId, ws as any);
-            await gameService.createGame(playerId, settings);
-
-            // Simulate disconnect
-            ws.simulateClose();
-            await waitForAsync(100);
-
-            // Connectors should be cleaned up
-            // (This is verified by the absence of errors and proper cleanup)
-        });
+    it('应该触发游戏结束回调', () => {
+      const onGameEndCallback = vi.fn();
+      const result = { winner: 'player1' };
+      
+      gameService.onGameEnd(onGameEndCallback);
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      gameService.startGame();
+      gameService.endGame(result);
+      
+      expect(onGameEndCallback).toHaveBeenCalledWith(result);
     });
 
-    describe('Message Routing', () => {
-        it('should route messages to correct sub connectors', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-            const settings = createTestGameSettings();
+    it('应该触发游戏解散回调', () => {
+      const onDisbandCallback = vi.fn();
+      gameService.onDisband(onDisbandCallback);
+      
+      gameService.disbandGame();
+      
+      expect(onDisbandCallback).toHaveBeenCalled();
+    });
+  });
 
-            await gameService.connectPlayer(playerId, ws as any);
-            await gameService.createGame(playerId, settings);
-
-            // Clear previous messages
-            ws.clearMessages();
-
-            // Simulate incoming message for pregame domain
-            const pregameMessage = {
-                domain: 'pregame',
-                type: 'UPDATE_SETTINGS',
-                payload: { key: 'mapSize', value: 'large' }
-            };
-
-            ws.simulateMessage(pregameMessage);
-            await waitForAsync(10);
-
-            // Message should be processed by pregame instance
-            // (Actual verification would depend on PreGameInstance implementation)
-        });
-
-        it('should ignore messages for unknown domains', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-
-            await gameService.connectPlayer(playerId, ws as any);
-
-            // Simulate message for unknown domain
-            const unknownMessage = {
-                domain: 'unknown',
-                type: 'SOME_ACTION',
-                payload: {}
-            };
-
-            // Should not throw error
-            expect(() => ws.simulateMessage(unknownMessage)).not.toThrow();
-        });
+  describe('消息处理', () => {
+    beforeEach(() => {
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
     });
 
-    describe('Heartbeat and Timeout', () => {
-        it('should update heartbeat on message', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-
-            await gameService.connectPlayer(playerId, ws as any);
-
-            const message = {
-                domain: 'pregame',
-                type: 'SYNC_REQUEST',
-                payload: {}
-            };
-
-            ws.simulateMessage(message);
-            
-            // Heartbeat should be updated (verified internally)
-        });
-
-        it('should handle heartbeat timeout', async () => {
-            // This test would require mocking timers
-            // and is more complex to implement properly
-            // For now, just verify the test structure
-            expect(true).toBe(true);
-        });
+    it('应该处理来自已知连接的消息', () => {
+      const payload = {
+        domain: 'pregame',
+        data: { type: 'ready', playerId: player1Id }
+      };
+      
+      const result = gameService.onMessage('conn-1', payload);
+      
+      // 消息应该被处理（不返回错误）
+      expect(result).toBeUndefined();
     });
 
-    describe('Resource Cleanup', () => {
-        it('should clean up resources on destroy', () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-            
-            gameService.connectPlayer(playerId, ws as any);
-            
-            // Should not throw
-            expect(() => gameService.destroy()).not.toThrow();
-        });
+    it('应该拒绝来自未知连接的消息', () => {
+      const payload = { domain: 'pregame', data: { type: 'ready' } };
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      gameService.onMessage('unknown-conn', payload);
+      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Unknown connection')
+      );
+      
+      consoleSpy.mockRestore();
+    });
+  });
 
-        it('should clean up empty games', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-            const settings = createTestGameSettings();
-
-            await gameService.connectPlayer(playerId, ws as any);
-            const gameId = await gameService.createGame(playerId, settings);
-            expect(gameId).toBeDefined();
-
-            // Disconnect the only player
-            ws.simulateClose();
-            await waitForAsync(100);
-
-            // Game should eventually be cleaned up
-            // (This would be verified by checking internal state)
-        });
+  describe('游戏状态查询', () => {
+    it('应该返回正确的游戏状态', () => {
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      
+      const gameState = gameService.getGameState();
+      
+      expect(gameState).toEqual({
+        gameId,
+        phase: GamePhase.PREGAME,
+        playerCount: 1,
+        players: [player1Id],
+        preGameState: expect.any(Object),
+        gameState: undefined
+      });
     });
 
-    describe('Error Handling', () => {
-        it('should handle malformed messages gracefully', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-
-            await gameService.connectPlayer(playerId, ws as any);
-
-            // Send malformed message
-            expect(() => ws.simulateMessage(null)).not.toThrow();
-            expect(() => ws.simulateMessage(undefined)).not.toThrow();
-            expect(() => ws.simulateMessage({})).not.toThrow();
-        });
-
-        it('should handle WebSocket errors gracefully', async () => {
-            const { playerId, ws } = createMockPlayer('player1' as PlayerId);
-
-            await gameService.connectPlayer(playerId, ws as any);
-
-            // Simulate WebSocket error
-            ws.readyState = 3; // WebSocket.CLOSED
-            
-            // Should handle gracefully - expect error when sending to closed socket
-            expect(() => ws.send('test')).toThrow();
-        });
+    it('应该在游戏开始后返回游戏实例状态', () => {
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      gameService.startGame();
+      
+      const gameState = gameService.getGameState();
+      
+      expect(gameState.phase).toBe(GamePhase.INGAME);
+      expect(gameState.gameState).toBeDefined();
+      expect(gameState.preGameState).toBeUndefined();
     });
+  });
+
+  describe('连接生命周期', () => {
+    it('应该处理连接断开', () => {
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      expect(gameService.hasPlayer(player1Id)).toBe(true);
+      
+      gameService.onDisconnect('conn-1');
+      
+      // 连接断开不应该立即移除玩家（可能重连）
+      expect(gameService.hasPlayer(player1Id)).toBe(true);
+    });
+
+    it('应该处理连接重连', () => {
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      gameService.onDisconnect('conn-1');
+      
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      gameService.onReconnect('conn-1');
+      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Connection reconnected')
+      );
+      
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('边界情况', () => {
+    it('应该处理空的玩家连接配置', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      gameService.onOpen('conn-1', {});
+      
+      expect(gameService.getPlayerCount()).toBe(0);
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('应该处理重复的玩家连接', () => {
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      gameService.onOpen('conn-2', { playerId: player1Id, playerName: 'Player 1' });
+      
+      // 应该只有一个玩家实例
+      expect(gameService.getPlayerCount()).toBe(1);
+    });
+
+    it('应该处理游戏已解散后的连接尝试', () => {
+      gameService.disbandGame();
+      
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      gameService.onOpen('conn-1', { playerId: player1Id, playerName: 'Player 1' });
+      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Game ended, rejecting connection')
+      );
+      
+      consoleSpy.mockRestore();
+    });
+  });
 });

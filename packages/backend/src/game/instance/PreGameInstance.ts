@@ -1,508 +1,315 @@
 import {
-    PlayerId,
-    GameId,
-    SyncedStateServerEvent,
-    SyncedStateServerEventType,
-    SyncedStateServerStateUpdatePayloadType,
-    ServerSyncConnector
+  PlayerId,
+  PreGameRoomState,
+  SyncedPreGameClientActions,
+  SyncedPreGameServerEvent,
+  SyncedPreGameClientActionTypes,
+  SyncedPreGameServerEventType,
+  SyncedPreGameServerStateUpdatePayloadType,
+  ServerSyncConnector,
+  SyncedPreGameState,
 } from '@generale/types';
 import { compare } from 'fast-json-patch';
 
-export interface PreGameSettings {
-    mapSize: 'small' | 'medium' | 'large';
-    maxPlayers: number;
-    gameMode: 'classic' | 'blitz' | 'custom';
-    timeLimit?: number;
-    customRules?: Record<string, any>;
-}
-
-export interface PlayerStatus {
-    playerId: PlayerId;
-    name: string;
-    isReady: boolean;
-    isHost: boolean;
-    joinedAt: number;
-}
-
-export interface PreGameState {
-    gameId: GameId;
-    status: 'waiting' | 'starting' | 'cancelled';
-    settings: PreGameSettings;
-    players: Map<PlayerId, PlayerStatus>;
-    hostId: PlayerId;
-    version: number;
-    canStart: boolean; // 是否满足开始游戏的条件
-}
-
-export interface PreGameClientAction {
-    type: 'UPDATE_SETTINGS' | 'TOGGLE_READY' | 'KICK_PLAYER' | 'START_GAME' | 'SYNC_REQUEST';
-    payload?: any;
-    optimisticId?: number;
-}
-
-export interface PreGameConnectorManager {
-    createSubConnector: (playerId: PlayerId) => Promise<ServerSyncConnector<PreGameClientAction, SyncedStateServerEvent<PreGameState>>>;
-    removeSubConnector: (playerId: PlayerId) => Promise<void>;
-    onGameStart: (settings: PreGameSettings, players: PlayerId[]) => Promise<void>;
-}
+// 类型别名，便于引用
+export type PreGameServerConnector = ServerSyncConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>;
 
 /**
- * PreGameInstance - 游戏前准备阶段管理器
- * 
- * 职责：
- * 1. 管理房间设置（仅房主可修改）
- * 2. 管理玩家准备状态
- * 3. 处理玩家加入/退出
- * 4. 房主转移逻辑
- * 5. 开始游戏条件检查
+ * PreGameInstance - 游戏房间阶段实例
+ * 负责房主、设置、准备、队伍、同步等管理
  */
 export class PreGameInstance {
-    private state: PreGameState;
-    private connectors = new Map<PlayerId, ServerSyncConnector<PreGameClientAction, SyncedStateServerEvent<PreGameState>>>();
-    private connectorManager: PreGameConnectorManager;
-    private startGameTimer?: NodeJS.Timeout;
+  private state: PreGameRoomState;
+  private connectors: Map<PlayerId, PreGameServerConnector> = new Map();
+  private prevSentState: Map<PlayerId, SyncedPreGameState> = new Map();
+  private version = 0;
+  private destroyed = false;
 
-    constructor(
-        gameId: GameId,
-        hostId: PlayerId,
-        initialSettings: PreGameSettings,
-        connectorManager: PreGameConnectorManager
-    ) {
-        this.connectorManager = connectorManager;
-        
-        this.state = {
-            gameId,
-            status: 'waiting',
-            settings: { ...initialSettings },
-            players: new Map(),
-            hostId,
-            version: 0,
-            canStart: false
-        };
+  constructor(initialState: PreGameRoomState, initialConnectors: Map<PlayerId, PreGameServerConnector>) {
+    this.state = structuredClone(initialState);
+    this.connectors = new Map(initialConnectors);
 
-        // 添加房主
-        this.state.players.set(hostId, {
-            playerId: hostId,
-            name: `Player_${hostId}`, // 实际应该从用户系统获取
-            isReady: false,
-            isHost: true,
-            joinedAt: Date.now()
-        });
+    for (const [pid, conn] of this.connectors) {
+      conn.onOpen(() => this.sendState(pid, true));
+      conn.onDisconnect(() => this.removePlayer(pid));
+      conn.onReconnect(() => this.sendState(pid, true));
+      conn.onClientMessage(evt => this.handleClientAction(pid, evt));
+      conn.onClose(() => this.connectors.delete(pid));
+    }
+  }
 
-        this.updateCanStart();
+  /** 处理客户端 action */
+  private handleClientAction(pid: PlayerId, evt: SyncedPreGameClientActions) {
+    if (this.destroyed) return;
+    const player = this.state.players.find(p => p.id === pid);
+    if (!player) return;
+    switch (evt.type) {
+      case SyncedPreGameClientActionTypes.READY:
+        this.setReady(pid, true); break;
+      case SyncedPreGameClientActionTypes.UNREADY:
+        this.setReady(pid, false); break;
+      case SyncedPreGameClientActionTypes.CHANGE_SETTING:
+        this.changeSetting(pid, evt.payload); break;
+      case SyncedPreGameClientActionTypes.CHANGE_MAP:
+        this.changeMap(pid, evt.payload); break;
+      case SyncedPreGameClientActionTypes.CHANGE_TEAM:
+        this.changeTeam(pid, evt.payload.teamId); break;
+      case SyncedPreGameClientActionTypes.KICK_PLAYER:
+        this.kickPlayer(evt.payload.playerId); break;
+      case SyncedPreGameClientActionTypes.LEAVE_ROOM:
+        this.removePlayer(pid); break;
+      case SyncedPreGameClientActionTypes.START_GAME:
+        this.tryStartGame(pid); break;
+      case SyncedPreGameClientActionTypes.TRANSFER_HOST:
+        this.transferHost(pid, evt.payload.newHostId); break;
+      case SyncedPreGameClientActionTypes.DISBAND_ROOM:
+        this.disbandRoom(pid); break;
+      default:
+        // ignore
+        break;
+    }
+    this.version++;
+    this.broadcastState();
+  }
+
+  /** 设置准备状态 */
+  private setReady(pid: PlayerId, ready: boolean) {
+    const p = this.state.players.find(p => p.id === pid);
+    if (p && !p.isHost) p.ready = ready ? 1 : 0;
+  }
+
+  /** 修改房间设置（仅房主） */
+  private changeSetting(pid: PlayerId, patch: Partial<PreGameRoomState['gameSetting']>) {
+    if (pid !== this.state.hostId) return;
+    Object.assign(this.state.gameSetting, patch);
+  }
+
+  /** 修改地图设置（仅房主） */
+  private changeMap(pid: PlayerId, mapSetting: PreGameRoomState['mapSetting']) {
+    if (pid !== this.state.hostId) return;
+    this.state.mapSetting = mapSetting;
+  }
+
+  /** 换队 */
+  private changeTeam(pid: PlayerId, teamId: string) {
+    const p = this.state.players.find(p => p.id === pid);
+    if (p) p.teamId = teamId;
+  }
+
+  /** 踢人（仅房主） */
+  private kickPlayer(target: PlayerId) {
+    this.sendKickEvent(target, 'You have been kicked from the room.');
+    this.removePlayer(target);
+  }
+
+  private sendKickEvent(pid: PlayerId, reason: string) {
+    this.connectors.get(pid)?.send({
+      type: SyncedPreGameServerEventType.KICKED,
+      payload: { reason }
+    });
+  }
+
+  /** 离开房间/断开 */
+  private removePlayer(pid: PlayerId) {
+    this.connectors.get(pid)?.close();
+    this.connectors.delete(pid);
+    this.state.players = this.state.players.filter(p => p.id !== pid);
+    // 如果房主离开，自动转让
+    if (this.state.hostId === pid) {
+      this.autoTransferHost();
+    }
+    // 如果没人了，自动销毁
+    if (this.state.players.length === 0) this.destroy();
+  }
+
+  /** 房主转让 */
+  private transferHost(pid: PlayerId, newHostId: PlayerId) {
+    if (pid !== this.state.hostId) return;
+    const newHost = this.state.players.find(p => p.id === newHostId);
+    if (!newHost) return;
+    this.state.players.forEach(p => (p.isHost = false));
+    newHost.isHost = true;
+    this.state.hostId = newHostId;
+  }
+
+  /** 自动转让房主 */
+  private autoTransferHost() {
+    const candidate = this.state.players[0];
+    if (candidate) {
+      candidate.isHost = true;
+      this.state.hostId = candidate.id;
+    }
+  }
+
+  /** 解散房间（仅房主） */
+  private disbandRoom(pid: PlayerId) {
+    if (pid !== this.state.hostId) return;
+    for (const [_pid, conn] of this.connectors) {
+      conn.send({
+        type: SyncedPreGameServerEventType.DISBANDED,
+        payload: { reason: 'Room has been disbanded.' }
+      });
+      conn.close();
+    }
+    this.destroy();
+  }
+
+  /** 检查是否可开始游戏并广播 */
+  private tryStartGame(pid: PlayerId) {
+    if (pid !== this.state.hostId) return;
+    if (!this.canStart()) return;
+    // 可扩展: 通知 GameService 切换为正式游戏阶段
+    this.state.started = true;
+    // 广播游戏开始事件
+    const startedAt = Date.now();
+    for (const conn of this.connectors.values()) {
+      conn.send({
+        type: SyncedPreGameServerEventType.GAME_STARTED,
+        payload: { startedAt }
+      });
+    }
+  }
+
+  /** 判断是否所有非房主都准备好且人数足够 */
+  private canStart(): boolean {
+    const readyPlayers = this.state.players.filter(p => !p.isHost && p.ready === 1);
+    return (
+      this.state.players.length >= 2 &&
+      readyPlayers.length === this.state.players.length - 1
+    );
+  }
+
+  /** 全量同步/patch同步 */
+  private sendState(pid: PlayerId, forceSnapshot = false) {
+    const conn = this.connectors.get(pid);
+    if (!conn) return;
+    const prev = this.prevSentState.get(pid);
+    const foundSelf = this.state.players.find(p => p.id === pid);
+    const curr: SyncedPreGameState = foundSelf
+      ? { room: this.state, selfId: pid, self: foundSelf }
+      : { room: this.state, selfId: pid };
+
+    const confirmedOp = 0; // 预留字段（可后续实现op确认）
+    if (!prev || forceSnapshot) {
+      conn.send({
+        type: SyncedPreGameServerEventType.STATE_UPDATE,
+        payload: {
+          type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
+          version: this.version,
+          confirmedOp,
+          payload: curr,
+        },
+      });
+      this.prevSentState.set(pid, structuredClone(curr));
+      return;
+    }
+    const patches = compare(prev, curr);
+    if (patches.length > 1000) {
+      conn.send({
+        type: SyncedPreGameServerEventType.STATE_UPDATE,
+        payload: {
+          type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
+          version: this.version,
+          confirmedOp,
+          payload: curr,
+        },
+      });
+    } else {
+      conn.send({
+        type: SyncedPreGameServerEventType.STATE_UPDATE,
+        payload: {
+          type: SyncedPreGameServerStateUpdatePayloadType.PATCH,
+          version: this.version,
+          confirmedOp,
+          payload: patches,
+        },
+      });
+    }
+    this.prevSentState.set(pid, structuredClone(curr));
+  }
+
+  /** 广播同步 */
+  private broadcastState(forceSnapshot = false) {
+    for (const pid of this.connectors.keys()) {
+      this.sendState(pid, forceSnapshot);
+    }
+  }
+
+  /** 主动销毁实例 */
+  public destroy() {
+    this.destroyed = true;
+    for (const [_pid, conn] of this.connectors) conn.close();
+    this.connectors.clear();
+    this.state.players = [];
+  }
+
+  /** 获取当前房间状态 */
+  public getState(): PreGameRoomState {
+    return this.state;
+  }
+
+  /** 动态添加玩家（用于 GameService） */
+  public addPlayer(playerId: PlayerId, playerName: string, connector: PreGameServerConnector): boolean {
+    if (this.destroyed) {
+      console.warn(`[PreGameInstance] Cannot add player to destroyed instance`);
+      return false;
     }
 
-    /**
-     * 添加玩家
-     */
-    async addPlayer(playerId: PlayerId): Promise<void> {
-        if (this.state.players.has(playerId)) {
-            console.warn(`Player ${playerId} already in pregame`);
-            return;
-        }
-
-        if (this.state.players.size >= this.state.settings.maxPlayers) {
-            throw new Error('Game is full');
-        }
-
-        // 添加玩家到状态
-        this.state.players.set(playerId, {
-            playerId,
-            name: `Player_${playerId}`,
-            isReady: false,
-            isHost: false,
-            joinedAt: Date.now()
-        });
-
-        // 创建连接器
-        const connector = await this.connectorManager.createSubConnector(playerId);
-        this.connectors.set(playerId, connector);
-
-        // 设置消息处理
-        connector.onClientMessage((action) => {
-            this.handlePlayerAction(playerId, action);
-        });
-
-        connector.onDisconnect(() => {
-            this.handlePlayerDisconnect(playerId);
-        });
-
-        // 发送初始状态
-        this.sendStateToPlayer(playerId, 'snapshot');
-        
-        // 广播玩家加入事件
-        this.broadcastState('patch');
-        this.updateCanStart();
+    if (this.state.players.length >= this.state.playerLimit) {
+      console.warn(`[PreGameInstance] Room is full, cannot add player ${playerId}`);
+      return false;
     }
 
-    /**
-     * 处理玩家重连
-     */
-    async handlePlayerReconnect(playerId: PlayerId): Promise<void> {
-        if (!this.state.players.has(playerId)) {
-            console.warn(`Player ${playerId} not in pregame, re-adding player`);
-            // 如果玩家不在状态中，重新添加
-            await this.addPlayer(playerId);
-            return;
-        }
-
-        // 重新创建连接器
-        const connector = await this.connectorManager.createSubConnector(playerId);
-        this.connectors.set(playerId, connector);
-
-        // 设置消息处理
-        connector.onClientMessage((action) => {
-            this.handlePlayerAction(playerId, action);
-        });
-
-        connector.onDisconnect(() => {
-            this.handlePlayerDisconnect(playerId);
-        });
-
-        // 发送当前完整状态
-        this.sendStateToPlayer(playerId, 'snapshot');
+    if (this.state.players.find(p => p.id === playerId)) {
+      console.warn(`[PreGameInstance] Player ${playerId} already in room`);
+      return false;
     }
 
-    /**
-     * 处理玩家断开连接
-     */
-    handlePlayerDisconnect(playerId: PlayerId): void {
-        const player = this.state.players.get(playerId);
-        if (!player) return;
-
-        // 如果是房主断开，需要转移房主
-        if (player.isHost) {
-            this.transferHost();
-        }
-
-        // 移除玩家
-        this.state.players.delete(playerId);
-        this.connectors.delete(playerId);
-
-        // 清理连接器
-        this.connectorManager.removeSubConnector(playerId);
-
-        // 广播更新
-        this.broadcastState('patch');
-        this.updateCanStart();
-
-        // 如果没有玩家了，可以考虑销毁实例
-        if (this.state.players.size === 0) {
-            this.destroy();
-        }
+    // 如果是第一个玩家，设为房主
+    const isHost = this.state.players.length === 0;
+    if (isHost) {
+      this.state.hostId = playerId;
     }
 
-    /**
-     * 处理玩家操作
-     */
-    private handlePlayerAction(playerId: PlayerId, action: PreGameClientAction): void {
-        const player = this.state.players.get(playerId);
-        if (!player) {
-            console.warn(`Unknown player ${playerId} sent action`);
-            return;
-        }
+    // 添加玩家到状态
+    this.state.players.push({
+      id: playerId,
+      name: playerName,
+      isHost,
+      ready: isHost ? 1 : 0, // 房主默认准备
+      teamId: 'team1', // 默认队伍
+    });
 
-        try {
-            switch (action.type) {
-                case 'SYNC_REQUEST':
-                    this.handleSyncRequest(playerId, action);
-                    break;
-                    
-                case 'UPDATE_SETTINGS':
-                    this.handleUpdateSettings(playerId, action);
-                    break;
-                    
-                case 'TOGGLE_READY':
-                    this.handleToggleReady(playerId, action);
-                    break;
-                    
-                case 'KICK_PLAYER':
-                    this.handleKickPlayer(playerId, action);
-                    break;
-                    
-                case 'START_GAME':
-                    this.handleStartGame(playerId, action);
-                    break;
-                    
-                default:
-                    console.warn(`Unknown action type: ${action.type}`);
-            }
-        } catch (error) {
-            console.error(`Error handling action ${action.type} from ${playerId}:`, error);
-            
-            // 发送错误响应
-            if (action.optimisticId) {
-                this.sendActionResult(playerId, action.optimisticId, 'failed', (error as Error).message);
-            }
-        }
-    }
+    // 设置连接器
+    this.connectors.set(playerId, connector);
+    
+    // 设置连接器回调
+    connector.onOpen(() => this.sendState(playerId, true));
+    connector.onDisconnect(() => this.removePlayer(playerId));
+    connector.onReconnect(() => this.sendState(playerId, true));
+    connector.onClientMessage(evt => this.handleClientAction(playerId, evt));
+    connector.onClose(() => this.connectors.delete(playerId));
 
-    /**
-     * 处理同步请求
-     */
-    private handleSyncRequest(playerId: PlayerId, action: PreGameClientAction): void {
-        const clientVersion = action.payload?.version || 0;
-        
-        if (clientVersion < this.state.version) {
-            // 发送完整状态
-            this.sendStateToPlayer(playerId, 'snapshot');
-        }
-        
-        if (action.optimisticId) {
-            this.sendActionResult(playerId, action.optimisticId, 'success');
-        }
-    }
+    // 更新版本并广播状态
+    this.version++;
+    this.broadcastState();
 
-    /**
-     * 处理设置更新（仅房主）
-     */
-    private handleUpdateSettings(playerId: PlayerId, action: PreGameClientAction): void {
-        const player = this.state.players.get(playerId);
-        if (!player?.isHost) {
-            throw new Error('Only host can update settings');
-        }
+    console.log(`[PreGameInstance] Player ${playerId} (${playerName}) added to room, isHost: ${isHost}`);
+    return true;
+  }
 
-        const { key, value } = action.payload;
-        if (!(key in this.state.settings)) {
-            throw new Error(`Invalid setting key: ${key}`);
-        }
+  /** 移除玩家（用于 GameService） */
+  public removePlayerById(playerId: PlayerId): void {
+    this.removePlayer(playerId);
+  }
 
-        // 更新设置
-        (this.state.settings as any)[key] = value;
-        this.incrementVersion();
+  /** 获取玩家数量 */
+  public getPlayerCount(): number {
+    return this.state.players.length;
+  }
 
-        // 广播更新
-        this.broadcastState('patch');
-        this.updateCanStart();
-
-        if (action.optimisticId) {
-            this.sendActionResult(playerId, action.optimisticId, 'success');
-        }
-    }
-
-    /**
-     * 处理准备状态切换
-     */
-    private handleToggleReady(playerId: PlayerId, action: PreGameClientAction): void {
-        const player = this.state.players.get(playerId);
-        if (!player) {
-            throw new Error('Player not found');
-        }
-
-        // 房主不需要准备，直接可以开始游戏
-        if (player.isHost) {
-            throw new Error('Host does not need to be ready');
-        }
-
-        player.isReady = !player.isReady;
-        this.incrementVersion();
-
-        // 广播更新
-        this.broadcastState('patch');
-        this.updateCanStart();
-
-        if (action.optimisticId) {
-            this.sendActionResult(playerId, action.optimisticId, 'success');
-        }
-    }
-
-    /**
-     * 处理踢出玩家（仅房主）
-     */
-    private handleKickPlayer(playerId: PlayerId, action: PreGameClientAction): void {
-        const player = this.state.players.get(playerId);
-        if (!player?.isHost) {
-            throw new Error('Only host can kick players');
-        }
-
-        const targetPlayerId = action.payload?.targetPlayerId;
-        if (!targetPlayerId || targetPlayerId === playerId) {
-            throw new Error('Invalid kick target');
-        }
-
-        // 移除目标玩家
-        this.handlePlayerDisconnect(targetPlayerId);
-
-        if (action.optimisticId) {
-            this.sendActionResult(playerId, action.optimisticId, 'success');
-        }
-    }
-
-    /**
-     * 处理开始游戏（仅房主）
-     */
-    private handleStartGame(playerId: PlayerId, action: PreGameClientAction): void {
-        const player = this.state.players.get(playerId);
-        if (!player?.isHost) {
-            throw new Error('Only host can start game');
-        }
-
-        if (!this.state.canStart) {
-            throw new Error('Cannot start game: not all players are ready');
-        }
-
-        if (this.state.status !== 'waiting') {
-            throw new Error('Game is not in waiting status');
-        }
-
-        // 开始游戏
-        this.startGame();
-
-        if (action.optimisticId) {
-            this.sendActionResult(playerId, action.optimisticId, 'success');
-        }
-    }
-
-    /**
-     * 开始游戏
-     */
-    private async startGame(): Promise<void> {
-        this.state.status = 'starting';
-        this.incrementVersion();
-        
-        // 广播游戏即将开始
-        this.broadcastState('patch');
-
-        // 给玩家一些时间准备，然后启动游戏
-        this.startGameTimer = setTimeout(async () => {
-            const players = Array.from(this.state.players.keys());
-            await this.connectorManager.onGameStart(this.state.settings, players);
-        }, 3000); // 3秒倒计时
-    }
-
-    /**
-     * 转移房主
-     */
-    private transferHost(): void {
-        // 找到下一个玩家作为房主
-        const players = Array.from(this.state.players.values());
-        const nextHost = players.find(p => !p.isHost);
-        
-        if (nextHost) {
-            // 移除当前房主标记
-            for (const player of this.state.players.values()) {
-                player.isHost = false;
-            }
-            
-            // 设置新房主
-            nextHost.isHost = true;
-            nextHost.isReady = false; // 新房主不需要准备状态
-            this.state.hostId = nextHost.playerId;
-            
-            this.incrementVersion();
-            this.updateCanStart();
-        }
-    }
-
-    /**
-     * 更新是否可以开始游戏
-     */
-    private updateCanStart(): void {
-        const players = Array.from(this.state.players.values());
-        const nonHostPlayers = players.filter(p => !p.isHost);
-        
-        // 至少需要2个玩家，且所有非房主玩家都准备好了
-        this.state.canStart = 
-            players.length >= 2 && 
-            nonHostPlayers.every(p => p.isReady) &&
-            this.state.status === 'waiting';
-    }
-
-    /**
-     * 向特定玩家发送状态
-     */
-    private sendStateToPlayer(playerId: PlayerId, type: 'snapshot' | 'patch'): void {
-        const connector = this.connectors.get(playerId);
-        if (!connector) return;
-
-        const stateForClient = this.getStateForClient();
-        
-        if (type === 'snapshot') {
-            connector.send({
-                type: SyncedStateServerEventType.STATE_UPDATE,
-                payload: {
-                    version: this.state.version,
-                    type: SyncedStateServerStateUpdatePayloadType.SNAPSHOT,
-                    data: stateForClient,
-                    confirmedOp: 0 // PreGame 阶段暂时不需要复杂的操作确认
-                }
-            });
-        } else {
-            // TODO: 实现 patch 逻辑
-            // 暂时使用 snapshot
-            this.sendStateToPlayer(playerId, 'snapshot');
-        }
-    }
-
-    /**
-     * 广播状态给所有玩家
-     */
-    private broadcastState(type: 'snapshot' | 'patch'): void {
-        for (const playerId of this.connectors.keys()) {
-            this.sendStateToPlayer(playerId, type);
-        }
-    }
-
-    /**
-     * 发送操作结果
-     */
-    private sendActionResult(playerId: PlayerId, optimisticId: number, status: 'success' | 'failed', message?: string): void {
-        const connector = this.connectors.get(playerId);
-        if (!connector) return;
-
-        connector.send({
-            type: SyncedStateServerEventType.ACTION_RESULT,
-            payload: {
-                status,
-                optimisticId,
-                message
-            }
-        });
-    }
-
-    /**
-     * 获取客户端状态（可能需要过滤敏感信息）
-     */
-    private getStateForClient(): any {
-        return {
-            gameId: this.state.gameId,
-            status: this.state.status,
-            settings: this.state.settings,
-            players: Array.from(this.state.players.values()),
-            hostId: this.state.hostId,
-            canStart: this.state.canStart
-        };
-    }
-
-    /**
-     * 递增版本号
-     */
-    private incrementVersion(): void {
-        this.state.version++;
-    }
-
-    /**
-     * 销毁实例
-     */
-    destroy(): void {
-        if (this.startGameTimer) {
-            clearTimeout(this.startGameTimer);
-        }
-
-        // 关闭所有连接
-        for (const [playerId, connector] of this.connectors) {
-            connector.close();
-            this.connectorManager.removeSubConnector(playerId);
-        }
-
-        this.connectors.clear();
-        this.state.players.clear();
-    }
-
-    /**
-     * 获取当前状态（用于调试）
-     */
-    getState(): PreGameState {
-        return { ...this.state };
-    }
+  /** 检查是否可以开始游戏 */
+  public canStartGame(): boolean {
+    return this.canStart();
+  }
 }
