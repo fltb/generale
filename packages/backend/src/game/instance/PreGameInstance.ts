@@ -34,7 +34,7 @@ export class PreGameInstance {
       conn.onDisconnect(() => this.removePlayer(pid));
       conn.onReconnect(() => this.sendState(pid, true));
       conn.onClientMessage(evt => this.handleClientAction(pid, evt));
-      conn.onClose(() => this.connectors.delete(pid));
+      conn.onClose(() => this.removePlayer(pid));
     }
   }
 
