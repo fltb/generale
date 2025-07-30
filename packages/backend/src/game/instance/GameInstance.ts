@@ -33,23 +33,21 @@ export class GameInstance {
     private state: GameState;
     private version: number;
     private settings: GameInstanceSettings;
-    private connectors: Map<PlayerId, GameServerConnector>;
+    private connectors = new Map<PlayerId, GameServerConnector>();
     private syncData = new Map<PlayerId, SyncEntry>();
-    private prevSentState = new Map<PlayerId, SyncedGameState>;
+    private prevSentState = new Map<PlayerId, SyncedGameState>();
     private disconnected = new Set<PlayerId>();
 
     constructor(
         initialState: GameState,
         settings: GameInstanceSettings,
-        connectors: Map<PlayerId, GameServerConnector>
+        playerIds: PlayerId[]
     ) {
         this.state = structuredClone(initialState);
         this.settings = settings;
         this.version = 0;
-        this.connectors = new Map(connectors);
-
-        for (const [pid, conn] of this.connectors) {
-            // init synced state & metadata
+        // 初始化所有玩家的同步状态（无 connector）
+        for (const pid of playerIds) {
             const masked = mask(this.state, pid);
             this.syncData.set(pid, {
                 lastConfirmedOp: 0,
@@ -58,18 +56,32 @@ export class GameInstance {
                     playerDisplay: this.settings.playerDisplay,
                     playerOperationQueue: [],
                 }
-            })
-            conn.onOpen(() => this.sendState(pid, true));
-            conn.onDisconnect(() => this.disconnected.add(pid));
-            conn.onReconnect(() => {
-                this.disconnected.delete(pid);
-                this.sendState(pid, true);
             });
-            conn.onClientMessage(evt => this.handleClientEvent(pid, evt));
-            conn.onClose(() => this.connectors.delete(pid));
         }
     }
 
+    /**
+     * 动态绑定/替换某个玩家的 connector
+     */
+    public setConnector(playerId: PlayerId, connector: GameServerConnector) {
+        this.connectors.set(playerId, connector);
+        connector.onOpen(() => this.sendState(playerId, true));
+        connector.onDisconnect(() => this.disconnected.add(playerId));
+        connector.onReconnect(() => {
+            this.disconnected.delete(playerId);
+            this.sendState(playerId, true);
+        });
+        connector.onClientMessage(evt => this.handleClientEvent(playerId, evt));
+        connector.onClose(() => this.removeConnector(playerId));
+    }
+
+    /**
+     * 移除某个玩家的 connector
+     */
+    public removeConnector(playerId: PlayerId) {
+        this.connectors.delete(playerId);
+    }
+    
     private handleClientEvent(pid: PlayerId, evt: SyncedGameClientActions) {
         const synced = this.syncData.get(pid)!;
         if (synced.lastConfirmedOp >= evt.optimisticId) {

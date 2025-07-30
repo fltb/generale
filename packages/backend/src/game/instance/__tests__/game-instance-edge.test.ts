@@ -99,10 +99,9 @@ beforeEach(() => {
   connectorB = new MockServerSyncConnector();
   const init = createInitialState();
   const settings: GameInstanceSettings = { playerDisplay: { A: { tileColor: 0xff0000 }, B: { tileColor: 0x0000ff } } };
-  inst = new GameInstance(init, settings, new Map([
-    [pidA, connectorA], // Typed connectors
-    [pidB, connectorB], // Typed connectors
-  ]));
+  inst = new GameInstance(init, settings, [pidA, pidB]);
+  inst.setConnector(pidA, connectorA);
+  inst.setConnector(pidB, connectorB);
   connectorA.triggerOpen();
   connectorB.triggerOpen();
 });
@@ -322,7 +321,7 @@ describe("GameInstance core behaviors", () => {
   });
 
   it("handles no connectors gracefully", () => {
-    const empty = new GameInstance(createInitialState(), { playerDisplay: {} }, new Map());
+    const empty = new GameInstance(createInitialState(), { playerDisplay: {} }, []);
     expect(() => empty.advance()).not.toThrow();
   });
 
@@ -341,10 +340,9 @@ describe("GameInstance core behaviors", () => {
       { type: TileType.Plain, ownerId: null, army: 1 },
       { type: TileType.Plain, ownerId: "B", army: 3 }
     ];
-    inst = new GameInstance(customInitialState, { playerDisplay: {} }, new Map([
-      [pidA, connectorA],
-      [pidB, connectorB],
-    ]));
+    inst = new GameInstance(customInitialState, { playerDisplay: {} }, [pidA, pidB]);
+    inst.setConnector(pidA, connectorA);
+    inst.setConnector(pidB, connectorB);
     connectorA.triggerOpen();
     connectorB.triggerOpen();
     connectorA.triggerClient({
@@ -484,7 +482,7 @@ describe("GameInstance core behaviors", () => {
       }
     };
     // 用GameInstance推进
-    const { GameInstance } = require("./GameInstance");
+    const { GameInstance } = require("../GameInstance");
     const settings = { playerDisplay: { A: { tileColor: 0xff0000 }, B: { tileColor: 0x0000ff } } };
     const connectorA = { 
       sent: [], 
@@ -514,10 +512,9 @@ describe("GameInstance core behaviors", () => {
         inst.handleClientEvent("B", evt);
       }
     };
-    const inst = new GameInstance(state, settings, new Map([
-      ["A", connectorA],
-      ["B", connectorB],
-    ]));
+    const inst = new GameInstance(state, settings, ["A", "B"]);
+    inst.setConnector("A", connectorA);
+    inst.setConnector("B", connectorB);
     inst.advance();
     // 添加操作让A攻占B的王座
     const queues = {
