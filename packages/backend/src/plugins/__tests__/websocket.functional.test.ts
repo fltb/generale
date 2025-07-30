@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { registerDomainHandler, unregisterDomainHandler } from '../websocket';
+import { registerDomainHandler, unregisterDomainHandler, DomainHandler, SubConnectorImpl as MockSubConnector } from '../websocket';
 
 // 功能测试 - 测试域名处理器的核心功能
 describe('WebSocket Domain Handler Functionality', () => {
@@ -60,17 +60,21 @@ describe('WebSocket Domain Handler Functionality', () => {
     });
 
     it('should handle duplicate domain registration', () => {
-      const handler1 = { onOpen: () => receivedMessages.push('handler1') };
-      const handler2 = { onOpen: () => receivedMessages.push('handler2') };
-      
+      const handler1: DomainHandler = (connector) => {
+        connector.onOpen(() => receivedMessages.push('handler1'));
+      };
+      const handler2: DomainHandler = (connector) => {
+        connector.onOpen(() => receivedMessages.push('handler2'));
+      };
       // 注册第一个处理器
       registerDomainHandler('duplicate-test', handler1);
-      
       // 注册第二个处理器（应该覆盖第一个）
       registerDomainHandler('duplicate-test', handler2);
-      
       // 验证第二个处理器生效
-      handler2.onOpen();
+      // 通过模拟 subConnector 触发 open
+      const subConnector = new MockSubConnector('duplicate-test', {});
+      handler2(subConnector);
+      subConnector._triggerOpen();
       expect(receivedMessages).toContain('handler2');
     });
   });
@@ -82,9 +86,19 @@ describe('WebSocket Domain Handler Functionality', () => {
 
     it('should handle onOpen callback', () => {
       const config = { playerId: 'player123', gameId: 'game456' };
-      
-      mockHandler.onOpen(mockConnectionId, config);
-      
+      // 新接口：注册 handler 并触发 open
+      const handler: DomainHandler = (connector: any) => {
+        connector.onOpen(() => {
+          receivedMessages.push({
+            type: 'open',
+            connId: mockConnectionId,
+            config
+          });
+        });
+      };
+      const subConnector = new MockSubConnector('test-domain', config);
+      handler(subConnector);
+      subConnector._triggerOpen();
       expect(receivedMessages).toHaveLength(1);
       expect(receivedMessages[0]).toEqual({
         type: 'open',
@@ -95,9 +109,19 @@ describe('WebSocket Domain Handler Functionality', () => {
 
     it('should handle onMessage callback', () => {
       const payload = { action: 'move', position: { x: 10, y: 20 } };
-      
-      mockHandler.onMessage(mockConnectionId, payload);
-      
+      // 新接口：注册 handler 并触发 message
+      const handler: DomainHandler = (connector: any) => {
+        connector.onMessage((msg: any) => {
+          receivedMessages.push({
+            type: 'message',
+            connId: mockConnectionId,
+            payload: msg
+          });
+        });
+      };
+      const subConnector = new MockSubConnector('test-domain', {});
+      handler(subConnector);
+      subConnector._triggerMessage(payload);
       expect(receivedMessages).toHaveLength(1);
       expect(receivedMessages[0]).toEqual({
         type: 'message',
@@ -109,9 +133,20 @@ describe('WebSocket Domain Handler Functionality', () => {
     it('should handle onClose callback', () => {
       const code = 1000;
       const reason = 'Normal closure';
-      
-      mockHandler.onClose(mockConnectionId, code, reason);
-      
+      // 新接口：注册 handler 并触发 close
+      const handler: DomainHandler = (connector) => {
+        connector.onClose((closeCode, closeReason) => {
+          receivedMessages.push({
+            type: 'close',
+            connId: mockConnectionId,
+            code: closeCode,
+            reason: closeReason
+          });
+        });
+      };
+      const subConnector = new MockSubConnector('test-domain', {});
+      handler(subConnector);
+      subConnector._triggerClose(code, reason);
       expect(receivedMessages).toHaveLength(1);
       expect(receivedMessages[0]).toEqual({
         type: 'close',
@@ -123,9 +158,19 @@ describe('WebSocket Domain Handler Functionality', () => {
 
     it('should handle onDisconnect callback', () => {
       const error = new Error('Connection lost');
-      
-      mockHandler.onDisconnect(mockConnectionId, error);
-      
+      // 新接口：注册 handler 并触发 disconnect
+      const handler: DomainHandler = (connector) => {
+        connector.onDisconnect((err) => {
+          receivedMessages.push({
+            type: 'disconnect',
+            connId: mockConnectionId,
+            err
+          });
+        });
+      };
+      const subConnector = new MockSubConnector('test-domain', {});
+      handler(subConnector);
+      subConnector._triggerDisconnect(error);
       expect(receivedMessages).toHaveLength(1);
       expect(receivedMessages[0]).toEqual({
         type: 'disconnect',
@@ -150,27 +195,25 @@ describe('WebSocket Domain Handler Functionality', () => {
       const gameMessages: any[] = [];
       const chatMessages: any[] = [];
       
-      const gameHandler = {
-        onMessage: (connId: string, payload: any) => {
-          gameMessages.push({ connId, payload });
-        }
+      const gameHandler: DomainHandler = (connector) => {
+        connector.onMessage((payload) => {
+          gameMessages.push({ domain: 'game', payload });
+        });
       };
-      
-      const chatHandler = {
-        onMessage: (connId: string, payload: any) => {
-          chatMessages.push({ connId, payload });
-        }
+      const chatHandler: DomainHandler = (connector) => {
+        connector.onMessage((payload) => {
+          chatMessages.push({ domain: 'chat', payload });
+        });
       };
-      
       registerDomainHandler('game', gameHandler);
       registerDomainHandler('chat', chatHandler);
-      
-      // 发送游戏消息
-      gameHandler.onMessage(mockConnectionId, { action: 'move' });
-      
-      // 发送聊天消息
-      chatHandler.onMessage(mockConnectionId, { message: 'Hello!' });
-      
+      // 通过 subConnector 分别触发消息
+      const gameSub = new MockSubConnector('game', {});
+      const chatSub = new MockSubConnector('chat', {});
+      gameHandler(gameSub);
+      chatHandler(chatSub);
+      gameSub._triggerMessage({ action: 'move' });
+      chatSub._triggerMessage({ message: 'Hello!' });
       // 验证消息被正确路由
       expect(gameMessages).toHaveLength(1);
       expect(gameMessages[0].payload.action).toBe('move');
@@ -185,63 +228,61 @@ describe('WebSocket Domain Handler Functionality', () => {
         messages: [] as any[]
       };
       
-      const gameHandler = {
-        onOpen: (connId: string, config: any) => {
-          gameState.players.set(connId, { 
-            name: config.playerName, 
+      const gameHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => {
+          type PlayerContext = { playerName: string };
+          const ctx = connector.context as PlayerContext;
+          const connId = connector.domain + '-' + (ctx.playerName || '');
+          gameState.players.set(connId, {
+            name: ctx.playerName,
             ready: false,
             position: { x: 0, y: 0 }
           });
-          gameState.messages.push({ type: 'player_joined', connId, config });
-        },
-        
-        onMessage: (connId: string, payload: any) => {
+          gameState.messages.push({ type: 'player_joined', connId, config: connector.context });
+        });
+        connector.onMessage((payload) => {
+          const ctx = connector.context as { playerName: string };
+          const connId = connector.domain + '-' + (ctx.playerName || '');
           const player = gameState.players.get(connId);
-          
-          switch (payload.action) {
+          const msg = payload as { action: string; position?: { x: number; y: number } };
+          switch (msg.action) {
             case 'ready':
               player.ready = true;
               gameState.messages.push({ type: 'player_ready', connId });
               break;
             case 'move':
-              player.position = payload.position;
-              gameState.messages.push({ type: 'player_moved', connId, position: payload.position });
+              player.position = msg.position;
+              gameState.messages.push({ type: 'player_moved', connId, position: msg.position });
               break;
           }
-        },
-        
-        onClose: (connId: string) => {
+        });
+        connector.onClose(() => {
+          const ctx = connector.context as { playerName: string };
+          const connId = connector.domain + '-' + (ctx.playerName || '');
           gameState.players.delete(connId);
           gameState.messages.push({ type: 'player_left', connId });
-        }
+        });
       };
-      
       registerDomainHandler('game-scenario', gameHandler);
-      
       // 模拟游戏场景
-      const player1 = 'player1';
-      const player2 = 'player2';
-      
+      const player1 = new MockSubConnector('game-scenario', { playerName: 'Alice' });
+      const player2 = new MockSubConnector('game-scenario', { playerName: 'Bob' });
+      gameHandler(player1); gameHandler(player2);
       // 玩家加入
-      gameHandler.onOpen(player1, { playerName: 'Alice' });
-      gameHandler.onOpen(player2, { playerName: 'Bob' });
-      
+      player1._triggerOpen();
+      player2._triggerOpen();
       // 玩家准备
-      gameHandler.onMessage(player1, { action: 'ready' });
-      gameHandler.onMessage(player2, { action: 'ready' });
-      
+      player1._triggerMessage({ action: 'ready' });
+      player2._triggerMessage({ action: 'ready' });
       // 玩家移动
-      gameHandler.onMessage(player1, { action: 'move', position: { x: 10, y: 5 } });
-      gameHandler.onMessage(player2, { action: 'move', position: { x: 20, y: 15 } });
-      
+      player1._triggerMessage({ action: 'move', position: { x: 10, y: 5 } });
+      player2._triggerMessage({ action: 'move', position: { x: 20, y: 15 } });
       // 玩家离开
-      gameHandler.onClose(player1);
-      
+      player1._triggerClose();
       // 验证游戏状态
       expect(gameState.players.size).toBe(1);
-      expect(gameState.players.has(player2)).toBe(true);
-      expect(gameState.players.get(player2).position).toEqual({ x: 20, y: 15 });
-      
+      expect([...gameState.players.values()][0].name).toBe('Bob');
+      expect([...gameState.players.values()][0].position).toEqual({ x: 20, y: 15 });
       // 验证消息历史
       expect(gameState.messages).toHaveLength(7);
       expect(gameState.messages[0].type).toBe('player_joined');
@@ -256,45 +297,30 @@ describe('WebSocket Domain Handler Functionality', () => {
 
   describe('Error Handling', () => {
     it('should handle missing handler methods gracefully', () => {
-      const partialHandler = {
-        onOpen: (connId: string) => {
-          receivedMessages.push({ type: 'open', connId });
-        }
-        // 缺少其他方法
+      const partialHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => {
+          receivedMessages.push({ type: 'open', domain: connector.domain });
+        });
+        // 不注册其他事件
       };
-      
       registerDomainHandler('partial-handler', partialHandler);
-      
-      // 调用存在的方法
-      expect(() => partialHandler.onOpen(mockConnectionId)).not.toThrow();
+      // 用 MockSubConnector 触发 open
+      const sub = new MockSubConnector('partial-handler', {});
+      partialHandler(sub);
+      expect(() => sub._triggerOpen()).not.toThrow();
       expect(receivedMessages).toHaveLength(1);
-      
-      // 调用不存在的方法应该不会抛出错误（因为是可选的）
-      expect(() => {
-        // partialHandler 只有 onOpen 方法，没有 onMessage
-        // 这里测试的是可选方法不存在时的情况
-        expect(partialHandler.onMessage).toBeUndefined();
-      }).not.toThrow();
+      // 不触发 onMessage，不会有异常
+      expect(() => sub._triggerMessage({})).not.toThrow();
     });
 
     it('should handle handler exceptions gracefully', () => {
-      const errorHandler = {
-        onMessage: (_connectionId: string, _payload: any) => {
-          throw new Error('Handler error');
-        }
+      const errorHandler: DomainHandler = (connector) => {
+        connector.onMessage(() => { throw new Error('Handler error'); });
       };
-      
       registerDomainHandler('error-handler', errorHandler);
-      
-      // 处理器抛出错误不应该影响系统
-      expect(() => {
-        try {
-          errorHandler.onMessage(mockConnectionId, {});
-        } catch (error) {
-          // 错误被捕获，这是预期的
-          expect((error as Error).message).toBe('Handler error');
-        }
-      }).not.toThrow();
+      const sub = new MockSubConnector('error-handler', {});
+      errorHandler(sub);
+      expect(() => sub._triggerMessage({})).toThrow('Handler error');
     });
   });
 
@@ -304,8 +330,8 @@ describe('WebSocket Domain Handler Functionality', () => {
       
       // 快速注册大量处理器
       for (let i = 0; i < 100; i++) {
-        registerDomainHandler(`domain-${i}`, {
-          onMessage: () => {}
+        registerDomainHandler(`domain-${i}`, (connector) => {
+          connector.onOpen(() => {});
         });
       }
       

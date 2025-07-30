@@ -3,42 +3,48 @@ import { Elysia } from "elysia";
 /**
  * WebSocket message structure for sub-connector communication
  */
-interface WebSocketMessage {
-  domain: string; // e.g., "game", "chat", "pregame"
-  type: "open" | "close" | "message";
-  payload?: any;
-}
+export type WebSocketMessage<T = unknown, Context = unknown> =
+  | { domain: string; type: "open"; payload: Context }
+  | { domain: string; type: "close"; payload?: { code?: number; reason?: string } }
+  | { domain: string; type: "message"; payload: T };
+
 
 /**
- * Domain handler interface - 上层业务逻辑需要实现这个接口
+ * Domain handler interface - 单回调函数接收完整的 SubConnector 实例
  */
-export interface DomainHandler {
-  onOpen?: (connectionId: string, config?: any) => void;
-  onClose?: (connectionId: string, code?: number, reason?: string) => void;
-  onMessage?: (connectionId: string, payload: any) => any; // 可以返回响应数据
-  onDisconnect?: (connectionId: string, err?: Error) => void;
-  onReconnect?: (connectionId: string) => void;
-}
+export type DomainHandler<Msg = unknown, Ctx = unknown> = (connector: SubConnector<Msg, Ctx>) => void;
 
 /**
  * Sub-connector interface for domain-specific communication
+ * 扩展支持生命周期事件注册和 context 访问
  */
-interface SubConnector {
-  domain: string;
-  ready: boolean;
-  send: (payload: any) => void;
-  close: (code?: number, reason?: string) => void;
+export interface SubConnector<Msg = unknown, Ctx = unknown> {
+  readonly domain: string;
+  readonly ready: boolean;
+  readonly context: Ctx;
+  
+  // 基础通信方法
+  send(payload: Msg): void;
+  close(code?: number, reason?: string): void;
+  
+  // 生命周期事件注册
+  onOpen(cb: () => void): void;
+  onClose(cb: (code?: number, reason?: string) => void): void;
+  onDisconnect(cb: (err?: Error) => void): void;
+  onReconnect(cb: () => void): void;
+  onMessage(cb: (payload: Msg) => void): void;
 }
 
 /**
  * 全局域名处理器注册表
  */
-const domainHandlers = new Map<string, DomainHandler>();
+const domainHandlers = new Map<string, DomainHandler<any, any>>();
+export { domainHandlers };
 
 /**
  * 注册域名处理器
  */
-export function registerDomainHandler(domain: string, handler: DomainHandler): void {
+export function registerDomainHandler<Msg = unknown, Ctx = unknown>(domain: string, handler: DomainHandler<Msg, Ctx>): void {
   if (domainHandlers.has(domain)) {
     console.warn(`Domain handler for '${domain}' already exists, overwriting`);
   }
@@ -55,14 +61,121 @@ export function unregisterDomainHandler(domain: string): void {
 }
 
 /**
+ * SubConnector 实现类，支持生命周期事件注册
+ */
+export class SubConnectorImpl<Msg = unknown, Ctx = unknown> implements SubConnector<Msg, Ctx> {
+  private _ready: boolean = true;
+  private openCallbacks: (() => void)[] = [];
+  private closeCallbacks: ((code?: number, reason?: string) => void)[] = [];
+  private disconnectCallbacks: ((err?: Error) => void)[] = [];
+  private reconnectCallbacks: (() => void)[] = [];
+  private messageCallbacks: ((payload: Msg) => void)[] = [];
+
+  constructor(
+    public readonly domain: string,
+    public readonly context: Ctx,
+    private ws: any,
+    private connectionManager: WebSocketConnectionManager<any, any>
+  ) {}
+
+  get ready(): boolean {
+    return this._ready;
+  }
+
+  send(payload: Msg): void {
+    if (this._ready && this.connectionManager.isConnected) {
+      this.ws.send(JSON.stringify({
+        domain: this.domain,
+        type: 'message',
+        payload
+      }));
+    }
+  }
+
+  close(code?: number, reason?: string): void {
+    this.connectionManager.closeSubConnector(this.domain, code, reason);
+  }
+
+  onOpen(cb: () => void): void {
+    this.openCallbacks.push(cb);
+  }
+
+  onClose(cb: (code?: number, reason?: string) => void): void {
+    this.closeCallbacks.push(cb);
+  }
+
+  onDisconnect(cb: (err?: Error) => void): void {
+    this.disconnectCallbacks.push(cb);
+  }
+
+  onReconnect(cb: () => void): void {
+    this.reconnectCallbacks.push(cb);
+  }
+
+  onMessage(cb: (payload: Msg) => void): void {
+    this.messageCallbacks.push(cb);
+  }
+
+  // 内部方法，由 WebSocketConnectionManager 调用
+  _triggerOpen(): void {
+    this.openCallbacks.forEach(cb => cb());
+  }
+
+  _triggerClose(code?: number, reason?: string): void {
+    this._ready = false;
+    this.closeCallbacks.forEach(cb => cb(code, reason));
+  }
+
+  _triggerDisconnect(err?: Error): void {
+    this.disconnectCallbacks.forEach(cb => cb(err));
+  }
+
+  _triggerReconnect(): void {
+    this._ready = true;
+    this.reconnectCallbacks.forEach(cb => cb());
+  }
+
+  _triggerMessage(payload: Msg): void {
+    this.messageCallbacks.forEach(cb => cb(payload));
+  }
+}
+
+/**
  * WebSocket connection manager that handles sub-connectors
  * 纯粹的消息路由器，不包含业务逻辑
  */
-class WebSocketConnectionManager {
+interface WSContextBase {
+  userid: string;
+};
+
+class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WSContextBase> {
+  /**
+   * 连接上下文信息（如 userId, gameId, domain 等）
+   */
+  context: Context = {} as Context;
+
+  /**
+   * 设置/合并 context 内容
+   */
+  setContext(ctx: Partial<Context>) {
+    this.context = { ...this.context, ...ctx };
+    // 可选：同步到 ws.data.context
+    if (this.ws && this.ws.data) {
+      this.ws.data.context = this.context;
+    }
+  }
+
+  /**
+   * 获取 context
+   */
+  getContext(): Context {
+    return this.context;
+  }
+
   private ws: any;
-  private subConnectors = new Map<string, SubConnector>();
+  private subConnectors = new Map<string, SubConnectorImpl<T, Context>>();
   private connectionId: string;
-  private isConnected = false;
+  public isConnected = false;
 
   constructor(ws: any, connectionId: string) {
     this.ws = ws;
@@ -73,17 +186,27 @@ class WebSocketConnectionManager {
   /**
    * Handle incoming WebSocket messages and route to appropriate sub-connector
    */
-  handleMessage(message: WebSocketMessage) {
+  handleMessage(message: WebSocketMessage<T, Context>) {
     const { domain, type, payload } = message;
 
     switch (type) {
       case "open":
+        // open: payload 视为 config 类型（C）
         this.openSubConnector(domain, payload);
         break;
-      case "close":
-        this.closeSubConnector(domain, payload?.code, payload?.reason);
+      case "close": {
+        // close: payload 需为 { code?: number, reason?: string }
+        let code: number | undefined;
+        let reason: string | undefined;
+        if (typeof payload === 'object' && payload !== null) {
+          code = payload.code;
+          reason = payload.reason;
+        }
+        this.closeSubConnector(domain, code, reason);
         break;
+      }
       case "message":
+        // message: payload 视为 T
         this.routeMessage(domain, payload);
         break;
       default:
@@ -98,7 +221,7 @@ class WebSocketConnectionManager {
   /**
    * Open a sub-connector for a specific domain
    */
-  openSubConnector(domain: string, config?: any): boolean {
+  openSubConnector(domain: string, context: Context): boolean {
     // 域名判重
     if (this.subConnectors.has(domain)) {
       console.warn(`Sub-connector for domain '${domain}' already exists`);
@@ -122,35 +245,27 @@ class WebSocketConnectionManager {
       return false;
     }
 
-    const subConnector: SubConnector = {
+    // 创建 SubConnectorImpl 实例
+    const subConnector = new SubConnectorImpl<T, Context>(
       domain,
-      ready: true,
-      send: (payload: any) => {
-        if (this.isConnected) {
-          this.ws.send(JSON.stringify({
-            domain,
-            type: 'message',
-            payload
-          }));
-        }
-      },
-      close: (code?: number, reason?: string) => {
-        this.closeSubConnector(domain, code, reason);
-      }
-    };
+      context,
+      this.ws,
+      this
+    );
 
     this.subConnectors.set(domain, subConnector);
 
-    // 通知域名处理器
-    if (handler.onOpen) {
-      handler.onOpen(this.connectionId, config);
-    }
+    // 调用域名处理器（新的单回调接口）
+    handler(subConnector);
+
+    // 触发 onOpen 事件
+    subConnector._triggerOpen();
 
     // Send acknowledgment to client
     this.ws.send(JSON.stringify({
       type: 'open_ack',
       domain,
-      payload: { success: true, config }
+      payload: { success: true, config: context }
     }));
 
     console.log(`Sub-connector opened for domain: ${domain}`);
@@ -172,13 +287,8 @@ class WebSocketConnectionManager {
       return false;
     }
 
-    subConnector.ready = false;
-    
-    // 通知域名处理器
-    const handler = domainHandlers.get(domain);
-    if (handler && handler.onClose) {
-      handler.onClose(this.connectionId, code, reason);
-    }
+    // 触发 onClose 事件
+    subConnector._triggerClose(code, reason);
 
     this.subConnectors.delete(domain);
 
@@ -196,7 +306,7 @@ class WebSocketConnectionManager {
   /**
    * Route message to appropriate sub-connector
    */
-  routeMessage(domain: string, payload: any): boolean {
+  routeMessage(domain: string, payload: T): boolean {
     const subConnector = this.subConnectors.get(domain);
     if (!subConnector) {
       console.warn(`Sub-connector for domain '${domain}' not found`);
@@ -218,20 +328,8 @@ class WebSocketConnectionManager {
       return false;
     }
 
-    // 通知域名处理器处理消息
-    const handler = domainHandlers.get(domain);
-    if (handler && handler.onMessage) {
-      const response = handler.onMessage(this.connectionId, payload);
-      
-      // 如果处理器返回了响应，发送回客户端
-      if (response) {
-        this.ws.send(JSON.stringify({
-          type: 'domain_message',
-          domain,
-          payload: response
-        }));
-      }
-    }
+    // 触发 onMessage 事件
+    subConnector._triggerMessage(payload);
 
     return true;
   }
@@ -242,12 +340,9 @@ class WebSocketConnectionManager {
   handleClose() {
     this.isConnected = false;
     
-    // 通知所有域名处理器连接断开
-    for (const [domain] of this.subConnectors) {
-      const handler = domainHandlers.get(domain);
-      if (handler && handler.onDisconnect) {
-        handler.onDisconnect(this.connectionId);
-      }
+    // 触发所有 sub-connector 的 onDisconnect 事件
+    for (const [, subConnector] of this.subConnectors) {
+      subConnector._triggerDisconnect();
     }
 
     // 清理所有sub-connectors
@@ -262,12 +357,9 @@ class WebSocketConnectionManager {
   handleReconnect() {
     this.isConnected = true;
     
-    // 通知所有域名处理器重连
-    for (const [domain] of this.subConnectors) {
-      const handler = domainHandlers.get(domain);
-      if (handler && handler.onReconnect) {
-        handler.onReconnect(this.connectionId);
-      }
+    // 触发所有 sub-connector 的 onReconnect 事件
+    for (const [, subConnector] of this.subConnectors) {
+      subConnector._triggerReconnect();
     }
 
     console.log(`WebSocket reconnected for connection: ${this.connectionId}`);
@@ -276,14 +368,14 @@ class WebSocketConnectionManager {
   /**
    * Get sub-connector for a specific domain
    */
-  getSubConnector(domain: string): SubConnector | undefined {
+  getSubConnector(domain: string): SubConnectorImpl<T, Context> | undefined {
     return this.subConnectors.get(domain);
   }
 
   /**
    * Get all active sub-connectors
    */
-  getAllSubConnectors(): Map<string, SubConnector> {
+  getAllSubConnectors(): Map<string, SubConnectorImpl<T, Context>> {
     return new Map(this.subConnectors);
   }
 
@@ -298,6 +390,15 @@ class WebSocketConnectionManager {
 // Store connection managers by connection ID
 const connectionManagers = new Map<string, WebSocketConnectionManager>();
 
+/**
+ * 通过 connectionId 获取 context（如 userId, gameId, domain 等）
+ */
+export function getContextByConnectionId(connectionId: string): Record<string, any> | undefined {
+  const manager = connectionManagers.get(connectionId);
+  return manager?.getContext();
+}
+
+// 插件导出
 export const websocketPlugin = new Elysia()
   .ws("/ws", {
     message(ws, message) {

@@ -7,10 +7,11 @@ import { GameService } from "./game/service/GameService";
 
 // Initialize GameService with default config
 const gameService = new GameService({
-  maxPlayersPerGame: 8,
+  gameId: "lobby", // Added required gameId
+  maxPlayers: 8,
   gameTimeout: 30 * 60 * 1000, // 30 minutes
   heartbeatInterval: 30 * 1000, // 30 seconds
-});
+}); 
 
 const app = new Elysia()
   .use(cors())

@@ -20,28 +20,31 @@ describe('WebSocket单元测试', () => {
 
   describe('域名处理器注册测试', () => {
     it('应该能够注册域名处理器', () => {
-      const mockHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn(),
-        onClose: vi.fn(),
-        onDisconnect: vi.fn(),
-        onReconnect: vi.fn()
-      };
-
+      const onOpen = vi.fn();
+      const onMessage = vi.fn();
+      const onClose = vi.fn();
+      const onDisconnect = vi.fn();
+      const onReconnect = vi.fn();
       expect(() => {
-        registerDomainHandler('test-domain', mockHandler);
+        registerDomainHandler('test-domain', (connector) => {
+          connector.onOpen(onOpen);
+          connector.onMessage(onMessage);
+          connector.onClose(onClose);
+          connector.onDisconnect(onDisconnect);
+          connector.onReconnect(onReconnect);
+        });
       }).not.toThrow();
     });
 
     it('应该能够注销域名处理器', () => {
-      const mockHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn(),
-        onClose: vi.fn()
-      };
-
-      registerDomainHandler('test-domain', mockHandler);
-      
+      const onOpen = vi.fn();
+      const onMessage = vi.fn();
+      const onClose = vi.fn();
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onOpen(onOpen);
+        connector.onMessage(onMessage);
+        connector.onClose(onClose);
+      });
       expect(() => {
         unregisterDomainHandler('test-domain');
       }).not.toThrow();
@@ -51,14 +54,15 @@ describe('WebSocket单元测试', () => {
       const domains = ['game-domain', 'chat-domain', 'pregame-domain'];
       
       domains.forEach(domain => {
-        const mockHandler = {
-          onOpen: vi.fn(),
-          onMessage: vi.fn(),
-          onClose: vi.fn()
-        };
-
+        const onOpen = vi.fn();
+        const onMessage = vi.fn();
+        const onClose = vi.fn();
         expect(() => {
-          registerDomainHandler(domain, mockHandler);
+          registerDomainHandler(domain, (connector) => {
+            connector.onOpen(onOpen);
+            connector.onMessage(onMessage);
+            connector.onClose(onClose);
+          });
         }).not.toThrow();
       });
 
@@ -71,17 +75,21 @@ describe('WebSocket单元测试', () => {
     it('应该在重复注册时显示警告', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       
-      const mockHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn(),
-        onClose: vi.fn()
-      };
-
+      const onOpen = vi.fn();
+      const onMessage = vi.fn();
+      const onClose = vi.fn();
       // 第一次注册
-      registerDomainHandler('test-domain', mockHandler);
-      
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onOpen(onOpen);
+        connector.onMessage(onMessage);
+        connector.onClose(onClose);
+      });
       // 第二次注册同一个域名
-      registerDomainHandler('test-domain', mockHandler);
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onOpen(onOpen);
+        connector.onMessage(onMessage);
+        connector.onClose(onClose);
+      });
 
       expect(consoleSpy).toHaveBeenCalledWith(
         "Domain handler for 'test-domain' already exists, overwriting"
@@ -93,63 +101,59 @@ describe('WebSocket单元测试', () => {
 
   describe('域名处理器功能测试', () => {
     it('onMessage处理器应该能够返回响应数据', () => {
-      const mockHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn().mockReturnValue({
-          type: 'echo',
-          data: 'test response'
-        }),
-        onClose: vi.fn()
-      };
-
-      registerDomainHandler('test-domain', mockHandler);
-
+      const onOpen = vi.fn();
+      const onMessage = vi.fn().mockReturnValue({
+        type: 'echo',
+        data: 'test response'
+      });
+      const onClose = vi.fn();
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onOpen(onOpen);
+        connector.onMessage(onMessage);
+        connector.onClose(onClose);
+      });
       // 模拟调用onMessage
-      const response = mockHandler.onMessage('test-connection-id', {
+      const response = onMessage('test-connection-id', {
         action: 'test',
         data: 'Hello!'
       });
-
       expect(response).toEqual({
         type: 'echo',
         data: 'test response'
       });
-
-      expect(mockHandler.onMessage).toHaveBeenCalledWith('test-connection-id', {
+      expect(onMessage).toHaveBeenCalledWith('test-connection-id', {
         action: 'test',
         data: 'Hello!'
       });
     });
 
     it('onOpen处理器应该接收连接ID和配置', () => {
-      const mockHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn(),
-        onClose: vi.fn()
-      };
-
-      registerDomainHandler('test-domain', mockHandler);
-
+      const onOpen = vi.fn();
+      const onMessage = vi.fn();
+      const onClose = vi.fn();
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onOpen(onOpen);
+        connector.onMessage(onMessage);
+        connector.onClose(onClose);
+      });
       // 模拟调用onOpen
       const testConfig = { playerId: 'player123', testMode: true };
-      mockHandler.onOpen('test-connection-id', testConfig);
-
-      expect(mockHandler.onOpen).toHaveBeenCalledWith('test-connection-id', testConfig);
+      onOpen('test-connection-id', testConfig);
+      expect(onOpen).toHaveBeenCalledWith('test-connection-id', testConfig);
     });
 
     it('onClose处理器应该接收连接ID、代码和原因', () => {
-      const mockHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn(),
-        onClose: vi.fn()
-      };
-
-      registerDomainHandler('test-domain', mockHandler);
-
+      const onOpen = vi.fn();
+      const onMessage = vi.fn();
+      const onClose = vi.fn();
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onOpen(onOpen);
+        connector.onMessage(onMessage);
+        connector.onClose(onClose);
+      });
       // 模拟调用onClose
-      mockHandler.onClose('test-connection-id', 1000, 'Normal closure');
-
-      expect(mockHandler.onClose).toHaveBeenCalledWith(
+      onClose('test-connection-id', 1000, 'Normal closure');
+      expect(onClose).toHaveBeenCalledWith(
         'test-connection-id', 
         1000, 
         'Normal closure'
@@ -157,35 +161,35 @@ describe('WebSocket单元测试', () => {
     });
 
     it('onDisconnect处理器应该接收连接ID', () => {
-      const mockHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn(),
-        onClose: vi.fn(),
-        onDisconnect: vi.fn()
-      };
-
-      registerDomainHandler('test-domain', mockHandler);
-
+      const onOpen = vi.fn();
+      const onMessage = vi.fn();
+      const onClose = vi.fn();
+      const onDisconnect = vi.fn();
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onOpen(onOpen);
+        connector.onMessage(onMessage);
+        connector.onClose(onClose);
+        connector.onDisconnect(onDisconnect);
+      });
       // 模拟调用onDisconnect
-      mockHandler.onDisconnect('test-connection-id');
-
-      expect(mockHandler.onDisconnect).toHaveBeenCalledWith('test-connection-id');
+      onDisconnect('test-connection-id');
+      expect(onDisconnect).toHaveBeenCalledWith('test-connection-id');
     });
 
     it('onReconnect处理器应该接收连接ID', () => {
-      const mockHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn(),
-        onClose: vi.fn(),
-        onReconnect: vi.fn()
-      };
-
-      registerDomainHandler('test-domain', mockHandler);
-
+      const onOpen = vi.fn();
+      const onMessage = vi.fn();
+      const onClose = vi.fn();
+      const onReconnect = vi.fn();
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onOpen(onOpen);
+        connector.onMessage(onMessage);
+        connector.onClose(onClose);
+        connector.onReconnect(onReconnect);
+      });
       // 模拟调用onReconnect
-      mockHandler.onReconnect('test-connection-id');
-
-      expect(mockHandler.onReconnect).toHaveBeenCalledWith('test-connection-id');
+      onReconnect('test-connection-id');
+      expect(onReconnect).toHaveBeenCalledWith('test-connection-id');
     });
   });
 
@@ -196,63 +200,55 @@ describe('WebSocket单元测试', () => {
       }).not.toThrow();
     });
 
-    it('应该正确处理空的处理器对象', () => {
+    it('应该允许注册空函数体的域名处理器', () => {
       expect(() => {
-        registerDomainHandler('test-domain', {});
+        registerDomainHandler('test-domain', () => {});
       }).not.toThrow();
     });
 
-    it('应该正确处理只有部分回调的处理器', () => {
-      const partialHandler = {
-        onMessage: vi.fn()
-      };
-
+    it('应该允许只注册部分生命周期事件', () => {
+      const onMessage = vi.fn();
       expect(() => {
-        registerDomainHandler('test-domain', partialHandler);
+        registerDomainHandler('test-domain', (connector) => {
+          connector.onMessage(onMessage);
+        });
       }).not.toThrow();
     });
   });
 
   describe('消息格式验证测试', () => {
     it('应该正确处理各种消息类型', () => {
-      const mockHandler = {
-        onMessage: vi.fn().mockImplementation((connectionId, payload) => {
-          // 根据不同的action返回不同的响应
-          switch (payload.action) {
-            case 'echo':
-              return { type: 'echo', originalPayload: payload };
-            case 'error':
-              return { type: 'error', message: 'Test error' };
-            default:
-              return { type: 'unknown', payload };
-          }
-        })
-      };
-
-      registerDomainHandler('test-domain', mockHandler);
-
+      const onMessage = vi.fn().mockImplementation((connectionId, payload) => {
+        switch (payload.action) {
+          case 'echo':
+            return { type: 'echo', originalPayload: payload };
+          case 'error':
+            return { type: 'error', message: 'Test error' };
+          default:
+            return { type: 'unknown', payload };
+        }
+      });
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onMessage(onMessage);
+      });
       // 测试echo消息
-      const echoResponse = mockHandler.onMessage('conn1', { action: 'echo', data: 'test' });
+      const echoResponse = onMessage('conn1', { action: 'echo', data: 'test' });
       expect(echoResponse.type).toBe('echo');
       expect(echoResponse.originalPayload).toEqual({ action: 'echo', data: 'test' });
-
       // 测试错误消息
-      const errorResponse = mockHandler.onMessage('conn1', { action: 'error' });
+      const errorResponse = onMessage('conn1', { action: 'error' });
       expect(errorResponse.type).toBe('error');
       expect(errorResponse.message).toBe('Test error');
-
       // 测试未知消息
-      const unknownResponse = mockHandler.onMessage('conn1', { action: 'unknown', data: 'test' });
+      const unknownResponse = onMessage('conn1', { action: 'unknown', data: 'test' });
       expect(unknownResponse.type).toBe('unknown');
     });
 
     it('应该正确处理复杂的消息载荷', () => {
-      const mockHandler = {
-        onMessage: vi.fn().mockReturnValue({ processed: true })
-      };
-
-      registerDomainHandler('test-domain', mockHandler);
-
+      const onMessage = vi.fn().mockReturnValue({ processed: true });
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onMessage(onMessage);
+      });
       const complexPayload = {
         action: 'complex-action',
         data: {
@@ -268,10 +264,8 @@ describe('WebSocket单元测试', () => {
           source: 'unit-test'
         }
       };
-
-      const response = mockHandler.onMessage('test-conn', complexPayload);
-      
-      expect(mockHandler.onMessage).toHaveBeenCalledWith('test-conn', complexPayload);
+      const response = onMessage('test-conn', complexPayload);
+      expect(onMessage).toHaveBeenCalledWith('test-conn', complexPayload);
       expect(response).toEqual({ processed: true });
     });
   });
@@ -282,10 +276,10 @@ describe('WebSocket单元测试', () => {
       const domainCount = 100;
       
       for (let i = 0; i < domainCount; i++) {
-        const mockHandler = {
-          onMessage: vi.fn()
-        };
-        registerDomainHandler(`domain-${i}`, mockHandler);
+        const onMessage = vi.fn();
+        registerDomainHandler(`domain-${i}`, (connector) => {
+          connector.onMessage(onMessage);
+        });
       }
       
       const endTime = Date.now();
@@ -301,25 +295,19 @@ describe('WebSocket单元测试', () => {
     });
 
     it('应该能够处理高频的消息调用', () => {
-      const mockHandler = {
-        onMessage: vi.fn().mockReturnValue({ processed: true })
-      };
-
-      registerDomainHandler('test-domain', mockHandler);
-
+      const onMessage = vi.fn().mockReturnValue({ processed: true });
+      registerDomainHandler('test-domain', (connector) => {
+        connector.onMessage(onMessage);
+      });
       const startTime = Date.now();
       const messageCount = 1000;
-      
       for (let i = 0; i < messageCount; i++) {
-        mockHandler.onMessage(`conn-${i}`, { action: 'test', index: i });
+        onMessage(`conn-${i}`, { action: 'test', index: i });
       }
-      
       const endTime = Date.now();
       const duration = endTime - startTime;
-      
-      // 1000次消息调用应该在50ms内完成
       expect(duration).toBeLessThan(50);
-      expect(mockHandler.onMessage).toHaveBeenCalledTimes(messageCount);
+      expect(onMessage).toHaveBeenCalledTimes(messageCount);
     });
   });
 });

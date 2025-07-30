@@ -1,17 +1,87 @@
 /**
  * WebSocket域名处理器测试
- * 基于test-websocket-with-handlers.js改写的模拟测试
+ * 适配新的单回调 DomainHandler 接口
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { registerDomainHandler, unregisterDomainHandler } from '../websocket';
-import type { DomainHandler } from '../websocket';
+import type { DomainHandler, SubConnector } from '../websocket';
+
+// 模拟 SubConnector 实现
+class MockSubConnector implements SubConnector {
+  private openCallbacks: (() => void)[] = [];
+  private closeCallbacks: ((code?: number, reason?: string) => void)[] = [];
+  private disconnectCallbacks: ((err?: Error) => void)[] = [];
+  private reconnectCallbacks: (() => void)[] = [];
+  private messageCallbacks: ((payload: any) => void)[] = [];
+  private _ready = true;
+
+  constructor(
+    public readonly domain: string,
+    public readonly context: any
+  ) {}
+
+  get ready(): boolean {
+    return this._ready;
+  }
+
+  send(payload: any): void {
+    // Mock implementation
+  }
+
+  close(code?: number, reason?: string): void {
+    this._ready = false;
+    this.closeCallbacks.forEach(cb => cb(code, reason));
+  }
+
+  onOpen(cb: () => void): void {
+    this.openCallbacks.push(cb);
+  }
+
+  onClose(cb: (code?: number, reason?: string) => void): void {
+    this.closeCallbacks.push(cb);
+  }
+
+  onDisconnect(cb: (err?: Error) => void): void {
+    this.disconnectCallbacks.push(cb);
+  }
+
+  onReconnect(cb: () => void): void {
+    this.reconnectCallbacks.push(cb);
+  }
+
+  onMessage(cb: (payload: any) => void): void {
+    this.messageCallbacks.push(cb);
+  }
+
+  // 测试辅助方法
+  triggerOpen(): any {
+    if (this.openCallbacks.length > 0) {
+      return this.openCallbacks[0]();
+    }
+  }
+
+  triggerMessage(payload: any): any {
+    if (this.messageCallbacks.length > 0) {
+      return this.messageCallbacks[0](payload);
+    }
+  }
+
+  triggerDisconnect(err?: Error): void {
+    this.disconnectCallbacks.forEach(cb => cb(err));
+  }
+
+  triggerReconnect(): void {
+    this._ready = true;
+    this.reconnectCallbacks.forEach(cb => cb());
+  }
+}
 
 // 模拟域名处理器连接管理器
 class MockDomainHandlerManager {
   private connectionId: string;
   private domainHandlers = new Map<string, DomainHandler>();
-  private subConnectors = new Map<string, any>();
+  private subConnectors = new Map<string, MockSubConnector>();
 
   constructor(connectionId: string) {
     this.connectionId = connectionId;
@@ -32,22 +102,27 @@ class MockDomainHandlerManager {
     }
 
     const results = [];
+    const mockConnector = new MockSubConnector(domain, config);
+    this.subConnectors.set(domain, mockConnector);
 
-    // 1. 打开域名
-    const openResult = handler.onOpen?.(this.connectionId, config);
-    this.subConnectors.set(domain, { domain, ready: true });
-    results.push({ type: 'open', result: openResult });
+    // 调用域名处理器（新的单回调接口）
+    handler(mockConnector);
 
-    // 2. 处理消息
+    // 1. 触发打开事件并采集返回值
+    // 1. 触发打开事件并采集返回值
+    const openResult = mockConnector.triggerOpen();
+    results.push({ type: 'open', result: openResult, connector: mockConnector });
+
+    // 2. 处理消息并采集返回值
     for (const message of messages) {
-      const messageResult = handler.onMessage?.(this.connectionId, message);
-      results.push({ type: 'message', payload: message, result: messageResult });
+      const messageResult = mockConnector.triggerMessage(message);
+      results.push({ type: 'message', payload: message, result: messageResult, connector: mockConnector });
     }
 
     // 3. 关闭域名
-    const closeResult = handler.onClose?.(this.connectionId, 1000, 'Normal closure');
+    mockConnector.close(1000, 'Normal closure');
     this.subConnectors.delete(domain);
-    results.push({ type: 'close', result: closeResult });
+    results.push({ type: 'close', connector: mockConnector });
 
     return { success: true, lifecycle: results };
   }
@@ -67,13 +142,24 @@ class MockDomainHandlerManager {
       // 注册域名
       this.registerDomainViaAPI(domain, handler);
       
-      // 打开域名
-      const openResult = handler.onOpen?.(this.connectionId, { domain });
-      this.subConnectors.set(domain, { domain, ready: true });
-      
-      // 发送测试消息
-      const messageResult = handler.onMessage?.(this.connectionId, { test: `message for ${domain}` });
-      
+      // 新接口：创建 MockSubConnector 并注册事件
+      const mockConnector = new MockSubConnector(domain, { domain });
+      this.subConnectors.set(domain, mockConnector);
+      handler(mockConnector);
+
+      // 触发 open 事件并捕获返回值
+      let openResult: any = undefined;
+      if (mockConnector['openCallbacks'] && mockConnector['openCallbacks'].length > 0) {
+        // 只取第一个 open 回调的返回值
+        openResult = mockConnector['openCallbacks'][0]();
+      }
+
+      // 触发 message 事件并捕获返回值
+      let messageResult: any = undefined;
+      if (mockConnector['messageCallbacks'] && mockConnector['messageCallbacks'].length > 0) {
+        messageResult = mockConnector['messageCallbacks'][0]({ test: `message for ${domain}` });
+      }
+
       results.push({
         domain,
         open: openResult,
@@ -114,10 +200,13 @@ describe('WebSocket域名处理器测试', () => {
 
   describe('域名注册via HTTP API', () => {
     it('应该能够通过HTTP API注册域名处理器', () => {
-      const testHandler: DomainHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn(),
-        onClose: vi.fn()
+      const onOpen = vi.fn();
+      const onMessage = vi.fn();
+      const onClose = vi.fn();
+      const testHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => onOpen(connector.domain, connector.context));
+        connector.onMessage((payload) => onMessage(connector.domain, payload));
+        connector.onClose((code, reason) => onClose(connector.domain, code, reason));
       };
 
       const result = mockManager.registerDomainViaAPI('test-domain', testHandler);
@@ -128,14 +217,18 @@ describe('WebSocket域名处理器测试', () => {
     });
 
     it('应该能够注册多个不同的域名处理器', () => {
-      const gameHandler: DomainHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn((connectionId, payload) => ({ type: 'game-response', data: payload }))
+      const gameOnOpen = vi.fn();
+      const gameOnMessage = vi.fn();
+      const gameHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => gameOnOpen(connector.domain, connector.context));
+        connector.onMessage((payload) => gameOnMessage(connector.domain, payload));
       };
 
-      const chatHandler: DomainHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn((connectionId, payload) => ({ type: 'chat-response', data: payload }))
+      const chatOnOpen = vi.fn();
+      const chatOnMessage = vi.fn();
+      const chatHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => chatOnOpen(connector.domain, connector.context));
+        connector.onMessage((payload) => chatOnMessage(connector.domain, payload));
       };
 
       mockManager.registerDomainViaAPI('game-domain', gameHandler);
@@ -150,20 +243,13 @@ describe('WebSocket域名处理器测试', () => {
 
   describe('完整域名消息生命周期', () => {
     it('应该能够完成域名的打开->消息->关闭流程', () => {
-      const testHandler: DomainHandler = {
-        onOpen: vi.fn((connectionId, config) => ({
-          success: true,
-          message: 'Domain opened successfully',
-          config
-        })),
-        onMessage: vi.fn((connectionId, payload) => ({
-          echo: payload,
-          timestamp: Date.now(),
-          connectionId
-        })),
-        onClose: vi.fn((connectionId, code, reason) => {
-          return { closed: true, code, reason };
-        })
+      const onOpen2 = vi.fn();
+      const onMessage2 = vi.fn();
+      const onClose2 = vi.fn();
+      const testHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => onOpen2(connector.domain, connector.context));
+        connector.onMessage((payload) => onMessage2(connector.domain, payload));
+        connector.onClose((code, reason) => onClose2(connector.domain, code, reason));
       };
 
       // 注册域名处理器
@@ -182,24 +268,28 @@ describe('WebSocket域名处理器测试', () => {
       expect(result.lifecycle).toHaveLength(5); // 1 open + 3 messages + 1 close
 
       // 验证打开调用
-      expect(testHandler.onOpen).toHaveBeenCalledWith('test-connection-domain', { userId: 'user-1' });
+      expect(onOpen2).toHaveBeenCalledWith('test-domain', { userId: 'user-1' });
 
       // 验证消息调用
-      expect(testHandler.onMessage).toHaveBeenCalledTimes(3);
-      expect(testHandler.onMessage).toHaveBeenCalledWith('test-connection-domain', { action: 'ping' });
+      expect(onMessage2).toHaveBeenCalledTimes(3);
+      expect(onMessage2).toHaveBeenCalledWith('test-domain', { action: 'ping' });
+      expect(onMessage2).toHaveBeenCalledWith('test-domain', { action: 'getData', id: 123 });
+      expect(onMessage2).toHaveBeenCalledWith('test-domain', { action: 'updateStatus', status: 'active' });
 
       // 验证关闭调用
-      expect(testHandler.onClose).toHaveBeenCalledWith('test-connection-domain', 1000, 'Normal closure');
+      expect(onClose2).toHaveBeenCalledWith('test-domain', 1000, 'Normal closure');
     });
 
     it('应该正确处理域名处理器回调的返回值', () => {
-      const testHandler: DomainHandler = {
-        onOpen: vi.fn(() => ({ welcome: 'Hello from test domain!' })),
-        onMessage: vi.fn((connectionId, payload) => ({
+      const onOpen3 = vi.fn();
+      const onMessage3 = vi.fn();
+      const testHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => ({ welcome: 'Hello from test domain!' }));
+        connector.onMessage((payload) => ({
           processed: true,
           originalPayload: payload,
           response: `Processed: ${JSON.stringify(payload)}`
-        }))
+        }));
       };
 
       mockManager.registerDomainViaAPI('test-domain', testHandler);
@@ -211,8 +301,8 @@ describe('WebSocket域名处理器测试', () => {
       // 类型安全检查
       if ('lifecycle' in result && result.lifecycle) {
         // 检查打开结果
-        const openResult = result.lifecycle.find(item => item.type === 'open');
-        expect(openResult?.result).toEqual({ welcome: 'Hello from test domain!' });
+        const openResult = result.lifecycle.find(item => item.type === 'open')?.result;
+        expect(openResult).toEqual({ welcome: 'Hello from test domain!' });
 
         // 检查消息结果
         const messageResult = result.lifecycle.find(item => item.type === 'message');
@@ -227,19 +317,36 @@ describe('WebSocket域名处理器测试', () => {
 
   describe('多域名支持', () => {
     it('应该能够同时支持多个域名处理器', () => {
-      const gameHandler: DomainHandler = {
-        onOpen: vi.fn(() => ({ type: 'game', status: 'ready' })),
-        onMessage: vi.fn((connectionId, payload) => ({ type: 'game', echo: payload }))
+      const onOpen4 = vi.fn();
+      const onMessage4 = vi.fn((payload) => ({
+        processed: true,
+        originalPayload: payload,
+        response: `Processed: ${JSON.stringify(payload)}`
+      }));
+      const testHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => ({ welcome: 'Hello from test domain!' }));
+        connector.onMessage((payload) => onMessage4(payload));
       };
 
-      const chatHandler: DomainHandler = {
-        onOpen: vi.fn(() => ({ type: 'chat', status: 'connected' })),
-        onMessage: vi.fn((connectionId, payload) => ({ type: 'chat', echo: payload }))
+      const gameOnOpen = vi.fn(() => ({ type: 'game', status: 'ready' }));
+      const gameOnMessage = vi.fn((payload) => ({ type: 'game', echo: payload }));
+      const gameHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => { return gameOnOpen(connector.domain, connector.context); });
+        connector.onMessage((payload) => gameOnMessage(payload));
       };
 
-      const pregameHandler: DomainHandler = {
-        onOpen: vi.fn(() => ({ type: 'pregame', status: 'waiting' })),
-        onMessage: vi.fn((connectionId, payload) => ({ type: 'pregame', echo: payload }))
+      const chatOnOpen = vi.fn(() => ({ type: 'chat', status: 'connected' }));
+      const chatOnMessage = vi.fn((payload) => ({ type: 'chat', echo: payload }));
+      const chatHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => { return chatOnOpen(connector.domain, connector.context); });
+        connector.onMessage((payload) => chatOnMessage(payload));
+      };
+
+      const pregameOnOpen = vi.fn(() => ({ type: 'pregame', status: 'waiting' }));
+      const pregameOnMessage = vi.fn((payload) => ({ type: 'pregame', echo: payload }));
+      const pregameHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => { return pregameOnOpen(connector.domain, connector.context); });
+        connector.onMessage((payload) => pregameOnMessage(payload));
       };
 
       const domains = ['game-domain', 'chat-domain', 'pregame-domain'];
@@ -260,20 +367,24 @@ describe('WebSocket域名处理器测试', () => {
       expect(results[2]?.open).toEqual({ type: 'pregame', status: 'waiting' });
 
       // 验证所有处理器都被调用
-      expect(gameHandler.onOpen).toHaveBeenCalled();
-      expect(chatHandler.onOpen).toHaveBeenCalled();
-      expect(pregameHandler.onOpen).toHaveBeenCalled();
+      expect(gameOnOpen).toHaveBeenCalled();
+      expect(chatOnOpen).toHaveBeenCalled();
+      expect(pregameOnOpen).toHaveBeenCalled();
     });
 
     it('应该能够独立处理每个域名的消息', () => {
-      const gameHandler: DomainHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn((connectionId, payload) => ({ domain: 'game', processed: payload }))
+      const gameOnOpen3 = vi.fn();
+      const gameOnMessage3 = vi.fn((payload) => ({ domain: 'game', processed: payload }));
+      const gameHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => gameOnOpen3(connector.domain, connector.context));
+        connector.onMessage((payload) => gameOnMessage3(payload));
       };
 
-      const chatHandler: DomainHandler = {
-        onOpen: vi.fn(),
-        onMessage: vi.fn((connectionId, payload) => ({ domain: 'chat', processed: payload }))
+      const chatOnOpen3 = vi.fn();
+      const chatOnMessage3 = vi.fn((payload) => ({ domain: 'chat', processed: payload }));
+      const chatHandler: DomainHandler = (connector) => {
+        connector.onOpen(() => chatOnOpen3(connector.domain, connector.context));
+        connector.onMessage((payload) => chatOnMessage3(payload));
       };
 
       const domains = ['game-domain', 'chat-domain'];
@@ -293,8 +404,8 @@ describe('WebSocket域名处理器测试', () => {
       });
 
       // 验证每个处理器只处理自己的消息
-      expect(gameHandler.onMessage).toHaveBeenCalledWith('test-connection-domain', { test: 'message for game-domain' });
-      expect(chatHandler.onMessage).toHaveBeenCalledWith('test-connection-domain', { test: 'message for chat-domain' });
+      expect(gameOnMessage3).toHaveBeenCalledWith({ test: 'message for game-domain' });
+      expect(chatOnMessage3).toHaveBeenCalledWith({ test: 'message for chat-domain' });
     });
   });
 });

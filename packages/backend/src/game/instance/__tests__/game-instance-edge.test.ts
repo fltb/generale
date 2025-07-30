@@ -18,8 +18,8 @@ import {
   PlayerOperationType,
   SyncedGameState, // Added for type consistency
 } from "@generale/types";
-import { mask, tick } from "../core";
-import { GameInstance, GameInstanceSettings, SyncEntry } from "./GameInstance";
+import { mask, tick } from "../../core";
+import { GameInstance, GameInstanceSettings, SyncEntry } from "../GameInstance";
 import { applyPatch } from 'fast-json-patch';
 
 // --- MockConnector 与辅助函数 ---

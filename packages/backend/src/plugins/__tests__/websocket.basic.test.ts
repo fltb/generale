@@ -7,26 +7,30 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { unregisterDomainHandler } from '../websocket';
 
 // 模拟WebSocket连接管理器
+import { SubConnectorImpl } from '../websocket';
+import { domainHandlers } from '../websocket';
+
 class MockWebSocketConnectionManager {
   private connectionId: string;
   private isConnected: boolean = true;
-  private subConnectors = new Map<string, any>();
+  private subConnectors = new Map<string, SubConnectorImpl<any, any>>();
 
   constructor(connectionId: string) {
     this.connectionId = connectionId;
   }
 
   openSubConnector(domain: string, config: any) {
-    // 检查域名处理器是否存在
-    const domainHandlers = new Map();
-    if (!domainHandlers.has(domain)) {
+    const handler = domainHandlers.get(domain);
+    if (!handler) {
       return {
         success: false,
         error: 'Domain handler not found'
       };
     }
-
-    this.subConnectors.set(domain, { domain, ready: true });
+    const subConnector = new SubConnectorImpl(domain, config, null, this);
+    this.subConnectors.set(domain, subConnector);
+    handler(subConnector);
+    subConnector._triggerOpen();
     return { success: true, config };
   }
 
@@ -35,16 +39,25 @@ class MockWebSocketConnectionManager {
     if (!subConnector) {
       return { error: 'Domain not found' };
     }
+    subConnector._triggerMessage(payload);
     return { success: true, payload };
   }
 
   closeSubConnector(domain: string, code?: number, reason?: string) {
-    this.subConnectors.delete(domain);
-    return { success: true, code, reason };
+    const subConnector = this.subConnectors.get(domain);
+    if (subConnector) {
+      subConnector._triggerClose(code, reason);
+      this.subConnectors.delete(domain);
+      return { success: true, code, reason };
+    }
+    return { success: false, error: 'Domain not found' };
   }
 
   handleClose() {
     this.isConnected = false;
+    for (const [, subConnector] of this.subConnectors) {
+      subConnector._triggerDisconnect();
+    }
     this.subConnectors.clear();
   }
 
