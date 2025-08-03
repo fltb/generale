@@ -29,7 +29,9 @@ export interface SyncEntry {
 /**
  * 管理多玩家游戏实例，自动根据差异推送全量或增量，并跟踪 confirmedOp
  */
-export class GameInstance {
+import { IBaseInstance } from './interface';
+
+export class GameInstance implements IBaseInstance<SyncedGameClientActions, SyncedGameServerEvent> {
     private state: GameState;
     private version: number;
     private settings: GameInstanceSettings;
@@ -37,6 +39,7 @@ export class GameInstance {
     private syncData = new Map<PlayerId, SyncEntry>();
     private prevSentState = new Map<PlayerId, SyncedGameState>();
     private disconnected = new Set<PlayerId>();
+    private destroyed: boolean = false;
 
     constructor(
         initialState: GameState,
@@ -60,10 +63,45 @@ export class GameInstance {
         }
     }
 
+    public destroy() {
+        this.destroyed = true;
+        for (const [_pid, connector] of this.connectors) {
+            connector.close();
+        }
+        this.connectors.clear();
+        this.syncData.clear();
+        this.prevSentState.clear();
+        this.disconnected.clear();
+        this.state = null as any;
+        this.version = 0;
+    }
+
+    public canJoin(id: PlayerId): { success: true; } | { success: false; message: string; } {
+        if (this.destroyed) {
+            const msg = `[GameInstance] Cannot add player to destroyed instance`;
+            console.warn(msg);
+            return { success: false, message: msg };
+        }
+
+        if (!(id in this.state.players)) {
+            const msg = `[GameInstance] Player ${id} not in room`;
+            console.warn(msg);
+            return { success: false, message: msg };
+        }
+
+        return { success: true };
+    }
+
     /**
      * 动态绑定/替换某个玩家的 connector
      */
-    public setConnector(playerId: PlayerId, connector: GameServerConnector) {
+    /** 动态添加玩家（用于 GameService） */
+    public addPlayer(user: { id: PlayerId, name: string }, connector: GameServerConnector): { success: true } | { success: false, message: string } {
+        const playerId = user.id;
+        const res = this.canJoin(playerId);
+        if (!res.success) {
+            return res;
+        }
         this.connectors.set(playerId, connector);
         connector.onOpen(() => this.sendState(playerId, true));
         connector.onDisconnect(() => this.disconnected.add(playerId));
@@ -73,6 +111,7 @@ export class GameInstance {
         });
         connector.onClientMessage(evt => this.handleClientEvent(playerId, evt));
         connector.onClose(() => this.removeConnector(playerId));
+        return { success: true };
     }
 
     /**

@@ -9,32 +9,78 @@ import {
 /**
  * 依赖注入：ws sub-connector
  */
-export interface GameChatConnector {
-  onMessage(cb: (msg: ChatClientToServer) => void): void;
-  send(msg: ChatServerToClient): void;
-  close(): void;
-}
+export type GameChatConnector = ServerSyncConnector<ChatClientToServer, ChatServerToClient>
 
-export class GameChatInstance {
+import { IBaseInstance } from './interface';
+import { ServerSyncConnector } from '@generale/types';
+import { GameInstance } from './GameInstance';
+import { PreGameInstance } from './PreGameInstance';
+
+export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatServerToClient> {
   private messages: ChatMessage[] = [];
   private connectors = new Map<PlayerId, GameChatConnector>();
   private playerNames = new Map<PlayerId, string>();
   private maxMessages = 100;
   private messageIdCounter = 0;
 
+  private _activeStageInstance: GameInstance | PreGameInstance | null = null;
+
+  public set activeStageInstance(instance: GameInstance | PreGameInstance | null) {
+    this._activeStageInstance = instance;
+  }
+
+  private destroyed: boolean = false;
+
   constructor(maxMessages = 100) {
     this.maxMessages = maxMessages;
     this.addSystemMessage('游戏聊天已启动，欢迎大家！');
   }
 
+
+  
+  public destroy(): void {
+    this.destroyed = true;
+    for (const connector of this.connectors.values()) {
+      connector.close();
+    }
+    this._activeStageInstance = null;
+    this.connectors.clear();
+    this.playerNames.clear();
+    this.messages = [];
+  }
+
+  public canJoin(id: PlayerId): { success: true } | { success: false; message: string } {
+    if (this.destroyed) {
+      const msg = `[GameChatInstance] Cannot add player to destroyed instance`;
+      console.warn(msg);
+      return { success: false, message: msg };
+    }
+
+    if (this._activeStageInstance) {
+      const res = this._activeStageInstance.canJoin(id);
+      if (res.success) return { success: true };
+      return { success: false, message: `[GameChatInstance] Refused by active stage: ${res.message}` };
+    }
+    return { success: false, message: '[GameChatInstance] No active stage instance, cannot join chat.' };
+  }
+
   /** 玩家加入 */
-  addPlayer(pid: PlayerId, name: string, connector: GameChatConnector) {
+  /** 动态添加玩家（用于 GameService） */
+  public addPlayer(user: { id: PlayerId, name: string }, connector: ServerSyncConnector<ChatClientToServer, ChatServerToClient>): { success: true } | { success: false, message: string } {
+    const pid = user.id;
+    const name = user.name;
+    if (!this.canJoin(pid)) {
+      const msg = `[GameChatInstance] Player ${pid} not allowed to join`;
+      console.warn(msg);
+      return { success: false, message: msg };
+    }
     this.playerNames.set(pid, name);
     this.connectors.set(pid, connector);
-    connector.onMessage(msg => this.handleMessage(pid, msg));
+    connector.onClientMessage(msg => this.handleMessage(pid, msg));
     // 发送最近消息
     this.sendRecentMessages(pid, 30);
     this.addSystemMessage(`${name} 加入了游戏`);
+    return { success: true };
   }
 
   /** 玩家离开 */

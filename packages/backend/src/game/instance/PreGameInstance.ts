@@ -18,8 +18,15 @@ export type PreGameServerConnector = ServerSyncConnector<SyncedPreGameClientActi
  * PreGameInstance - 游戏房间阶段实例
  * 负责房主、设置、准备、队伍、同步等管理
  */
-export class PreGameInstance {
+import { IBaseInstance } from './interface';
+
+export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions, SyncedPreGameServerEvent> {
   private state: PreGameRoomState;
+  /**
+   * 处理客户端 action（带乐观编号幂等）
+   */
+  private syncData: Map<PlayerId, { lastConfirmedOp: number }> = new Map();
+
   private connectors: Map<PlayerId, PreGameServerConnector> = new Map();
   private prevSentState: Map<PlayerId, SyncedPreGameState> = new Map();
   private version = 0;
@@ -38,11 +45,21 @@ export class PreGameInstance {
     }
   }
 
-  /** 处理客户端 action */
   private handleClientAction(pid: PlayerId, evt: SyncedPreGameClientActions) {
     if (this.destroyed) return;
     const player = this.state.players.find(p => p.id === pid);
     if (!player) return;
+
+    // 幂等乐观编号判断
+    let synced = this.syncData.get(pid);
+    if (!synced) {
+      synced = { lastConfirmedOp: -1 };
+      this.syncData.set(pid, synced);
+    }
+    if (typeof evt.optimisticId === 'number' && synced.lastConfirmedOp >= evt.optimisticId) {
+      return;
+    }
+
     switch (evt.type) {
       case SyncedPreGameClientActionTypes.READY:
         this.setReady(pid, true); break;
@@ -69,6 +86,10 @@ export class PreGameInstance {
         break;
     }
     this.version++;
+    // 更新 lastConfirmedOp
+    if (typeof evt.optimisticId === 'number') {
+      synced.lastConfirmedOp = evt.optimisticId;
+    }
     this.broadcastState();
   }
 
@@ -154,6 +175,12 @@ export class PreGameInstance {
     this.destroy();
   }
 
+  private onStartGameCallbacks: Array<(state: PreGameRoomState) => void> = [];
+  /** 注册游戏开始回调 */
+  public onStartGame(callback: (state: PreGameRoomState) => void) {
+    this.onStartGameCallbacks.push(callback);
+  }
+
   /** 检查是否可开始游戏并广播 */
   private tryStartGame(pid: PlayerId) {
     if (pid !== this.state.hostId) return;
@@ -167,6 +194,10 @@ export class PreGameInstance {
         type: SyncedPreGameServerEventType.GAME_STARTED,
         payload: { startedAt }
       });
+    }
+    // 触发回调
+    for (const callback of this.onStartGameCallbacks) {
+      callback(this.state);
     }
   }
 
@@ -189,7 +220,7 @@ export class PreGameInstance {
       ? { room: this.state, selfId: pid, self: foundSelf }
       : { room: this.state, selfId: pid };
 
-    const confirmedOp = 0; // 预留字段（可后续实现op确认）
+    const confirmedOp = this.syncData.get(pid)?.lastConfirmedOp ?? 0;
     if (!prev || forceSnapshot) {
       conn.send({
         type: SyncedPreGameServerEventType.STATE_UPDATE,
@@ -248,21 +279,36 @@ export class PreGameInstance {
     return this.state;
   }
 
-  /** 动态添加玩家（用于 GameService） */
-  public addPlayer(playerId: PlayerId, playerName: string, connector: PreGameServerConnector): boolean {
+  public canJoin(playerId: PlayerId):{success: true} | {success: false, message: string} {
     if (this.destroyed) {
-      console.warn(`[PreGameInstance] Cannot add player to destroyed instance`);
-      return false;
+      const msg = `[PreGameInstance] Cannot add player to destroyed instance`;
+      console.warn(msg);
+      return { success: false, message: msg };
     }
 
     if (this.state.players.length >= this.state.playerLimit) {
-      console.warn(`[PreGameInstance] Room is full, cannot add player ${playerId}`);
-      return false;
+      const msg = `[PreGameInstance] Room is full, cannot add player ${playerId}`;
+      console.warn(msg);
+      return { success: false, message: msg };
     }
 
     if (this.state.players.find(p => p.id === playerId)) {
-      console.warn(`[PreGameInstance] Player ${playerId} already in room`);
-      return false;
+      const msg = `[PreGameInstance] Player ${playerId} already in room`;
+      console.warn(msg);
+      return { success: false, message: msg };
+    }
+
+    return { success: true };
+  }
+
+  /** 动态添加玩家（用于 GameService） */
+  public addPlayer(user:{id: PlayerId, name: string}, connector: PreGameServerConnector):  { success: true } | { success: false, message: string }{
+    const playerId = user.id;
+    const playerName = user.name;
+    
+    const res = this.canJoin(playerId);
+    if (!res.success) {
+      return res;
     }
 
     // 如果是第一个玩家，设为房主
@@ -295,7 +341,7 @@ export class PreGameInstance {
     this.broadcastState();
 
     console.log(`[PreGameInstance] Player ${playerId} (${playerName}) added to room, isHost: ${isHost}`);
-    return true;
+    return { success: true };
   }
 
   /** 移除玩家（用于 GameService） */

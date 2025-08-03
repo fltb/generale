@@ -4,7 +4,7 @@ import { GameChatInstance, GameChatConnector } from '../GameChatInstance';
 
 function createMockConnector() {
   return {
-    onMessage: vi.fn(),
+    onClientMessage: vi.fn(),
     send: vi.fn(),
     close: vi.fn(),
   } as unknown as GameChatConnector;
@@ -28,7 +28,7 @@ describe('GameChatInstance', () => {
   });
 
   it('玩家加入应注册 connector 并能收到历史消息', () => {
-    chat.addPlayer(player1, 'Alice', connector1);
+    chat.addPlayer({ id: player1, name: 'Alice' }, connector1);
     expect(chat["connectors"].get(player1)).toBe(connector1);
     // 加入后应收到历史消息（type: messages_batch）
     expect(connector1.send).toHaveBeenCalledWith(expect.objectContaining({ type: 'messages_batch' }));
@@ -37,16 +37,19 @@ describe('GameChatInstance', () => {
   });
 
   it('玩家发送消息应广播给所有玩家并入队', () => {
-    chat.addPlayer(player1, 'Alice', connector1);
     let handler1: any;
-    (connector1.onMessage as any).mockImplementation((cb: (msg: any) => void) => { handler1 = cb; });
-    chat.addPlayer(player1, 'Alice', connector1); // 触发 handler 注册
-    chat.addPlayer(player2, 'Bob', connector2);
+    (connector1.onClientMessage as any).mockImplementation((cb: (msg: any) => void) => { handler1 = cb; });
+    (connector1.send as any).mockClear();
+    (connector2.send as any).mockClear();
+    chat.addPlayer({ id: player1, name: 'Alice' }, connector1);
+    chat.addPlayer({ id: player2, name: 'Bob' }, connector2);
     // 玩家1发送消息
     handler1 && handler1({ type: 'send_message', content: 'hello' });
-    // 检查所有玩家都收到 new_message（遍历所有 send 调用）
+    // 输出调试信息
     const sendCalls1 = (connector1.send as any).mock.calls;
     const sendCalls2 = (connector2.send as any).mock.calls;
+    console.log('sendCalls1 after hello:', JSON.stringify(sendCalls1, null, 2));
+    console.log('sendCalls2 after hello:', JSON.stringify(sendCalls2, null, 2));
     expect(sendCalls1.some((args: any[]) => args[0].type === 'new_message' && args[0].message.content === 'hello')).toBe(true);
     expect(sendCalls2.some((args: any[]) => args[0].type === 'new_message' && args[0].message.content === 'hello')).toBe(true);
     // 消息入队
@@ -54,10 +57,10 @@ describe('GameChatInstance', () => {
   });
 
   it('消息队列超限应丢弃最早的', () => {
-    chat.addPlayer(player1, 'Alice', connector1);
+    chat.addPlayer({ id: player1, name: 'Alice' }, connector1);
     let handler: any;
-    (connector1.onMessage as any).mockImplementation((cb: (msg: any) => void) => { handler = cb; });
-    chat.addPlayer(player1, 'Alice', connector1); // 触发 handler 注册
+    (connector1.onClientMessage as any).mockImplementation((cb: (msg: any) => void) => { handler = cb; });
+    chat.addPlayer({ id: player1, name: 'Alice' }, connector1); // 触发 handler 注册
     handler && handler({ type: 'send_message', content: '1' });
     handler && handler({ type: 'send_message', content: '2' });
     handler && handler({ type: 'send_message', content: '3' });
@@ -68,12 +71,12 @@ describe('GameChatInstance', () => {
   });
 
   it('玩家离开后不会再收到消息', () => {
-    chat.addPlayer(player1, 'Alice', connector1);
-    chat.addPlayer(player2, 'Bob', connector2);
+    chat.addPlayer({ id: player1, name: 'Alice' }, connector1);
+    chat.addPlayer({ id: player2, name: 'Bob' }, connector2);
     chat.removePlayer(player2);
     let handler1: any;
-    (connector1.onMessage as any).mockImplementation((cb: any) => { handler1 = cb; });
-    chat.addPlayer(player1, 'Alice', connector1);
+    (connector1.onClientMessage as any).mockImplementation((cb: any) => { handler1 = cb; });
+    chat.addPlayer({ id: player1, name: 'Alice' }, connector1);
     handler1!({ type: 'send_message', content: 'bye' });
     expect(connector2.send).not.toHaveBeenCalledWith(expect.objectContaining({ content: 'bye' }));
   });
@@ -85,8 +88,8 @@ describe('GameChatInstance', () => {
   });
 
   it('多次加入/移除同一玩家无副作用', () => {
-    chat.addPlayer(player1, 'Alice', connector1);
-    chat.addPlayer(player1, 'Alice', connector1);
+    chat.addPlayer({ id: player1, name: 'Alice' }, connector1);
+    chat.addPlayer({ id: player1, name: 'Alice' }, connector1);
     chat.removePlayer(player1);
     chat.removePlayer(player1);
     expect(chat["connectors"].get(player1)).toBeUndefined();

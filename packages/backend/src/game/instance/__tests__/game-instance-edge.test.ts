@@ -36,7 +36,8 @@ class MockServerSyncConnector implements ServerSyncConnector<SyncedGameClientAct
     this.sent.push(structuredClone(evt));
   }
   onOpen(cb: () => void) { this.openCbs.push(cb); }
-  onClientMessage(cb: (evt: SyncedGameClientActions) => void) { this.msgCbs.push(cb); } // Typed
+  onMessage(cb: (evt: SyncedGameClientActions) => void) { this.msgCbs.push(cb); }
+  onClientMessage(cb: (evt: SyncedGameClientActions) => void) { this.onMessage(cb); } // Typed
   onClose(cb: (code: number, reason: string) => void) { this.closeCbs.push(cb); }
   onDisconnect(cb: (err?: Error) => void) { this.discCbs.push(cb); }
   onReconnect(cb: () => void) { this.recCbs.push(cb); }
@@ -100,8 +101,8 @@ beforeEach(() => {
   const init = createInitialState();
   const settings: GameInstanceSettings = { playerDisplay: { A: { tileColor: 0xff0000 }, B: { tileColor: 0x0000ff } } };
   inst = new GameInstance(init, settings, [pidA, pidB]);
-  inst.setConnector(pidA, connectorA);
-  inst.setConnector(pidB, connectorB);
+  inst.addPlayer({ id: pidA, name: 'A' }, connectorA);
+  inst.addPlayer({ id: pidB, name: 'B' }, connectorB);
   connectorA.triggerOpen();
   connectorB.triggerOpen();
 });
@@ -341,8 +342,8 @@ describe("GameInstance core behaviors", () => {
       { type: TileType.Plain, ownerId: "B", army: 3 }
     ];
     inst = new GameInstance(customInitialState, { playerDisplay: {} }, [pidA, pidB]);
-    inst.setConnector(pidA, connectorA);
-    inst.setConnector(pidB, connectorB);
+    inst.addPlayer({ id: pidA, name: 'A' }, connectorA);
+    inst.addPlayer({ id: pidB, name: 'B' }, connectorB);
     connectorA.triggerOpen();
     connectorB.triggerOpen();
     connectorA.triggerClient({
@@ -513,8 +514,8 @@ describe("GameInstance core behaviors", () => {
       }
     };
     const inst = new GameInstance(state, settings, ["A", "B"]);
-    inst.setConnector("A", connectorA);
-    inst.setConnector("B", connectorB);
+    inst.addPlayer({ id: "A", name: "A" }, connectorA);
+    inst.addPlayer({ id: "B", name: "B" }, connectorB);
     inst.advance();
     // 添加操作让A攻占B的王座
     const queues = {
