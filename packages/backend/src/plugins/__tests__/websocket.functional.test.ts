@@ -111,7 +111,7 @@ describe('WebSocket Domain Handler Functionality', () => {
       const payload = { action: 'move', position: { x: 10, y: 20 } };
       // 新接口：注册 handler 并触发 message
       const handler: DomainHandler = (connector: any) => {
-        connector.onMessage((msg: any) => {
+        connector.onClientMessage((msg: any) => {
           receivedMessages.push({
             type: 'message',
             connId: mockConnectionId,
@@ -196,12 +196,12 @@ describe('WebSocket Domain Handler Functionality', () => {
       const chatMessages: any[] = [];
       
       const gameHandler: DomainHandler = (connector) => {
-        connector.onMessage((payload) => {
+        connector.onClientMessage((payload) => {
           gameMessages.push({ domain: 'game', payload });
         });
       };
       const chatHandler: DomainHandler = (connector) => {
-        connector.onMessage((payload) => {
+        connector.onClientMessage((payload) => {
           chatMessages.push({ domain: 'chat', payload });
         });
       };
@@ -240,7 +240,7 @@ describe('WebSocket Domain Handler Functionality', () => {
           });
           gameState.messages.push({ type: 'player_joined', connId, config: connector.context });
         });
-        connector.onMessage((payload) => {
+        connector.onClientMessage((payload) => {
           const ctx = connector.context as { playerName: string };
           const connId = connector.domain + '-' + (ctx.playerName || '');
           const player = gameState.players.get(connId);
@@ -315,7 +315,7 @@ describe('WebSocket Domain Handler Functionality', () => {
 
     it('should handle handler exceptions gracefully', () => {
       const errorHandler: DomainHandler = (connector) => {
-        connector.onMessage(() => { throw new Error('Handler error'); });
+        connector.onClientMessage(() => { throw new Error('Handler error'); });
       };
       registerDomainHandler('error-handler', errorHandler);
       const sub = new MockSubConnector('error-handler', {});

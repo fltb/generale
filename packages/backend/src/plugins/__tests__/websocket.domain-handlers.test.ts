@@ -50,7 +50,7 @@ class MockSubConnector implements SubConnector {
     this.reconnectCallbacks.push(cb);
   }
 
-  onMessage(cb: (payload: any) => void): void {
+  onClientMessage(cb: (payload: any) => void): void {
     this.messageCallbacks.push(cb);
   }
 
@@ -205,7 +205,7 @@ describe('WebSocket域名处理器测试', () => {
       const onClose = vi.fn();
       const testHandler: DomainHandler = (connector) => {
         connector.onOpen(() => onOpen(connector.domain, connector.context));
-        connector.onMessage((payload) => onMessage(connector.domain, payload));
+        connector.onClientMessage((payload) => onMessage(connector.domain, payload));
         connector.onClose((code, reason) => onClose(connector.domain, code, reason));
       };
 
@@ -221,14 +221,14 @@ describe('WebSocket域名处理器测试', () => {
       const gameOnMessage = vi.fn();
       const gameHandler: DomainHandler = (connector) => {
         connector.onOpen(() => gameOnOpen(connector.domain, connector.context));
-        connector.onMessage((payload) => gameOnMessage(connector.domain, payload));
+        connector.onClientMessage((payload) => gameOnMessage(connector.domain, payload));
       };
 
       const chatOnOpen = vi.fn();
       const chatOnMessage = vi.fn();
       const chatHandler: DomainHandler = (connector) => {
         connector.onOpen(() => chatOnOpen(connector.domain, connector.context));
-        connector.onMessage((payload) => chatOnMessage(connector.domain, payload));
+        connector.onClientMessage((payload) => chatOnMessage(connector.domain, payload));
       };
 
       mockManager.registerDomainViaAPI('game-domain', gameHandler);
@@ -248,7 +248,7 @@ describe('WebSocket域名处理器测试', () => {
       const onClose2 = vi.fn();
       const testHandler: DomainHandler = (connector) => {
         connector.onOpen(() => onOpen2(connector.domain, connector.context));
-        connector.onMessage((payload) => onMessage2(connector.domain, payload));
+        connector.onClientMessage((payload) => onMessage2(connector.domain, payload));
         connector.onClose((code, reason) => onClose2(connector.domain, code, reason));
       };
 
@@ -285,7 +285,7 @@ describe('WebSocket域名处理器测试', () => {
       const onMessage3 = vi.fn();
       const testHandler: DomainHandler = (connector) => {
         connector.onOpen(() => ({ welcome: 'Hello from test domain!' }));
-        connector.onMessage((payload) => ({
+        connector.onClientMessage((payload) => ({
           processed: true,
           originalPayload: payload,
           response: `Processed: ${JSON.stringify(payload)}`
@@ -325,28 +325,28 @@ describe('WebSocket域名处理器测试', () => {
       }));
       const testHandler: DomainHandler = (connector) => {
         connector.onOpen(() => ({ welcome: 'Hello from test domain!' }));
-        connector.onMessage((payload) => onMessage4(payload));
+        connector.onClientMessage((payload) => onMessage4(payload));
       };
 
       const gameOnOpen = vi.fn(() => ({ type: 'game', status: 'ready' }));
       const gameOnMessage = vi.fn((payload) => ({ type: 'game', echo: payload }));
       const gameHandler: DomainHandler = (connector) => {
         connector.onOpen(() => { return gameOnOpen(connector.domain, connector.context); });
-        connector.onMessage((payload) => gameOnMessage(payload));
+        connector.onClientMessage((payload) => gameOnMessage(payload));
       };
 
       const chatOnOpen = vi.fn(() => ({ type: 'chat', status: 'connected' }));
       const chatOnMessage = vi.fn((payload) => ({ type: 'chat', echo: payload }));
       const chatHandler: DomainHandler = (connector) => {
         connector.onOpen(() => { return chatOnOpen(connector.domain, connector.context); });
-        connector.onMessage((payload) => chatOnMessage(payload));
+        connector.onClientMessage((payload) => chatOnMessage(payload));
       };
 
       const pregameOnOpen = vi.fn(() => ({ type: 'pregame', status: 'waiting' }));
       const pregameOnMessage = vi.fn((payload) => ({ type: 'pregame', echo: payload }));
       const pregameHandler: DomainHandler = (connector) => {
         connector.onOpen(() => { return pregameOnOpen(connector.domain, connector.context); });
-        connector.onMessage((payload) => pregameOnMessage(payload));
+        connector.onClientMessage((payload) => pregameOnMessage(payload));
       };
 
       const domains = ['game-domain', 'chat-domain', 'pregame-domain'];
@@ -377,14 +377,14 @@ describe('WebSocket域名处理器测试', () => {
       const gameOnMessage3 = vi.fn((payload) => ({ domain: 'game', processed: payload }));
       const gameHandler: DomainHandler = (connector) => {
         connector.onOpen(() => gameOnOpen3(connector.domain, connector.context));
-        connector.onMessage((payload) => gameOnMessage3(payload));
+        connector.onClientMessage((payload) => gameOnMessage3(payload));
       };
 
       const chatOnOpen3 = vi.fn();
       const chatOnMessage3 = vi.fn((payload) => ({ domain: 'chat', processed: payload }));
       const chatHandler: DomainHandler = (connector) => {
         connector.onOpen(() => chatOnOpen3(connector.domain, connector.context));
-        connector.onMessage((payload) => chatOnMessage3(payload));
+        connector.onClientMessage((payload) => chatOnMessage3(payload));
       };
 
       const domains = ['game-domain', 'chat-domain'];

@@ -1,50 +1,49 @@
 import { Elysia } from "elysia";
+import type { ServerSyncConnector } from '@generale/types/src/connection/conn-type';
+
+/**
+ * WebSocket connection manager that handles sub-connectors
+ * 纯粹的消息路由器，不包含业务逻辑
+ */
+interface WSContextBase {
+  userid: string;
+  username: string;
+};
 
 /**
  * WebSocket message structure for sub-connector communication
  */
-export type WebSocketMessage<T = unknown, Context = unknown> =
+export type WebSocketMessage<T = unknown, Context extends WSContextBase = WSContextBase> =
   | { domain: string; type: "open"; payload: Context }
   | { domain: string; type: "close"; payload?: { code?: number; reason?: string } }
   | { domain: string; type: "message"; payload: T };
-
-
-/**
- * Domain handler interface - 单回调函数接收完整的 SubConnector 实例
- */
-export type DomainHandler<Msg = unknown, Ctx = unknown> = (connector: SubConnector<Msg, Ctx>) => void;
 
 /**
  * Sub-connector interface for domain-specific communication
  * 扩展支持生命周期事件注册和 context 访问
  */
-export interface SubConnector<Msg = unknown, Ctx = unknown> {
+export interface SubConnector<CEvt = unknown, SEvt = unknown, Ctx extends WSContextBase = WSContextBase> extends ServerSyncConnector<CEvt, SEvt> {
+  /** 当前子连接所属域名（如 pregame/game/chat） */
   readonly domain: string;
-  readonly ready: boolean;
+  /** 连接上下文，通常包含 playerId/gameId 等 */
   readonly context: Ctx;
-  
-  // 基础通信方法
-  send(payload: Msg): void;
-  close(code?: number, reason?: string): void;
-  
-  // 生命周期事件注册
-  onOpen(cb: () => void): void;
-  onClose(cb: (code?: number, reason?: string) => void): void;
-  onDisconnect(cb: (err?: Error) => void): void;
-  onReconnect(cb: () => void): void;
-  onMessage(cb: (payload: Msg) => void): void;
 }
+
+/**
+ * Domain handler interface - 单回调函数接收完整的 SubConnector 实例
+ */
+export type DomainHandler<CEvt = unknown, SEvt = unknown, Ctx extends WSContextBase = WSContextBase> = (connector: SubConnector<CEvt, SEvt, Ctx>) => void;
 
 /**
  * 全局域名处理器注册表
  */
-const domainHandlers = new Map<string, DomainHandler<any, any>>();
+const domainHandlers = new Map<string, DomainHandler<any, any, any>>();
 export { domainHandlers };
 
 /**
  * 注册域名处理器
  */
-export function registerDomainHandler<Msg = unknown, Ctx = unknown>(domain: string, handler: DomainHandler<Msg, Ctx>): void {
+export function registerDomainHandler<CEvt = unknown, SEvt = unknown, Ctx extends WSContextBase = WSContextBase>(domain: string, handler: DomainHandler<CEvt, SEvt, Ctx>): void {
   if (domainHandlers.has(domain)) {
     console.warn(`Domain handler for '${domain}' already exists, overwriting`);
   }
@@ -63,13 +62,13 @@ export function unregisterDomainHandler(domain: string): void {
 /**
  * SubConnector 实现类，支持生命周期事件注册
  */
-export class SubConnectorImpl<Msg = unknown, Ctx = unknown> implements SubConnector<Msg, Ctx> {
+export class SubConnectorImpl<CEvt = unknown, SEvt = unknown, Ctx extends WSContextBase = WSContextBase> implements SubConnector<CEvt, SEvt, Ctx> {
   private _ready: boolean = true;
   private openCallbacks: (() => void)[] = [];
-  private closeCallbacks: ((code?: number, reason?: string) => void)[] = [];
+  private closeCallbacks: ((code: number, reason: string) => void)[] = [];
   private disconnectCallbacks: ((err?: Error) => void)[] = [];
   private reconnectCallbacks: (() => void)[] = [];
-  private messageCallbacks: ((payload: Msg) => void)[] = [];
+  private messageCallbacks: ((payload: CEvt) => void)[] = [];
 
   constructor(
     public readonly domain: string,
@@ -82,12 +81,12 @@ export class SubConnectorImpl<Msg = unknown, Ctx = unknown> implements SubConnec
     return this._ready;
   }
 
-  send(payload: Msg): void {
+  send(evt: SEvt): void {
     if (this._ready && this.connectionManager.isConnected) {
       this.ws.send(JSON.stringify({
         domain: this.domain,
         type: 'message',
-        payload
+        payload: evt
       }));
     }
   }
@@ -100,7 +99,7 @@ export class SubConnectorImpl<Msg = unknown, Ctx = unknown> implements SubConnec
     this.openCallbacks.push(cb);
   }
 
-  onClose(cb: (code?: number, reason?: string) => void): void {
+  onClose(cb: (code: number, reason: string) => void): void {
     this.closeCallbacks.push(cb);
   }
 
@@ -112,7 +111,7 @@ export class SubConnectorImpl<Msg = unknown, Ctx = unknown> implements SubConnec
     this.reconnectCallbacks.push(cb);
   }
 
-  onMessage(cb: (payload: Msg) => void): void {
+  onClientMessage(cb: (evt: CEvt) => void): void {
     this.messageCallbacks.push(cb);
   }
 
@@ -123,7 +122,7 @@ export class SubConnectorImpl<Msg = unknown, Ctx = unknown> implements SubConnec
 
   _triggerClose(code?: number, reason?: string): void {
     this._ready = false;
-    this.closeCallbacks.forEach(cb => cb(code, reason));
+    this.closeCallbacks.forEach(cb => cb(code ?? 1000, reason ?? 'Normal Closure'));
   }
 
   _triggerDisconnect(err?: Error): void {
@@ -135,18 +134,10 @@ export class SubConnectorImpl<Msg = unknown, Ctx = unknown> implements SubConnec
     this.reconnectCallbacks.forEach(cb => cb());
   }
 
-  _triggerMessage(payload: Msg): void {
+  _triggerMessage(payload: CEvt): void {
     this.messageCallbacks.forEach(cb => cb(payload));
   }
 }
-
-/**
- * WebSocket connection manager that handles sub-connectors
- * 纯粹的消息路由器，不包含业务逻辑
- */
-interface WSContextBase {
-  userid: string;
-};
 
 class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WSContextBase> {
   /**

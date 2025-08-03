@@ -28,7 +28,7 @@ describe('WebSocket单元测试', () => {
       expect(() => {
         registerDomainHandler('test-domain', (connector) => {
           connector.onOpen(onOpen);
-          connector.onMessage(onMessage);
+          connector.onClientMessage(onMessage);
           connector.onClose(onClose);
           connector.onDisconnect(onDisconnect);
           connector.onReconnect(onReconnect);
@@ -42,7 +42,7 @@ describe('WebSocket单元测试', () => {
       const onClose = vi.fn();
       registerDomainHandler('test-domain', (connector) => {
         connector.onOpen(onOpen);
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
         connector.onClose(onClose);
       });
       expect(() => {
@@ -60,7 +60,7 @@ describe('WebSocket单元测试', () => {
         expect(() => {
           registerDomainHandler(domain, (connector) => {
             connector.onOpen(onOpen);
-            connector.onMessage(onMessage);
+            connector.onClientMessage(onMessage);
             connector.onClose(onClose);
           });
         }).not.toThrow();
@@ -81,13 +81,13 @@ describe('WebSocket单元测试', () => {
       // 第一次注册
       registerDomainHandler('test-domain', (connector) => {
         connector.onOpen(onOpen);
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
         connector.onClose(onClose);
       });
       // 第二次注册同一个域名
       registerDomainHandler('test-domain', (connector) => {
         connector.onOpen(onOpen);
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
         connector.onClose(onClose);
       });
 
@@ -109,7 +109,7 @@ describe('WebSocket单元测试', () => {
       const onClose = vi.fn();
       registerDomainHandler('test-domain', (connector) => {
         connector.onOpen(onOpen);
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
         connector.onClose(onClose);
       });
       // 模拟调用onMessage
@@ -133,7 +133,7 @@ describe('WebSocket单元测试', () => {
       const onClose = vi.fn();
       registerDomainHandler('test-domain', (connector) => {
         connector.onOpen(onOpen);
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
         connector.onClose(onClose);
       });
       // 模拟调用onOpen
@@ -148,7 +148,7 @@ describe('WebSocket单元测试', () => {
       const onClose = vi.fn();
       registerDomainHandler('test-domain', (connector) => {
         connector.onOpen(onOpen);
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
         connector.onClose(onClose);
       });
       // 模拟调用onClose
@@ -167,7 +167,7 @@ describe('WebSocket单元测试', () => {
       const onDisconnect = vi.fn();
       registerDomainHandler('test-domain', (connector) => {
         connector.onOpen(onOpen);
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
         connector.onClose(onClose);
         connector.onDisconnect(onDisconnect);
       });
@@ -183,7 +183,7 @@ describe('WebSocket单元测试', () => {
       const onReconnect = vi.fn();
       registerDomainHandler('test-domain', (connector) => {
         connector.onOpen(onOpen);
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
         connector.onClose(onClose);
         connector.onReconnect(onReconnect);
       });
@@ -210,7 +210,7 @@ describe('WebSocket单元测试', () => {
       const onMessage = vi.fn();
       expect(() => {
         registerDomainHandler('test-domain', (connector) => {
-          connector.onMessage(onMessage);
+          connector.onClientMessage(onMessage);
         });
       }).not.toThrow();
     });
@@ -229,7 +229,7 @@ describe('WebSocket单元测试', () => {
         }
       });
       registerDomainHandler('test-domain', (connector) => {
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
       });
       // 测试echo消息
       const echoResponse = onMessage('conn1', { action: 'echo', data: 'test' });
@@ -247,7 +247,7 @@ describe('WebSocket单元测试', () => {
     it('应该正确处理复杂的消息载荷', () => {
       const onMessage = vi.fn().mockReturnValue({ processed: true });
       registerDomainHandler('test-domain', (connector) => {
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
       });
       const complexPayload = {
         action: 'complex-action',
@@ -278,7 +278,7 @@ describe('WebSocket单元测试', () => {
       for (let i = 0; i < domainCount; i++) {
         const onMessage = vi.fn();
         registerDomainHandler(`domain-${i}`, (connector) => {
-          connector.onMessage(onMessage);
+          connector.onClientMessage(onMessage);
         });
       }
       
@@ -297,7 +297,7 @@ describe('WebSocket单元测试', () => {
     it('应该能够处理高频的消息调用', () => {
       const onMessage = vi.fn().mockReturnValue({ processed: true });
       registerDomainHandler('test-domain', (connector) => {
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
       });
       const startTime = Date.now();
       const messageCount = 1000;

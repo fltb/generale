@@ -29,7 +29,7 @@ class MockSubConnector implements SubConnector {
   onClose(cb: (code?: number, reason?: string) => void): void { this.closeCallbacks.push(cb); }
   onDisconnect(cb: (err?: Error) => void): void { this.disconnectCallbacks.push(cb); }
   onReconnect(cb: () => void): void { this.reconnectCallbacks.push(cb); }
-  onMessage(cb: (payload: any) => any): void { this.messageCallbacks.push(cb); }
+  onClientMessage(cb: (payload: any) => any): void { this.messageCallbacks.push(cb); }
   triggerOpen(): any { return this.openCallbacks[0]?.(); }
   triggerMessage(payload: any): any { return this.messageCallbacks[0]?.(payload); }
   triggerDisconnect(err?: Error): void { this.disconnectCallbacks.forEach(cb => cb(err)); }
@@ -134,7 +134,7 @@ class MockRealTimeConnectionManager {
       const onReconnect = vi.fn();
       const testHandler: DomainHandler = (connector) => {
         connector.onOpen(() => onOpen());
-        connector.onMessage((payload) => onMessage(payload));
+        connector.onClientMessage((payload) => onMessage(payload));
         connector.onClose(() => onClose());
         connector.onDisconnect(() => onDisconnect());
         connector.onReconnect(() => onReconnect());
@@ -162,12 +162,12 @@ class MockRealTimeConnectionManager {
       const chatOnClose = vi.fn();
       const gameHandler: DomainHandler = (connector) => {
         connector.onOpen(() => gameOnOpen());
-        connector.onMessage((payload) => gameOnMessage(payload));
+        connector.onClientMessage((payload) => gameOnMessage(payload));
         connector.onClose(() => gameOnClose());
       };
       const chatHandler: DomainHandler = (connector) => {
         connector.onOpen(() => chatOnOpen());
-        connector.onMessage((payload) => chatOnMessage(payload));
+        connector.onClientMessage((payload) => chatOnMessage(payload));
         connector.onClose(() => chatOnClose());
       };
       mockConnection.registerDomain('game-domain', gameHandler);
@@ -263,7 +263,7 @@ class MockRealTimeConnectionManager {
       const onReconnect = vi.fn();
       const testHandler: DomainHandler = (connector) => {
         connector.onOpen(() => onOpen(connector.context));
-        connector.onMessage(onMessage);
+        connector.onClientMessage(onMessage);
         connector.onClose(onClose);
         connector.onDisconnect(onDisconnect);
         connector.onReconnect(onReconnect);
@@ -296,7 +296,7 @@ class MockRealTimeConnectionManager {
       const gameOnClose = vi.fn();
       const gameHandler: DomainHandler = (connector) => {
         connector.onOpen(gameOnOpen);
-        connector.onMessage(gameOnMessage);
+        connector.onClientMessage(gameOnMessage);
         connector.onClose(gameOnClose);
       };
 
@@ -305,7 +305,7 @@ class MockRealTimeConnectionManager {
       const chatOnClose = vi.fn();
       const chatHandler: DomainHandler = (connector) => {
         connector.onOpen(chatOnOpen);
-        connector.onMessage(chatOnMessage);
+        connector.onClientMessage(chatOnMessage);
         connector.onClose(chatOnClose);
       };
 
