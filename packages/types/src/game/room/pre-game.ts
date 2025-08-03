@@ -1,5 +1,5 @@
 // 游戏房间阶段（PreGameInstance）核心类型定义，最大程度复用 core-type
-import { PlayerId, TeamId, GameId, TileType } from '../core-type';
+import type { PlayerId, TeamId, GameId, TileType } from '../core-type';
 
 // 地图类型
 export enum PreGameMapType {

@@ -1,6 +1,6 @@
-import { SyncedStateClientGenericSyncAction, SyncedStateServerEvent } from '../../connection/sync-store-type';
-import { PreGameRoomState, PreGamePlayerInfo } from './pre-game';
-import { PlayerId } from '../core-type';
+import type { SyncedStateClientGenericSyncAction, SyncedStateServerEvent } from '../../connection/sync-store-type';
+import type { PreGameRoomState, PreGamePlayerInfo } from './pre-game';
+import type { PlayerId } from '../core-type';
 
 /**
  * 用于前端同步的房间状态（全量同步，类似于 SyncedGameState）

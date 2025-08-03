@@ -1,4 +1,4 @@
-import { PlayerId } from './core-type';
+import type { PlayerId } from './core-type';
 
 export type ChatMessageType = 'user' | 'system';
 

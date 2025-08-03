@@ -1,4 +1,4 @@
-import { SyncedStateClientGenericSyncAction } from "../connection";
+import type { SyncedStateClientGenericSyncAction } from "../connection";
 
 /**
  * 坐标

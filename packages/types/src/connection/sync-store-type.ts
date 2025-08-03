@@ -1,5 +1,5 @@
 // src/types.ts
-import { Operation } from 'fast-json-patch';
+import type { Operation } from 'fast-json-patch';
 
 /**
  * Full synchronization mechanism explanation:

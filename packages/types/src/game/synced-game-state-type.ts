@@ -1,5 +1,5 @@
-import { SyncedStateClientGenericSyncAction, SyncedStateServerEvent } from "../connection/sync-store-type";
-import { MaskedGameState, PlayerId, PlayerOperation } from "./core-type";
+import type { SyncedStateClientGenericSyncAction, SyncedStateServerEvent } from "../connection/sync-store-type";
+import type { MaskedGameState, PlayerId, PlayerOperation } from "./core-type";
 
 export interface SyncedGameState extends MaskedGameState {
     playerDisplay: {
