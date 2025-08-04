@@ -8,6 +8,7 @@ import {
   SyncedPreGameServerStateUpdatePayloadType,
   ServerSyncConnector,
   SyncedPreGameState,
+  PlayerColor
 } from '@generale/types';
 import { compare } from 'fast-json-patch';
 
@@ -266,6 +267,12 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     }
   }
 
+  private getAvailableTileColor(): PlayerColor {
+    const usedColors = this.state.players.map(p => p.tileColor);
+    const color = Object.values(PlayerColor).find(color => !usedColors.includes(color as PlayerColor));
+    return color as PlayerColor;
+  }
+
   /** 主动销毁实例 */
   public destroy() {
     this.destroyed = true;
@@ -324,6 +331,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       isHost,
       ready: isHost ? 1 : 0, // 房主默认准备
       teamId: 'team1', // 默认队伍
+      tileColor: this.getAvailableTileColor(), // 默认队伍
     });
 
     // 设置连接器
