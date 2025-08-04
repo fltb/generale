@@ -167,29 +167,55 @@ export function updateGameState(state: GameState): void {
 
 export function autoJudge(state: GameState) {
     // —— 自动判负：如果玩家land和army都为0，直接判为Defeated ——
+    let hasWinner = false;
+    const playerStatusMap: Record<string, PlayerStatus> = {};
     for (const player of Object.values(state.players)) {
         if (player.status === PlayerStatus.Playing && player.land === 0 && player.army === 0) {
             player.status = PlayerStatus.Defeated;
         }
+        playerStatusMap[player.id] = player.status;
     }
-    // —— 自动判负队伍+全局胜负判定：同tick内同步 ——
-    let aliveTeamsCount = 0;
+    // 如果已经有队伍胜利，则不再重复判定
     for (const team of Object.values(state.teams)) {
-        const allDefeated = team.memberIds.every(pid => state.players[pid]?.status !== PlayerStatus.Playing);
-        if (allDefeated) {
-            team.status = PlayerStatus.Defeated;
-        } else {
-            team.status = PlayerStatus.Playing;
-            aliveTeamsCount++;
+        if (team.status === PlayerStatus.Won) {
+            hasWinner = true;
+            break;
         }
     }
+    if (hasWinner) return;
+    // 合并队伍判定和赋值
+    const aliveTeams: string[] = [];
+    const teamDefeatedMap: Record<string, boolean> = {};
     const totalTeams = Object.keys(state.teams).length;
-    if (totalTeams > 1 && aliveTeamsCount <= 1) {
+    for (const [tid, team] of Object.entries(state.teams)) {
+        const allDefeated = team.memberIds.every(pid => playerStatusMap[pid] !== PlayerStatus.Playing);
+        teamDefeatedMap[tid] = allDefeated;
+        if (!allDefeated) aliveTeams.push(tid);
+    }
+    if (aliveTeams.length === 0) {
         state.status = GameStatus.Ended;
-    } else if (aliveTeamsCount === 0) {
-        // 所有队伍都被淘汰
+        for (const team of Object.values(state.teams)) {
+            team.status = PlayerStatus.Defeated;
+        }
+    } else if (totalTeams > 1 && aliveTeams.length === 1) {
+        const winnerTid = aliveTeams[0];
+        for (const [tid, team] of Object.entries(state.teams)) {
+            if (tid === winnerTid) {
+                team.status = PlayerStatus.Won;
+                for (const pid of team.memberIds) {
+                    if (state.players[pid]) {
+                        state.players[pid].status = PlayerStatus.Won;
+                    }
+                }
+            } else {
+                team.status = PlayerStatus.Defeated;
+            }
+        }
         state.status = GameStatus.Ended;
     } else {
+        for (const [tid, team] of Object.entries(state.teams)) {
+            team.status = teamDefeatedMap[tid] ? PlayerStatus.Defeated : PlayerStatus.Playing;
+        }
         state.status = GameStatus.Playing;
     }
 }

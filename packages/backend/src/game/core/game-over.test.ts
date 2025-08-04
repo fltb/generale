@@ -27,14 +27,29 @@ function createBasicState({
             army: t.army ?? 0,
         };
     }
+    // 统计每个玩家的地块和兵力
+    const playerLand: Record<PlayerId, number> = {};
+    const playerArmy: Record<PlayerId, number> = {};
+    for (const [pid] of Object.entries(players)) {
+        playerLand[pid] = 0;
+        playerArmy[pid] = 0;
+    }
+    for (const row of mapTiles) {
+        for (const tile of row) {
+            if (tile.ownerId && playerLand.hasOwnProperty(tile.ownerId)) {
+                playerLand[tile.ownerId] += 1;
+                playerArmy[tile.ownerId] += tile.army;
+            }
+        }
+    }
     const playerObjs: Record<PlayerId, any> = {};
     for (const [pid, info] of Object.entries(players)) {
         playerObjs[pid] = {
             id: pid,
             status: info.status ?? PlayerStatus.Playing,
             teamId: info.teamId,
-            army: 0,
-            land: 0,
+            army: playerArmy[pid],
+            land: playerLand[pid],
             lastActiveTick: 0,
         };
     }
@@ -88,7 +103,7 @@ describe('game-over by tick', () => {
         const state = createBasicState({
             players: {
                 p1: { teamId: 't1', status: PlayerStatus.Defeated },
-                p2: { teamId: 't2' },
+                p2: { teamId: 't2', status: PlayerStatus.Playing },
                 p3: { teamId: 't1', status: PlayerStatus.Defeated },
             },
             teams: {
@@ -102,14 +117,14 @@ describe('game-over by tick', () => {
         const { state: newState } = tick(state, {});
         expect(newState.status).toBe('ENDED');
         expect(newState.teams['t1'].status).toBe(PlayerStatus.Defeated);
-        expect(newState.teams['t2'].status).toBe(PlayerStatus.Playing);
+        expect(newState.teams['t2'].status).toBe(PlayerStatus.Won);
     });
 
     it('多玩家不同队伍最后一队胜利', () => {
         const state = createBasicState({
             players: {
                 p1: { teamId: 't1', status: PlayerStatus.Defeated },
-                p2: { teamId: 't2' },
+                p2: { teamId: 't2', status: PlayerStatus.Playing },
                 p3: { teamId: 't3', status: PlayerStatus.Defeated },
             },
             teams: {
@@ -123,7 +138,7 @@ describe('game-over by tick', () => {
         });
         const { state: newState } = tick(state, {});
         expect(newState.status).toBe('ENDED');
-        expect(newState.teams['t2'].status).toBe(PlayerStatus.Playing);
+        expect(newState.teams['t2'].status).toBe(PlayerStatus.Won);
         expect(newState.teams['t1'].status).toBe(PlayerStatus.Defeated);
         expect(newState.teams['t3'].status).toBe(PlayerStatus.Defeated);
     });
@@ -208,7 +223,7 @@ describe('game-over by tick', () => {
         };
         // 直接调用 tick 推进
         const { state: newState } = tick(state, {});
-        expect(newState.players['A']?.status).toBe(PlayerStatus.Playing);
+        expect(newState.players['A']?.status).toBe(PlayerStatus.Won);
         expect(newState.players['B']?.status).toBe(PlayerStatus.Defeated);
         expect(newState.status).toBe('ENDED');
         expect(newState.map.tiles[1][1]?.ownerId).toBe("A");
