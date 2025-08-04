@@ -12,7 +12,7 @@ import {
     SyncedGameClientActionTypes
 } from '@generale/types';
 import { tick, mask } from '../core';
-import { GameStatus } from '@generale/types';
+import { GameStatus, PlayerStatus } from '@generale/types';
 import { compare } from 'fast-json-patch';
 
 type GameServerConnector = ServerSyncConnector<SyncedGameClientActions, SyncedGameServerEvent>;
@@ -31,6 +31,12 @@ export interface SyncEntry {
  */
 import { IBaseInstance } from './interface';
 
+export interface GameEndResult {
+  winnerId: PlayerId;
+  reason: string;
+  [key: string]: any;
+}
+
 export class GameInstance implements IBaseInstance<SyncedGameClientActions, SyncedGameServerEvent> {
     private state: GameState;
     private version: number;
@@ -40,6 +46,20 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     private prevSentState = new Map<PlayerId, SyncedGameState>();
     private disconnected = new Set<PlayerId>();
     private destroyed: boolean = false;
+
+    private onEndGameCallbacks: Array<(result: GameEndResult) => void> = [];
+
+    /** 注册游戏结束回调 */
+    public onEndGame(callback: (result: GameEndResult) => void) {
+        this.onEndGameCallbacks.push(callback);
+    }
+
+    /** 触发所有结束回调 */
+    private triggerEndGame(result: GameEndResult) {
+        for (const callback of this.onEndGameCallbacks) {
+            callback(result);
+        }
+    }
 
     constructor(
         initialState: GameState,
@@ -225,6 +245,22 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
 
         for (const pid of this.connectors.keys()) {
             this.sendState(pid);
+        }
+
+        if (this.state.status === GameStatus.Ended) {
+            // 构造 GameEndResult 对象，winnerId/原因等可根据 state 计算
+            // 只查找 status === PlayerStatus.Won 的队伍
+            const winnerTeam = Object.values(this.state.teams).find(team => team.status === PlayerStatus.Won);
+            let winnerId: string = '';
+            if (winnerTeam && Array.isArray(winnerTeam.memberIds) && winnerTeam.memberIds.length > 0) {
+                winnerId = winnerTeam.memberIds[0] ?? '';
+            }
+            const result = {
+                winnerId,
+                reason: 'Game ended',
+                // 可扩展更多字段
+            };
+            this.triggerEndGame(result);
         }
     }
 
