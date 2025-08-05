@@ -78,3 +78,5 @@ export interface PreGameRoomState {
   playerLimit: number;
   started: boolean;
 }
+
+export { PlayerColor } from './player-colors';

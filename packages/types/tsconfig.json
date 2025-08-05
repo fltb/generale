@@ -3,11 +3,13 @@
     "target": "ESNext",
     "module": "ESNext",
     "lib": ["ESNext"],
-    "moduleResolution": "bundler", // 建议为现代打包器使用 bundler
+    "moduleResolution": "bundler",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noEmit": true // 核心：告诉 TS 不要生成任何输出文件
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist"
   },
   "include": ["src"]
 }
