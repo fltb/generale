@@ -1,5 +1,5 @@
 // game-instance-edge.test.ts
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach } from "vitest";
 import {
   type GameState,
   type MaskedGameState,
@@ -456,7 +456,6 @@ describe("GameInstance core behaviors", () => {
         ]
       }
     };
-    const { GameInstance } = require("../GameInstance");
     const settings = { playerDisplay: { A: { tileColor: 0xff0000 }, B: { tileColor: 0x0000ff } } };
     const connectorA = {
       sent: [],
@@ -577,7 +576,6 @@ describe("GameInstance core behaviors", () => {
       }
     };
     // 用GameInstance推进
-    const { GameInstance } = require("../GameInstance");
     const settings = { playerDisplay: { A: { tileColor: 0xff0000 }, B: { tileColor: 0x0000ff } } };
     const connectorA = { 
       sent: [], 

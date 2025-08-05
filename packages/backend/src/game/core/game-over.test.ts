@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect } from 'vitest';
 import { tick } from './game';
 import { TileType, GameState, PlayerStatus, TeamId, TeamCore, PlayerId, PlayerActionQueues } from '@generale/types';
 

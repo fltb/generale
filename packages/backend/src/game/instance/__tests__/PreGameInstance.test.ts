@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { PreGameInstance } from '../PreGameInstance';
 import {
   PreGameRoomState, PreGamePlayerReadyState,
