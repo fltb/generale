@@ -48,7 +48,7 @@ export function registerDomainHandler<CEvt = unknown, SEvt = unknown, Ctx extend
     console.warn(`Domain handler for '${domain}' already exists, overwriting`);
   }
   domainHandlers.set(domain, handler);
-  console.log(`Registered domain handler for: ${domain}`);
+  // console.log(`Registered domain handler for: ${domain}`);
 }
 
 /**
@@ -56,7 +56,7 @@ export function registerDomainHandler<CEvt = unknown, SEvt = unknown, Ctx extend
  */
 export function unregisterDomainHandler(domain: string): void {
   domainHandlers.delete(domain);
-  console.log(`Unregistered domain handler for: ${domain}`);
+  // console.log(`Unregistered domain handler for: ${domain}`);
 }
 
 /**
