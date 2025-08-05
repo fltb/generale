@@ -1,4 +1,5 @@
 import {
+  PlayerCore, TeamCore, TeamId, GameSettings, GameMap, PlayerStatus, SyncedGameState, PreGameMapType,
   PlayerId,
   GameId,
   PreGameRoomState,
@@ -6,12 +7,17 @@ import {
   GameStatus,
   SyncedGameClientActions,
   SyncedGameServerEvent,
+  SyncedPreGameClientActions,
+  SyncedPreGameServerEvent,
+  ChatClientToServer,
+  ChatServerToClient,
   ServerSyncConnector,
 } from '@generale/types';
 import { PreGameInstance, PreGameServerConnector } from '../instance/PreGameInstance';
 import { GameInstance, GameInstanceSettings } from '../instance/GameInstance';
 import { GameChatInstance, GameChatConnector } from '../instance/GameChatInstance';
-import { registerDomainHandler, unregisterDomainHandler, DomainHandler } from '../../plugins/websocket';
+import { registerDomainHandler, unregisterDomainHandler, DomainHandler, SubConnector } from '../../plugins/websocket';
+import { generateMap } from '../core/map-gen';
 
 /**
  * 游戏阶段枚举
@@ -30,109 +36,32 @@ export interface GameServiceConfig {
   gameId: GameId;
   maxPlayers?: number;
   chatMaxMessages?: number;
+  gameTimeout?: number;          // Optional: game timeout in ms
+  heartbeatInterval?: number;    // Optional: heartbeat interval in ms
   gameSettings?: Partial<GameInstanceSettings>;
 }
 
-/**
- * 玩家连接信息
- */
-interface PlayerConnection {
-  playerId: PlayerId;
-  playerName: string;
-  connectionId: string;
-  pregameConnector?: PreGameServerConnector;
-  gameConnector?: ServerSyncConnector<SyncedGameClientActions, SyncedGameServerEvent>;
-  chatConnector?: GameChatConnector;
-}
-
-/**
- * Sub-Connector 适配器：将 WebSocket sub-connector 适配为各 Instance 需要的接口
- */
-class SubConnectorAdapter {
-  constructor(
-    private connectionId: string,
-    private domain: string,
-    private sendToClient: (payload: any) => void,
-    private closeConnection: (code?: number, reason?: string) => void
-  ) {}
-
-  onOpen(callback: () => void): void {
-    // WebSocket sub-connector 的 open 事件由 GameService 处理
-    this.openCallback = callback;
-  }
-
-  onDisconnect(callback: () => void): void {
-    this.disconnectCallback = callback;
-  }
-
-  onReconnect(callback: () => void): void {
-    this.reconnectCallback = callback;
-  }
-
-  onClientMessage(callback: (evt: any) => void): void {
-    this.messageCallback = callback;
-  }
-
-  onClose(callback: () => void): void {
-    this.closeCallback = callback;
-  }
-
-  send(payload: any): void {
-    this.sendToClient(payload);
-  }
-
-  close(): void {
-    this.closeConnection();
-  }
-
-  // 内部回调
-  private openCallback?: () => void;
-  private disconnectCallback?: () => void;
-  private reconnectCallback?: () => void;
-  private messageCallback?: (evt: any) => void;
-  private closeCallback?: () => void;
-
-  // 触发回调的方法
-  triggerOpen(): void {
-    this.openCallback?.();
-  }
-
-  triggerDisconnect(): void {
-    this.disconnectCallback?.();
-  }
-
-  triggerReconnect(): void {
-    this.reconnectCallback?.();
-  }
-
-  triggerMessage(evt: any): void {
-    this.messageCallback?.(evt);
-  }
-
-  triggerClose(): void {
-    this.closeCallback?.();
-  }
-}
 
 /**
  * GameService - 游戏总管理服务
  * 管理游戏的各个阶段和实例，协调 WebSocket sub-connector
  */
-export class GameService implements DomainHandler {
+export class GameService {
+  // ...existing fields...
+  /** Tick timer ID for scheduled game advancement */
+  private tickTimerId: NodeJS.Timeout | null = null;
+
   private gameId: GameId;
   private phase: GamePhase = GamePhase.PREGAME;
-  private players = new Map<PlayerId, PlayerConnection>();
-  private connections = new Map<string, PlayerId>(); // connectionId -> playerId
-  
+
   // 各阶段实例
   private preGameInstance: PreGameInstance | null = null;
   private gameInstance: GameInstance | null = null;
   private chatInstance: GameChatInstance;
-  
+
   // 配置
   private config: GameServiceConfig;
-  private maxPlayers: number;
-  
+
   // 事件回调
   private onGameStartCallback?: () => void;
   private onGameEndCallback?: (result: any) => void;
@@ -141,11 +70,10 @@ export class GameService implements DomainHandler {
   constructor(config: GameServiceConfig) {
     this.config = config;
     this.gameId = config.gameId;
-    this.maxPlayers = config.maxPlayers || 8;
-    
+
     // 初始化聊天实例（贯穿整个游戏生命周期）
     this.chatInstance = new GameChatInstance(config.chatMaxMessages);
-    
+
     // 注册 WebSocket 域名处理器
     this.registerDomainHandlers();
   }
@@ -154,9 +82,14 @@ export class GameService implements DomainHandler {
    * 注册 WebSocket 域名处理器
    */
   private registerDomainHandlers(): void {
-    registerDomainHandler(`pregame-${this.gameId}`, this);
-    registerDomainHandler(`game-${this.gameId}`, this);
-    registerDomainHandler(`chat-${this.gameId}`, this);
+    // 注册 pregame 域名处理器
+    registerDomainHandler('pregame-' + this.gameId, this.createPregameDomainHandler());
+
+    // 注册 game 域名处理器
+    registerDomainHandler('game-' + this.gameId, this.createGameDomainHandler());
+
+    // 注册 chat 域名处理器
+    registerDomainHandler('chat-' + this.gameId, this.createChatDomainHandler());
   }
 
   /**
@@ -168,228 +101,126 @@ export class GameService implements DomainHandler {
     unregisterDomainHandler(`chat-${this.gameId}`);
   }
 
-  // ============ DomainHandler 接口实现 ============
+  // ============ DomainHandler 创建方法 ============
 
-/**
- * 检查当前阶段是否允许指定 domain 的 sub-connector
- * 不允许时直接发送错误消息
- */
-public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
-  // phase -> 允许的 domain
-  const phaseDomainMap: Record<string, string[]> = {
-    [GamePhase.PREGAME]: [`pregame-${this.gameId}`, `chat-${this.gameId}`],
-    [GamePhase.INGAME]: [`game-${this.gameId}`, `chat-${this.gameId}`],
-    [GamePhase.ENDED]: [`chat-${this.gameId}`],
-    [GamePhase.DISBANDED]: []
-  };
-  const allowed = phaseDomainMap[this.phase] || [];
-  if (!allowed.includes(domain)) {
-    this.sendToConnection(
-      connectionId,
-      domain,
-      { error: 'SUBCONNECTOR_PHASE_MISMATCH', message: `Cannot open domain ${domain} in phase ${this.phase}` }
-    );
-    return false;
-  }
-  return true;
-}
+  /**
+   * 创建 Pregame 域名处理器
+   */
+  private createPregameDomainHandler(): DomainHandler<SyncedPreGameClientActions, SyncedPreGameServerEvent> {
+    return (connector: SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>) => {
+      const ctx = connector.context;
+      const { userid, username } = ctx;
 
-
-  onOpen(connectionId: string, config?: any): void {
-    console.log(`[GameService ${this.gameId}] Connection opened: ${connectionId}`, config);
-    
-    if (!config?.playerId || !config?.playerName) {
-      console.error(`[GameService ${this.gameId}] Invalid connection config:`, config);
-      return;
-    }
-
-    const playerId = config.playerId as PlayerId;
-    const playerName = config.playerName as string;
-    
-    // 记录连接
-    this.connections.set(connectionId, playerId);
-    
-    // 获取或创建玩家连接信息
-    let playerConnection = this.players.get(playerId);
-    if (!playerConnection) {
-      playerConnection = {
-        playerId,
-        playerName,
-        connectionId,
-      };
-      this.players.set(playerId, playerConnection);
-    } else {
-      // 更新连接ID（重连情况）
-      playerConnection.connectionId = connectionId;
-    }
-
-    // 根据当前阶段处理连接
-    this.handlePlayerConnection(playerId, connectionId);
-  }
-
-  onClose(connectionId: string, code?: number, reason?: string): void {
-    console.log(`[GameService ${this.gameId}] Connection closed: ${connectionId}`, { code, reason });
-    
-    const playerId = this.connections.get(connectionId);
-    if (!playerId) return;
-
-    const playerConnection = this.players.get(playerId);
-    if (!playerConnection) return;
-
-    // 触发各实例的关闭回调
-    playerConnection.pregameConnector?.close();
-    playerConnection.gameConnector?.close();
-    playerConnection.chatConnector?.close();
-
-    // 清理连接
-    this.connections.delete(connectionId);
-    this.players.delete(playerId);
-  }
-
-  onMessage(connectionId: string, payload: any): any {
-    const playerId = this.connections.get(connectionId);
-    if (!playerId) {
-      console.error(`[GameService ${this.gameId}] Unknown connection: ${connectionId}`);
-      return;
-    }
-
-    const playerConnection = this.players.get(playerId);
-    if (!playerConnection) return;
-
-    // 根据消息类型路由到对应的 connector
-    if (payload.domain) {
-      const domain = payload.domain as string;
-      
-      if (domain.includes('pregame') && playerConnection.pregameConnector) {
-        playerConnection.pregameConnector.send(payload.data);
-      } else if (domain.includes('game') && playerConnection.gameConnector) {
-        playerConnection.gameConnector.send(payload.data);
-      } else if (domain.includes('chat') && playerConnection.chatConnector) {
-        // Chat connector 直接处理消息
-        // 这里需要适配 ChatConnector 接口
+      if (!userid || !username) {
+        connector.close(4001, 'Missing userid or username');
+        return;
       }
-    }
+
+      // 检查阶段是否允许 pregame 连接
+      if (this.phase !== GamePhase.PREGAME) {
+        connector.close(4002, 'Invalid phase for pregame');
+        return;
+      }
+
+      // 初始化 PreGameInstance（如果不存在）
+      if (!this.preGameInstance) {
+        this.initializePreGame();
+      }
+
+      // 将玩家添加到 PreGameInstance
+      if (this.preGameInstance) {
+        const result = this.preGameInstance.addPlayer({ id: userid, name: username }, this.adaptToPregameConnector(connector));
+        if (!result.success) {
+          connector.close(4003, 'Failed to add to pregame');
+          return;
+        }
+      }
+    };
   }
 
-  onDisconnect(connectionId: string, err?: Error): void {
-    console.log(`[GameService ${this.gameId}] Connection disconnected: ${connectionId}`, err);
-    
-    const playerId = this.connections.get(connectionId);
-    if (!playerId) return;
+  /**
+   * 创建 Game 域名处理器
+   */
+  private createGameDomainHandler(): DomainHandler<SyncedGameClientActions, SyncedGameServerEvent> {
+    return (connector: SubConnector<SyncedGameClientActions, SyncedGameServerEvent>) => {
+      const ctx = connector.context;
+      const { userid, username } = ctx;
 
-    const playerConnection = this.players.get(playerId);
-    if (!playerConnection) return;
+      if (!userid || !username) {
+        connector.close(4001, 'Missing userid or username');
+        return;
+      }
 
-    // 触发断开连接回调
-    // playerConnection.pregameConnector?.triggerDisconnect(); // Not available on public API. If needed, handle at connection manager.
-    // playerConnection.gameConnector?.triggerDisconnect(); // Not available on public API. If needed, handle at connection manager.
+      // 检查阶段是否允许 game 连接
+      if (this.phase !== GamePhase.INGAME) {
+        connector.close(4002, 'Invalid phase for game');
+        return;
+      }
+
+      // 新接口：动态绑定 GameInstance connector
+      if (this.gameInstance) {
+        const res = this.gameInstance.addPlayer({ id: userid, name: username }, this.adaptToGameConnector(connector));
+        if (!res.success) {
+          connector.close(4003, res.message);
+          return;
+        }
+      }
+    };
   }
 
-  onReconnect(connectionId: string): void {
-    console.log(`[GameService ${this.gameId}] Connection reconnected: ${connectionId}`);
-    
-    const playerId = this.connections.get(connectionId);
-    if (!playerId) return;
+  /**
+   * 创建 Chat 域名处理器
+   */
+  private createChatDomainHandler(): DomainHandler<ChatClientToServer, ChatServerToClient> {
+    return (connector: SubConnector<ChatClientToServer, ChatServerToClient>) => {
+      const ctx = connector.context;
+      const { userid, username } = ctx;
 
-    const playerConnection = this.players.get(playerId);
-    if (!playerConnection) return;
+      if (!userid || !username) {
+        connector.close(4001, 'Missing userid or username');
+        return;
+      }
 
-    // 触发重连回调
-    // playerConnection.pregameConnector?.triggerReconnect(); // Not available on public API. If needed, handle at connection manager.
-    // playerConnection.gameConnector?.triggerReconnect(); // Not available on public API. If needed, handle at connection manager.
+      // Chat 在所有阶段都可用（除了 DISBANDED）
+      if (this.phase === GamePhase.DISBANDED) {
+        connector.close(4004, 'Game disbanded');
+        return;
+      }
+
+      // 获取玩家连接
+      // 将玩家添加到 ChatInstance
+      const res = this.chatInstance.addPlayer({ id: userid, name: username }, this.adaptToChatConnector(connector));
+      if (!res.success) {
+        connector.close(4003, res.message);
+        return;
+      }
+    };
+  }
+
+  // ============ Connector 适配方法 ============
+
+  /**
+   * 将 SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent, { playerId: PlayerId; playerName: string }> 适配为 PreGameServerConnector
+   */
+  private adaptToPregameConnector(connector: SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>): PreGameServerConnector {
+    return connector;
+  }
+
+  /**
+   * 将 SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent, { playerId: PlayerId; playerName: string }> 适配为 ServerSyncConnector
+   */
+  private adaptToGameConnector(connector: SubConnector<SyncedGameClientActions, SyncedGameServerEvent>): ServerSyncConnector<SyncedGameClientActions, SyncedGameServerEvent> {
+    return connector;
+  }
+
+  /**
+   * 将 SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent, { playerId: PlayerId; playerName: string }> 适配为 GameChatConnector
+   */
+  private adaptToChatConnector(connector: SubConnector<ChatClientToServer, ChatServerToClient>): GameChatConnector {
+    return connector;
   }
 
   // ============ 游戏阶段管理 ============
-
-  /**
-   * 处理玩家连接，根据当前阶段创建对应的 connector
-   */
-  private handlePlayerConnection(playerId: PlayerId, connectionId: string): void {
-    const playerConnection = this.players.get(playerId);
-    if (!playerConnection) return;
-
-    switch (this.phase) {
-      case GamePhase.PREGAME:
-        this.setupPreGameConnector(playerConnection);
-        break;
-      case GamePhase.INGAME:
-        this.setupGameConnector(playerConnection);
-        break;
-      case GamePhase.ENDED:
-      case GamePhase.DISBANDED:
-        // 游戏已结束，拒绝新连接
-        console.warn(`[GameService ${this.gameId}] Game ended, rejecting connection: ${connectionId}`);
-        break;
-    }
-
-    // 总是设置聊天连接器
-    this.setupChatConnector(playerConnection);
-  }
-
-  /**
-   * 设置 PreGame 连接器
-   */
-  private setupPreGameConnector(playerConnection: PlayerConnection): void {
-    const { playerId, connectionId } = playerConnection;
-    
-    const connector = new SubConnectorAdapter(
-      connectionId,
-      `pregame-${this.gameId}`,
-      (payload) => this.sendToConnection(connectionId, `pregame-${this.gameId}`, payload),
-      (code, reason) => this.closeConnection(connectionId, code, reason)
-    ) as unknown as PreGameServerConnector;
-
-    playerConnection.pregameConnector = connector;
-
-    // 如果 PreGameInstance 不存在，创建它
-    if (!this.preGameInstance) {
-      this.initializePreGame();
-    }
-
-    // 将玩家添加到 PreGameInstance
-    this.addPlayerToPreGame(playerId, playerConnection.playerName, connector);
-  }
-
-  /**
-   * 设置 Game 连接器
-   */
-  private setupGameConnector(playerConnection: PlayerConnection): void {
-    const { playerId, connectionId } = playerConnection;
-    
-    const connector = new SubConnectorAdapter(
-      connectionId,
-      `game-${this.gameId}`,
-      (payload) => this.sendToConnection(connectionId, `game-${this.gameId}`, payload),
-      (code, reason) => this.closeConnection(connectionId, code, reason)
-    ) as unknown as ServerSyncConnector<SyncedGameClientActions, SyncedGameServerEvent>;
-
-    playerConnection.gameConnector = connector;
-
-    // 将玩家添加到 GameInstance（如果存在）
-    if (this.gameInstance) {
-      // GameInstance 需要支持动态添加玩家，这里可能需要扩展 GameInstance 接口
-      console.log(`[GameService ${this.gameId}] Adding player ${playerId} to game instance`);
-    }
-  }
-
-  /**
-   * 设置 Chat 连接器
-   */
-  private setupChatConnector(playerConnection: PlayerConnection): void {
-    const { playerId, connectionId, playerName } = playerConnection;
-    
-    const chatConnector: GameChatConnector = {
-      onMessage: (callback) => {
-        // 这里需要设置消息回调，当收到聊天消息时调用
-        playerConnection.chatMessageCallback = callback;
-      },
-      send: (payload) => this.sendToConnection(connectionId, `chat-${this.gameId}`, payload),
-      close: () => this.closeConnection(connectionId)
-    };
-    
-    playerConnection.chatConnector = chatConnector;
-    this.chatInstance.addPlayer(playerId, playerName, chatConnector);
-  }
 
   /**
    * 初始化 PreGame 阶段
@@ -401,45 +232,42 @@ public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
       players: [],
       gameSetting: {
         speed: 1.0,
-        tileGrowth: 1,
-        tileConsume: 1
+        tileGrow: {
+          PLAIN:   { duration: 40,      growth: 1 },
+          THRONE:  { duration: 1,       growth: 1 },
+          BARRACKS:{ duration: 1,       growth: 1 },
+          MOUNTAIN:{ duration: 1e10,    growth: 0 },
+          SWAMP:   { duration: 1,       growth: -1 },
+          FOG:     { duration: 1e10,    growth: 0 },
+        },
+        afkThreshold: 30,
       },
       mapSetting: {
-        type: 'random' as any,
+        type: PreGameMapType.Random,
         width: 20,
         height: 20,
         tileFrequency: {}
       },
       teamCount: 2,
-      playerLimit: this.maxPlayers,
+      playerLimit: this.config.maxPlayers ?? 8,
       started: false
     };
 
     this.preGameInstance = new PreGameInstance(initialState, new Map());
     this.phase = GamePhase.PREGAME;
+    this.chatInstance.activeStageInstance = this.preGameInstance;
+
+    this.preGameInstance.onStartGame(this.startGame.bind(this));
 
     console.log(`[GameService ${this.gameId}] PreGame initialized`);
   }
 
   /**
-   * 将玩家添加到 PreGame
-   */
-  private addPlayerToPreGame(playerId: PlayerId, playerName: string, connector: PreGameServerConnector): void {
-    if (!this.preGameInstance) return;
-
-    // 使用 PreGameInstance 的 addPlayer 方法
-    const success = this.preGameInstance.addPlayer(playerId, playerName, connector);
-    if (success) {
-      console.log(`[GameService ${this.gameId}] Player ${playerId} (${playerName}) added to pregame`);
-    } else {
-      console.warn(`[GameService ${this.gameId}] Failed to add player ${playerId} to pregame`);
-    }
-  }
-
-  /**
    * 从 PreGame 转换到 Game 阶段
    */
-  public startGame(): void {
+  public startGame(state: PreGameRoomState): void {
+
+
     if (this.phase !== GamePhase.PREGAME || !this.preGameInstance) {
       console.error(`[GameService ${this.gameId}] Cannot start game from phase: ${this.phase}`);
       return;
@@ -447,59 +275,90 @@ public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
 
     console.log(`[GameService ${this.gameId}] Starting game...`);
 
-    // 获取 PreGame 状态
-    const preGameState = this.preGameInstance.getState();
-    
-    // 创建初始游戏状态（使用类型断言避免类型错误）
-    const initialGameState = {
-      status: GameStatus.Playing,
-      players: preGameState.players.map(p => ({
-        id: p.id,
-        name: p.name,
-        teamId: p.teamId,
-      })),
-      tick: 0,
-      settings: {},
-      teams: {},
-      map: { width: 20, height: 20, tiles: [] },
-    } as unknown as GameState;
+    // 直接使用传入的 PreGame 状态
+    const preGameState = state;
 
-    // 创建游戏设置
-    const gameSettings: GameInstanceSettings = {
-      playerDisplay: preGameState.players.reduce((acc, p) => {
-        acc[p.id] = { name: p.name, teamId: p.teamId };
-        return acc;
-      }, {} as any),
-      ...this.config.gameSettings
+    // 创建初始游戏状态
+    const nowTick = 0;
+
+    // 构建 players
+    const players: Record<PlayerId, PlayerCore> = {};
+    for (const p of preGameState.players) {
+      players[p.id] = {
+        id: p.id,
+        status: PlayerStatus.Playing,
+        army: 0,
+        land: 0,
+        lastActiveTick: nowTick,
+        teamId: p.teamId,
+      };
+    }
+
+    // 构建 teams
+    const teams: Record<TeamId, TeamCore> = {};
+    for (const p of preGameState.players) {
+      if (!teams[p.teamId]) {
+        teams[p.teamId] = {
+          id: p.teamId,
+          memberIds: [],
+          status: PlayerStatus.Playing,
+        };
+      }
+      teams[p.teamId]!.memberIds.push(p.id);
+    }
+
+    // 直接透传 PreGameGameSetting（已兼容 GameSettings）
+    const settings: GameSettings = preGameState.gameSetting;
+
+    // 构建 map（根据 mapSetting 生成地图）
+    const map: GameMap = generateMap(preGameState.mapSetting, preGameState.players);
+
+    const initialGameState: GameState = {
+      status: GameStatus.Playing,
+      tick: nowTick,
+      players,
+      teams,
+      settings,
+      map,
     };
 
-    // 创建游戏连接器映射
-    const gameConnectors = new Map<PlayerId, ServerSyncConnector<SyncedGameClientActions, SyncedGameServerEvent>>();
-    
-    for (const [playerId, playerConnection] of this.players) {
-      if (playerConnection.gameConnector) {
-        gameConnectors.set(playerId, playerConnection.gameConnector);
-      }
+    // 分配专属颜色：假设玩家都有合法的颜色
+    const gameInstanceSettings: GameInstanceSettings = {
+      playerDisplay: preGameState.players.reduce(
+        (acc, p) => {
+          acc[p.id] = { tileColor: p.tileColor };
+          return acc;
+        },
+        {} as SyncedGameState["playerDisplay"]
+      )
     }
 
     // 创建 GameInstance
-    this.gameInstance = new GameInstance(initialGameState, gameSettings, gameConnectors);
+    const playerIds = Array.from(preGameState.players.map(p => p.id));
+    this.gameInstance = new GameInstance(initialGameState, gameInstanceSettings, playerIds);
     this.phase = GamePhase.INGAME;
+    this.chatInstance.activeStageInstance = this.gameInstance;
+
+    // 开始调度 Tick（必须在 phase 设置为 INGAME 且 gameInstance 创建后）
+    this.scheduleGameTicks(state.gameSetting?.speed ?? 1.0);
 
     // 清理 PreGameInstance
     this.preGameInstance.destroy();
-    this.preGameInstance = null;
+    this.preGameInstance =  null;
 
     // 触发游戏开始回调
     this.onGameStartCallback?.();
 
-    console.log(`[GameService ${this.gameId}] Game started with ${this.players.size} players`);
+    console.log(`[GameService ${this.gameId}] Game started with ${playerIds.length} players`);
   }
 
   /**
    * 结束游戏
    */
   public endGame(result?: any): void {
+    // Clear tick timer on game end
+    this.clearTickTimer();
+
     if (this.phase !== GamePhase.INGAME) {
       console.error(`[GameService ${this.gameId}] Cannot end game from phase: ${this.phase}`);
       return;
@@ -514,7 +373,6 @@ public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
 
     // 清理游戏实例
     if (this.gameInstance) {
-      // GameInstance 可能需要添加 destroy 方法
       this.gameInstance = null;
     }
 
@@ -525,6 +383,9 @@ public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
    * 解散游戏
    */
   public disbandGame(): void {
+    // Clear tick timer on disband
+    this.clearTickTimer();
+
     console.log(`[GameService ${this.gameId}] Disbanding game...`);
 
     this.phase = GamePhase.DISBANDED;
@@ -532,16 +393,9 @@ public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
     // 清理所有实例
     this.preGameInstance?.destroy();
     this.preGameInstance = null;
+    this.gameInstance?.destroy();
     this.gameInstance = null;
-
-    // 关闭所有连接
-    for (const [connectionId] of this.connections) {
-      this.closeConnection(connectionId, 1000, 'Game disbanded');
-    }
-
-    // 清理连接
-    this.connections.clear();
-    this.players.clear();
+    this.chatInstance.destroy();
 
     // 注销域名处理器
     this.unregisterDomainHandlers();
@@ -551,27 +405,58 @@ public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
 
     console.log(`[GameService ${this.gameId}] Game disbanded`);
   }
-
-  // ============ 辅助方法 ============
+  // ============ Tick Scheduling ============
 
   /**
-   * 发送消息到指定连接
+   * Schedule game ticks according to speed, with initial delay.
+   * @param speed Game speed factor (default 1.0)
    */
-  private sendToConnection(connectionId: string, domain: string, payload: any): void {
-    // 这里需要调用 WebSocket 插件的方法来发送消息
-    // 具体实现取决于 WebSocket 插件的 API
-    console.log(`[GameService ${this.gameId}] Sending to ${connectionId}@${domain}:`, payload);
+  private scheduleGameTicks(speed: number) {
+    this.clearTickTimer(); // Prevent double scheduling
+    if (this.phase !== GamePhase.INGAME || !this.gameInstance) return;
+
+    const initialDelayMs = 5000; // 5 seconds before first tick
+    const tickIntervalMs = Math.max(250, Math.floor(1000 / (speed || 1.0))); // Minimum 250ms interval
+
+    console.log(`[GameService ${this.gameId}] Scheduling first tick in ${initialDelayMs}ms, interval: ${tickIntervalMs}ms`);
+
+    // Start after initial delay
+    this.tickTimerId = setTimeout(() => {
+      this.runTickLoop(tickIntervalMs);
+    }, initialDelayMs);
   }
 
   /**
-   * 关闭指定连接
+   * Internal tick loop: advances game and reschedules next tick.
    */
-  private closeConnection(connectionId: string, code?: number, reason?: string): void {
-    // 这里需要调用 WebSocket 插件的方法来关闭连接
-    console.log(`[GameService ${this.gameId}] Closing connection ${connectionId}:`, { code, reason });
+  private runTickLoop(tickIntervalMs: number) {
+    if (this.phase !== GamePhase.INGAME || !this.gameInstance) {
+      this.clearTickTimer();
+      return;
+    }
+    try {
+      this.gameInstance.advance();
+    } catch (err) {
+      console.error(`[GameService ${this.gameId}] Error during game tick:`, err);
+    }
+    // If game still running, schedule next tick
+    if (this.phase === GamePhase.INGAME && this.gameInstance) {
+      this.tickTimerId = setTimeout(() => this.runTickLoop(tickIntervalMs), tickIntervalMs);
+    } else {
+      this.clearTickTimer();
+    }
   }
 
-  // ============ 公共接口 ============
+  /**
+   * Clears the tick timer if set.
+   */
+  private clearTickTimer() {
+    if (this.tickTimerId) {
+      clearTimeout(this.tickTimerId);
+      this.tickTimerId = null;
+      console.log(`[GameService ${this.gameId}] Cleared tick timer.`);
+    }
+  }
 
   /**
    * 获取游戏ID
@@ -590,22 +475,43 @@ public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
   /**
    * 获取玩家数量
    */
+  /**
+   * 获取玩家数量（自动根据阶段判断）
+   */
   public getPlayerCount(): number {
-    return this.players.size;
+    if (this.phase === GamePhase.PREGAME && this.preGameInstance) {
+      return this.preGameInstance.getState().players.length;
+    }
+    if (this.phase === GamePhase.INGAME && this.gameInstance) {
+      return Object.keys(this.gameInstance.getState().players).length;
+    }
+    return 0;
   }
 
   /**
-   * 获取玩家列表
+   * 获取玩家列表（自动根据阶段判断）
    */
   public getPlayers(): PlayerId[] {
-    return Array.from(this.players.keys());
+    if (this.phase === GamePhase.PREGAME && this.preGameInstance) {
+      return this.preGameInstance.getState().players.map(p => p.id);
+    }
+    if (this.phase === GamePhase.INGAME && this.gameInstance) {
+      return Object.keys(this.gameInstance.getState().players);
+    }
+    return [];
   }
 
   /**
-   * 检查玩家是否在游戏中
+   * 检查玩家是否在游戏中（自动根据阶段判断）
    */
   public hasPlayer(playerId: PlayerId): boolean {
-    return this.players.has(playerId);
+    if (this.phase === GamePhase.PREGAME && this.preGameInstance) {
+      return this.preGameInstance.getState().players.some(p => p.id === playerId);
+    }
+    if (this.phase === GamePhase.INGAME && this.gameInstance) {
+      return !!this.gameInstance.getState().players[playerId];
+    }
+    return false;
   }
 
   /**
@@ -615,8 +521,8 @@ public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
     return {
       gameId: this.gameId,
       phase: this.phase,
-      playerCount: this.players.size,
-      players: Array.from(this.players.keys()),
+      playerCount: this.getPlayerCount(),
+      players: this.getPlayers(),
       preGameState: this.preGameInstance?.getState(),
       gameState: this.gameInstance?.getState(),
     };
@@ -644,15 +550,93 @@ public handleSubConnectorOpen(domain: string, connectionId: string): boolean {
   public onDisband(callback: () => void): void {
     this.onDisbandCallback = callback;
   }
-}
 
+  // ============ HTTP API 支持方法 ============
 
-interface PlayerConnection {
-  playerId: PlayerId;
-  playerName: string;
-  connectionId: string;
-  pregameConnector?: PreGameServerConnector;
-  gameConnector?: ServerSyncConnector<SyncedGameClientActions, SyncedGameServerEvent>;
-  chatConnector?: GameChatConnector;
-  chatMessageCallback?: (msg: any) => void;
+  /**
+   * 创建游戏（HTTP API）
+   */
+  public static createGameForAPI(config: GameServiceConfig): GameService {
+    return new GameService(config);
+  }
+
+  /**
+   * 加入游戏（HTTP API）
+   */
+  /**
+   * 加入游戏（HTTP API）
+   */
+  public joinGameForAPI(playerId: PlayerId): { success: false; message: string } | { success: true; domains: any } {
+    // 仅允许 PREGAME 阶段加入
+    if (this.phase !== GamePhase.PREGAME) {
+      return { success: false, message: `Cannot join game in phase ${this.phase}` };
+    }
+
+    // 动态获取当前玩家列表和最大人数
+    const preGameState = this.preGameInstance?.getState();
+    const players = preGameState?.players ?? [];
+    const maxPlayers = preGameState?.playerLimit ?? this.config.maxPlayers ?? 8;
+
+    if (players.find(p => p.id === playerId)) {
+      return { success: false, message: 'Player already in game' };
+    }
+
+    if (players.length >= maxPlayers) {
+      return { success: false, message: 'Game is full' };
+    }
+
+    // 预注册玩家（实际连接通过 WebSocket 建立）
+    // 这里只做逻辑校验，不做真正添加
+    // domains 可根据需要返回
+    return { success: true, domains: { pregame: true } };
+  }
+
+  /**
+   * 获取游戏信息（HTTP API）
+   */
+  /**
+   * 获取游戏信息（HTTP API）
+   */
+  public getGameInfo(): any {
+    let players: any[] = [];
+    let maxPlayers = this.config.maxPlayers ?? 8;
+    if (this.phase === GamePhase.PREGAME && this.preGameInstance) {
+      const state = this.preGameInstance.getState();
+      players = state.players.map(p => ({
+        playerId: p.id,
+        playerName: p.name,
+        connected: {
+          pregame: true,
+          game: false,
+          chat: false
+        },
+        teamId: p.teamId,
+        tileColor: p.tileColor,
+        isHost: p.isHost
+      }));
+      maxPlayers = state.playerLimit ?? maxPlayers;
+    } else if (this.phase === GamePhase.INGAME && this.gameInstance) {
+      const state = this.gameInstance.getState();
+      players = Object.values(state.players).map((p: any) => ({
+        playerId: p.id,
+        playerName: '', // 可补充
+        connected: {
+          pregame: false,
+          game: true,
+          chat: false
+        },
+        teamId: p.teamId
+      }));
+      maxPlayers = Object.keys(state.players).length;
+    }
+    return {
+      gameId: this.gameId,
+      phase: this.phase,
+      playerCount: players.length,
+      maxPlayers,
+      players,
+      preGameState: this.preGameInstance?.getState(),
+      gameState: this.gameInstance?.getState()
+    };
+  }
 }
