@@ -2,19 +2,14 @@ import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import { gameRoutes } from "./routes/game";
+import { userRoutes } from "./routes/user";
+import { authPlugin } from "./middleware/authPlugin";
 import { websocketPlugin } from "./plugins/websocket";
-import { GameService } from "./game/service/GameService";
-
-// Initialize GameService with default config
-const gameService = new GameService({
-  gameId: "lobby", // Added required gameId
-  maxPlayers: 8,
-  gameTimeout: 30 * 60 * 1000, // 30 minutes
-  heartbeatInterval: 30 * 1000, // 30 seconds
-}); 
 
 const app = new Elysia()
   .use(cors())
+  .use(authPlugin)
+  .use(userRoutes)
   .use(swagger({
     documentation: {
       info: {
@@ -28,7 +23,6 @@ const app = new Elysia()
       ]
     }
   }))
-  .decorate('gameService', gameService)
   .use(websocketPlugin)
   .use(gameRoutes)
   .get("/", () => ({ message: "Generale Game Server", version: "1.0.0" }))

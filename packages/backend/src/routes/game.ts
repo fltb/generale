@@ -1,245 +1,129 @@
 import { Elysia, t } from "elysia";
-import { GameService } from "../game/service/GameService";
+import { gameServiceManager } from "../game/service/GameServiceManager";
 import { PlayerId, GameId } from "@generale/types";
 
-// Request/Response types
-const CreateGameRequest = t.Object({
-  playerName: t.String({ minLength: 1, maxLength: 50 }),
-  gameSettings: t.Optional(t.Object({
-    maxPlayers: t.Optional(t.Number({ minimum: 2, maximum: 8 })),
-    mapSize: t.Optional(t.Union([t.Literal("small"), t.Literal("medium"), t.Literal("large")])),
-    gameMode: t.Optional(t.Union([t.Literal("classic"), t.Literal("blitz"), t.Literal("custom")]))
-  }))
-});
-
-const JoinGameRequest = t.Object({
-  gameId: t.String(),
-  playerName: t.String({ minLength: 1, maxLength: 50 }),
-  password: t.Optional(t.String())
-});
-
-
+// Import schemas from your shared types package
+import {
+  createGameReqSchema,
+  gameParamsReqSchema,
+  gamePlayerParamsReqSchema,
+  createGameSuccessRespSchema,
+  gameInfoSuccessRespSchema,
+  listGamesSuccessRespSchema,
+  connectWsSuccessRespSchema,
+  errorRespSchema
+} from "@generale/types";
 
 export const gameRoutes = new Elysia({ prefix: "/api/game" })
-  .decorate("gameService", {} as GameService) // Will be overridden by main app
-  
-  // Create a new game
-  .post("/create", async ({ body, gameService, set }) => {
-    try {
-      const playerId = generatePlayerId();
-      const gameId = await gameService.createGameForAPI(playerId, body.playerName, body.gameSettings);
-      
-      return {
-        success: true,
-        data: {
-          gameId,
-          playerId,
-          message: "Game created successfully"
-        }
-      };
-    } catch (error) {
-      set.status = 400;
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to create game"
-      };
+  // Decorate with the actual singleton manager instance
+  .decorate("gameServiceManager", gameServiceManager)
+  .post("/create", async ({ body, gameServiceManager }) => {
+    const gameId = `game_${Date.now()}` as GameId;
+
+    // Build the config object, ensuring optional properties are handled correctly.
+    const gameConfig: any = { gameId };
+    if (body.gameSettings?.maxPlayers) {
+      gameConfig.maxPlayers = body.gameSettings.maxPlayers;
     }
+
+    // Use the manager to create a new game service instance
+    gameServiceManager.createGame(gameConfig);
+
+    // A player ID is not needed on creation, it's generated on join.
+    return {
+      success: true,
+      data: { gameId, playerId: '', message: "Game created successfully. Player can now join." }
+    };
   }, {
-    body: CreateGameRequest,
-    detail: {
-      tags: ["Game"],
-      summary: "Create a new game",
-      description: "Creates a new game session and returns game ID and player ID"
-    }
+    body: createGameReqSchema,
+    response: { 200: createGameSuccessRespSchema, 400: errorRespSchema },
+    detail: { tags: ["Game"], summary: "Create a new game" }
   })
-  
-  // Join an existing game
-  .post("/join", async ({ body, gameService, set }) => {
-    try {
-      const playerId = generatePlayerId();
-      const success = await gameService.joinGameForAPI(body.gameId as GameId, playerId, body.playerName, body.password);
-      
-      if (!success) {
-        set.status = 400;
-        return {
-          success: false,
-          error: "Failed to join game. Game may be full, not found, or password incorrect."
-        };
-      }
-      
-      return {
-        success: true,
-        data: {
-          gameId: body.gameId,
-          playerId,
-          message: "Joined game successfully"
-        }
-      };
-    } catch (error) {
-      set.status = 400;
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to join game"
-      };
+  .get("/info/:gameId", async ({ params, gameServiceManager, set }) => {
+    const gameService = gameServiceManager.getGame(params.gameId as GameId);
+
+    if (!gameService) {
+      set.status = 404;
+      return { error: "Game not found" };
     }
+
+    // Call the instance method
+    const gameInfo = gameService.getGameInfo();
+    return { success: true, data: gameInfo };
   }, {
-    body: JoinGameRequest,
-    detail: {
-      tags: ["Game"],
-      summary: "Join an existing game",
-      description: "Join an existing game session with game ID"
-    }
+    params: gameParamsReqSchema,
+    response: { 200: gameInfoSuccessRespSchema, 404: errorRespSchema, 500: errorRespSchema },
+    detail: { tags: ["Game"], summary: "Get game information" }
   })
-  
-  // Get game info
-  .get("/info/:gameId", async ({ params, gameService, set }) => {
-    try {
-      const gameInfo = await gameService.getGameInfo(params.gameId as GameId);
-      
-      if (!gameInfo) {
-        set.status = 404;
-        return {
-          success: false,
-          error: "Game not found"
-        };
-      }
-      
-      return {
-        success: true,
-        data: gameInfo
-      };
-    } catch (error) {
-      set.status = 500;
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to get game info"
-      };
-    }
+  .get("/list", async ({ gameServiceManager }) => {
+    // Get active game IDs from the manager
+    const activeGameIds = gameServiceManager.getActiveGames();
+    const games = activeGameIds
+      .map(id => gameServiceManager.getGame(id)?.getGameInfo())
+      .filter(Boolean); // Filter out any undefined games
+
+    return { success: true, data: games };
   }, {
-    params: t.Object({
-      gameId: t.String()
-    }),
-    detail: {
-      tags: ["Game"],
-      summary: "Get game information",
-      description: "Retrieve information about a specific game"
-    }
-  })
-  
-  // List active games
-  .get("/list", async ({ gameService, query }) => {
-    try {
-      const games = await gameService.listActiveGames({
-        includePrivate: query.includePrivate === "true",
-        limit: query.limit ? parseInt(query.limit) : 20
-      });
-      
-      return {
-        success: true,
-        data: games
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to list games"
-      };
-    }
-  }, {
-    query: t.Optional(t.Object({
+    query: t.Object({
       includePrivate: t.Optional(t.String()),
       limit: t.Optional(t.String())
-    })),
-    detail: {
-      tags: ["Game"],
-      summary: "List active games",
-      description: "Get a list of active games that can be joined"
-    }
-  })
-  
-  // Connect to WebSocket for a specific game
-  .get("/connect/:gameId/:playerId", async ({ params, gameService, set }) => {
-    try {
-      const { gameId, playerId } = params;
-      
-      // Validate that player is part of this game
-      const canConnect = await gameService.canPlayerConnect(gameId as GameId, playerId as PlayerId);
-      
-      if (!canConnect) {
-        set.status = 403;
-        return {
-          success: false,
-          error: "Player not authorized to connect to this game"
-        };
-      }
-      
-      return {
-        success: true,
-        data: {
-          websocketUrl: `/ws`,
-          gameId,
-          playerId,
-          message: "Ready to connect to WebSocket"
-        }
-      };
-    } catch (error) {
-      set.status = 500;
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to prepare connection"
-      };
-    }
-  }, {
-    params: t.Object({
-      gameId: t.String(),
-      playerId: t.String()
     }),
-    detail: {
-      tags: ["WebSocket"],
-      summary: "Prepare WebSocket connection",
-      description: "Validate and prepare WebSocket connection for a player in a game"
-    }
+    response: { 200: listGamesSuccessRespSchema, 500: errorRespSchema },
+    detail: { tags: ["Game"], summary: "List active games" }
   })
-  
-  // Leave game
-  .post("/leave", async ({ body, gameService, set }) => {
-    try {
-      const { gameId, playerId } = body;
-      const success = await gameService.leaveGame(gameId as GameId, playerId as PlayerId);
-      
-      if (!success) {
-        set.status = 400;
-        return {
-          success: false,
-          error: "Failed to leave game"
-        };
-      }
-      
-      return {
-        success: true,
-        data: {
-          message: "Left game successfully"
-        }
-      };
-    } catch (error) {
-      set.status = 500;
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to leave game"
-      };
-    }
-  }, {
-    body: t.Object({
-      gameId: t.String(),
-      playerId: t.String()
-    }),
-    detail: {
-      tags: ["Game"],
-      summary: "Leave game",
-      description: "Remove player from game session"
-    }
-  });
+  .get("/connect/:gameId/:playerId", async ({ params, gameServiceManager, set }) => {
+    const { gameId, playerId } = params;
+    const gameService = gameServiceManager.getGame(gameId as GameId);
 
-// Helper function to generate unique player IDs
-function generatePlayerId(): PlayerId {
-  return `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` as PlayerId;
-}
+    // 1. Check if the game resource exists at all.
+    if (!gameService) {
+      set.status = 404;
+      return { success: false, error: "Game not found" };
+    }
+
+    // 2. Call the new, single service method to handle all logic.
+    const result = gameService.prepareConnectionForPlayer(playerId as PlayerId);
+
+    // 3. Handle failure cases based on the reason provided by the service.
+    if (!result.success) {
+      switch (result.reason) {
+        case 'NOT_AUTHORIZED':
+          set.status = 403; // Forbidden
+          break;
+        case 'GAME_UNAVAILABLE':
+          set.status = 410; // Gone (more specific than 404)
+          break;
+        case 'INVALID_STATE':
+          set.status = 400; // Bad Request
+          break;
+        default:
+          set.status = 500; // Internal Server Error for unexpected reasons
+      }
+      return { success: false, error: result.message };
+    }
+
+    // 4. Build the success response directly from the service's data.
+    return {
+      success: true,
+      data: {
+        gameId,
+        playerId,
+        // The service now provides the phase and domains
+        phase: result.data.phase,
+        domains: result.data.domains,
+        message: "Ready to connect. Please open the provided domains."
+      }
+    };
+  }, {
+    params: gamePlayerParamsReqSchema,
+    // IMPORTANT: Update the response schema to include the new status codes and response body
+    response: {
+      200: connectWsSuccessRespSchema, // This schema must be updated for the new 'data' shape
+      400: errorRespSchema,
+      403: errorRespSchema,
+      404: errorRespSchema,
+      410: errorRespSchema, // Add 410 for disbanded/ended games
+      500: errorRespSchema
+    },
+    detail: { tags: ["WebSocket"], summary: "Prepare WebSocket connection" }
+  })
