@@ -36,7 +36,8 @@ vi.mock('../../instance/PreGameInstance', () => ({
       mapSetting: { type: 'Random', width: 10, height: 10, tileFrequency: {} }
     }),
     destroy: vi.fn(),
-    addPlayer: vi.fn().mockReturnValue({ success: true })
+    addPlayer: vi.fn().mockReturnValue({ success: true }),
+    onStartGame: vi.fn(), // <-- The missing method
   }))
 }));
 
@@ -81,14 +82,14 @@ describe('GameService HTTP API', () => {
     vi.clearAllMocks();
   });
 
-  describe('createGameForAPI', () => {
+  describe('constructor', () => {
     it('应该创建新的 GameService 实例', () => {
       const newConfig: GameServiceConfig = {
         gameId: 'api-game-456' as GameId,
         maxPlayers: 8
       };
       
-      const newGameService = GameService.createGameForAPI(newConfig);
+      const newGameService = new GameService(newConfig);
       
       expect(newGameService).toBeInstanceOf(GameService);
       expect(newGameService.getGameId()).toBe('api-game-456');
@@ -98,85 +99,125 @@ describe('GameService HTTP API', () => {
     });
   });
 
-  describe('joinGameForAPI', () => {
-    it('应该允许在 PREGAME 阶段加入游戏', () => {
-      // 初始化 PreGameInstance
-      gameService['preGameInstance'] = new PreGameInstance();
-      
-      const result = gameService.joinGameForAPI('new-player');
-      
-      expect(result.success).toBe(true);
-      expect(result).toHaveProperty('domains');
-      if (result.success) {
-        expect(result.domains).toEqual({ pregame: true });
-      }
-    });
+  // Add this new describe block inside the main 'GameService HTTP API' describe block
+  describe('prepareConnectionForPlayer', () => {
 
-    it('应该拒绝在非 PREGAME 阶段加入游戏', () => {
-      gameService['phase'] = GamePhase.INGAME;
-      
-      const result = gameService.joinGameForAPI('new-player');
-      
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.message).toContain('Cannot join game in phase');
-      }
-    });
-
-    it('应该拒绝已存在的玩家重复加入', () => {
-      // 初始化 PreGameInstance
-      gameService['preGameInstance'] = new PreGameInstance();
-      
-      const result = gameService.joinGameForAPI('player1'); // 已存在的玩家
-      
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.message).toBe('Player already in game');
-      }
-    });
-
-    it('应该拒绝超过最大玩家数的加入', () => {
-      // Mock 满员状态
-      const mockPreGameInstance = new PreGameInstance();
-      mockPreGameInstance.getState = vi.fn().mockReturnValue({
-        players: [
-          { id: 'player1', name: 'Player 1' },
-          { id: 'player2', name: 'Player 2' },
-          { id: 'player3', name: 'Player 3' },
-          { id: 'player4', name: 'Player 4' }
-        ],
-        playerLimit: 4
+    describe('when in PREGAME phase', () => {
+      beforeEach(() => {
+        // Set the game phase to PREGAME for these tests
+        gameService['phase'] = GamePhase.PREGAME;
+        // The service needs an active PreGameInstance to check player counts
+        gameService['initializePreGame']();
       });
-      gameService['preGameInstance'] = mockPreGameInstance;
-      
-      const result = gameService.joinGameForAPI('new-player');
-      
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.message).toBe('Game is full');
-      }
+
+      it('should allow a new player to connect when the game is not full', () => {
+        // Arrange: The mock has 2 players, limit 4. A new player should be allowed.
+        const playerId = 'new-player-id' as PlayerId;
+
+        // Act
+        const result = gameService.prepareConnectionForPlayer(playerId);
+
+        // Assert
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.phase).toBe(GamePhase.PREGAME);
+          expect(result.data.domains).toEqual({
+            primary: `pregame-${config.gameId}`,
+            chat: `chat-${config.gameId}`
+          });
+        }
+      });
+
+      it('should deny connection when the game is full', () => {
+        // Arrange: Mock the getPlayerCount to simulate a full game
+        vi.spyOn(gameService, 'getPlayerCount').mockReturnValue(4);
+        const playerId = 'another-new-player-id' as PlayerId;
+
+        // Act
+        const result = gameService.prepareConnectionForPlayer(playerId);
+
+        // Assert
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.reason).toBe('GAME_UNAVAILABLE');
+          expect(result.message).toBe('Game is full. Cannot connect.');
+        }
+      });
     });
 
-    it('应该使用配置的最大玩家数作为后备', () => {
-      // Mock PreGameInstance 没有 playerLimit
-      const mockPreGameInstance = new PreGameInstance();
-      mockPreGameInstance.getState = vi.fn().mockReturnValue({
-        players: [
-          { id: 'player1', name: 'Player 1' },
-          { id: 'player2', name: 'Player 2' },
-          { id: 'player3', name: 'Player 3' },
-          { id: 'player4', name: 'Player 4' }
-        ],
-        playerLimit: undefined
+    describe('when in INGAME phase', () => {
+      beforeEach(() => {
+        // Set the game phase to INGAME and ensure an instance exists
+        gameService['phase'] = GamePhase.INGAME;
+        gameService['gameInstance'] = new GameInstance();
       });
-      gameService['preGameInstance'] = mockPreGameInstance;
-      
-      const result = gameService.joinGameForAPI('new-player');
-      
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.message).toBe('Game is full');
-      }
+
+      it('should allow an existing player to reconnect', () => {
+        // Arrange: 'player1' exists in the mock GameInstance state
+        const playerId = 'player1' as PlayerId;
+        
+        // Act
+        const result = gameService.prepareConnectionForPlayer(playerId);
+
+        // Assert
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.phase).toBe(GamePhase.INGAME);
+          expect(result.data.domains).toEqual({
+            primary: `game-${config.gameId}`,
+            chat: `chat-${config.gameId}`
+          });
+        }
+      });
+
+      it('should deny a non-existent player from connecting', () => {
+        // Arrange: 'non-existent-player' is not in the mock GameInstance state
+        const playerId = 'non-existent-player' as PlayerId;
+
+        // Act
+        const result = gameService.prepareConnectionForPlayer(playerId);
+
+        // Assert
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.reason).toBe('NOT_AUTHORIZED');
+          expect(result.message).toBe('Player not found in this game.');
+        }
+      });
+    });
+
+    describe('when in terminal phases (ENDED or DISBANDED)', () => {
+      it('should deny connection when the game has ENDED', () => {
+        // Arrange
+        gameService['phase'] = GamePhase.ENDED;
+        const playerId = 'any-player' as PlayerId;
+
+        // Act
+        const result = gameService.prepareConnectionForPlayer(playerId);
+
+        // Assert
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.reason).toBe('GAME_UNAVAILABLE');
+          expect(result.message).toContain('disbanded'); // Based on the provided code's fall-through
+        }
+      });
+
+      it('should deny connection when the game is DISBANDED', () => {
+        // Arrange
+        gameService['phase'] = GamePhase.DISBANDED;
+        const playerId = 'any-player' as PlayerId;
+
+        // Act
+        const result = gameService.prepareConnectionForPlayer(playerId);
+
+        // Assert
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.reason).toBe('GAME_UNAVAILABLE');
+          expect(result.message).toContain('disbanded');
+        }
+      });
     });
   });
 

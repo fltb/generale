@@ -28,7 +28,8 @@ vi.mock('../../instance/PreGameInstance', () => {
     advance     = vi.fn();
     onEndGame   = vi.fn();
   }
-  globalThis.PreGameInstance = PreGameInstance;
+  // Use a global to be accessible inside the test file if needed
+  (globalThis as any).PreGameInstance = PreGameInstance;
   return { PreGameInstance };
 });
 
@@ -73,7 +74,7 @@ vi.mock('../core/map-gen', () => ({
 }));
 
 import { GameService, GamePhase } from '../GameService';
-import { GameId } from '@generale/types';
+import { GameId, PlayerId } from '@generale/types';
 
 describe('GameService 全流程集成测试', () => {
   let gameService: GameService;
@@ -89,31 +90,35 @@ describe('GameService 全流程集成测试', () => {
       heartbeatInterval: 30000
     };
     gameService = new GameService(config);
-    mockPlayers = [];
+    mockPlayers = []; // Reset mock state for each test
   });
 
   afterEach(() => {
     vi.useRealTimers();
     gameService.disbandGame();
     vi.clearAllMocks();
-    mockPlayers = [];
   });
 
   it('完整流程：创建 → 准备 → 开始 → 推进 → 结束', () => {
+    // 1. Initial State
     expect(gameService.getPhase()).toBe(GamePhase.PREGAME);
     expect(gameService.getGameId()).toBe('integration-test-game');
     expect(gameService.getPlayerCount()).toBe(0);
 
-    gameService.initializePreGame();
-    let r = gameService.joinGameForAPI('player1'); expect(r.success).toBe(true); mockPlayers.push({ id: 'player1', name: 'P1' });
-    r = gameService.joinGameForAPI('player2');             expect(r.success).toBe(true); mockPlayers.push({ id: 'player2', name: 'P2' });
-    r = gameService.joinGameForAPI('player1');             expect(r.success).toBe(false);
+    // 2. Pregame Phase: Simulate players joining by populating the mock state
+    // FIX: Removed calls to the deleted `joinGameForAPI`.
+    // We now directly manipulate the mock state to simulate players being present.
+    mockPlayers.push({ id: 'player1', name: 'P1' });
+    mockPlayers.push({ id: 'player2', name: 'P2' });
 
-    gameService.initializePreGame();
-    gameService.preGameInstance = new globalThis.PreGameInstance();
+    // Initialize the pre-game instance which will now use the mock state with 2 players
+    gameService['initializePreGame'](); 
+    
+    // Check game info after players have "joined"
     const info = gameService.getGameInfo();
     expect(info.playerCount).toBe(2);
 
+    // 3. Setup Callbacks
     const onStart = vi.fn();
     const onEnd   = vi.fn();
     const onDb    = vi.fn();
@@ -121,28 +126,34 @@ describe('GameService 全流程集成测试', () => {
     gameService.onGameEnd(onEnd);
     gameService.onDisband(onDb);
 
-    gameService.startGame(gameService.preGameInstance!.getState());
+    // 4. Start Game
+    gameService.startGame(gameService['preGameInstance']!.getState());
     expect(gameService.getPhase()).toBe(GamePhase.INGAME);
     expect(onStart).toHaveBeenCalled();
 
-    vi.advanceTimersByTime(5000);
+    // 5. Advance Ticks
+    vi.advanceTimersByTime(5000); // Initial delay
     expect(gameService['gameInstance']!.advance).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(500); // Tick interval
     expect(gameService['gameInstance']!.advance).toHaveBeenCalledTimes(2);
 
+    // 6. End Game
     const result = { winnerId: 'player1', reason: 'Victory', duration: 120000, finalStats: {} };
     gameService.endGame(result);
     expect(gameService.getPhase()).toBe(GamePhase.ENDED);
     expect(onEnd).toHaveBeenCalledWith(result);
 
+    // 7. Disband Game
     gameService.disbandGame();
     expect(gameService.getPhase()).toBe(GamePhase.DISBANDED);
     expect(onDb).toHaveBeenCalled();
   });
 
   it('异常流程：中途解散', () => {
-    gameService.preGameInstance = new globalThis.PreGameInstance();
-    gameService.startGame(gameService.preGameInstance!.getState());
+    mockPlayers.push({ id: 'player1', name: 'P1' });
+    gameService['initializePreGame']();
+    gameService.startGame(gameService['preGameInstance']!.getState());
+
     expect(gameService.getPhase()).toBe(GamePhase.INGAME);
     const onDb = vi.fn();
     gameService.onDisband(onDb);
@@ -152,38 +163,62 @@ describe('GameService 全流程集成测试', () => {
   });
 
   it('Tick 异常不崩溃', () => {
-    gameService.preGameInstance = new globalThis.PreGameInstance();
-    gameService.startGame(gameService.preGameInstance!.getState());
+    mockPlayers.push({ id: 'player1', name: 'P1' });
+    gameService['initializePreGame']();
+    gameService.startGame(gameService['preGameInstance']!.getState());
+
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     gameService['gameInstance']!.advance = vi.fn(() => { throw new Error('oops'); });
-    vi.advanceTimersByTime(5000);
+    vi.advanceTimersByTime(5000); // Trigger the first tick
     expect(spy).toHaveBeenCalledWith(expect.stringContaining('Error during game tick:'), expect.any(Error));
     expect(gameService.getPhase()).toBe(GamePhase.INGAME);
     spy.mockRestore();
   });
 
   it('边界：满员', () => {
-    const pre = new globalThis.PreGameInstance();
-    pre.getState = vi.fn().mockReturnValue({ players: [1,2,3,4].map(i=>({id:`p${i}`,name:`p${i}`})), playerLimit:4 });
-    gameService.preGameInstance = pre;
-    const res = gameService.joinGameForAPI('p5');
+    // Arrange: Set up a game state with 4 players and a limit of 4
+    mockPlayers.push(
+        { id: 'p1', name: 'p1' },
+        { id: 'p2', name: 'p2' },
+        { id: 'p3', name: 'p3' },
+        { id: 'p4', name: 'p4' }
+    );
+    gameService['initializePreGame']();
+
+    // Act: Test the correct API for checking connection readiness
+    // FIX: Changed call from `joinGameForAPI` to `prepareConnectionForPlayer`.
+    const res = gameService.prepareConnectionForPlayer('p5' as PlayerId);
+
+    // Assert: Check against the new method's return format
     expect(res.success).toBe(false);
-    expect(res.message).toBe('Game is full');
+    if (!res.success) {
+      expect(res.reason).toBe('GAME_UNAVAILABLE');
+      expect(res.message).toBe('Game is full. Cannot connect.');
+    }
   });
 
   it('性能：高速 Tick 调度', () => {
-    const pre = new globalThis.PreGameInstance();
+    mockPlayers.push({ id: 'p1', name: 'p1', teamId: 't1', isHost: true, ready: true, tileColor: 0xFF0000 });
+    
+    // We need to create a custom preGameInstance for this specific setting
+    const pre = new (globalThis as any).PreGameInstance();
     pre.getState = vi.fn().mockReturnValue({
-      players:[{id:'p1',name:'p1',teamId:'t1',isHost:true,ready:true,tileColor:0xFF0000}],
-      playerLimit:4,
-      gameSetting:{speed:10,tileGrowth:1,tileConsume:1},
-      mapSetting:{type:'Random',width:10,height:10,tileFrequency:{}}
+      players: mockPlayers,
+      playerLimit: 4,
+      gameSetting: { speed: 10 }, // High speed setting
+      mapSetting: { type: 'Random', width: 10, height: 10, tileFrequency: {} }
     });
-    gameService.preGameInstance = pre;
+    gameService['preGameInstance'] = pre;
+
     gameService.startGame(pre.getState());
     vi.advanceTimersByTime(5000);
     expect(gameService['gameInstance']!.advance).toHaveBeenCalledTimes(1);
-    for(let i=0;i<10;i++) vi.advanceTimersByTime(250);
+
+    // 1000ms / 10 speed = 100ms interval. But our code has a minimum of 250ms.
+    // So we advance by the minimum interval.
+    for (let i = 0; i < 10; i++) {
+        vi.advanceTimersByTime(250);
+    }
     expect(gameService['gameInstance']!.advance).toHaveBeenCalledTimes(11);
   });
 });

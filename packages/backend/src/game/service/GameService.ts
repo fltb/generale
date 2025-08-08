@@ -1,5 +1,5 @@
 import {
-  PlayerCore, TeamCore, TeamId, GameSettings, GameMap, PlayerStatus, SyncedGameState, PreGameMapType,
+  PlayerCore, TeamCore, TeamId, GameMap, PlayerStatus, SyncedGameState, PreGameMapType,
   PlayerId,
   GameId,
   PreGameRoomState,
@@ -12,6 +12,8 @@ import {
   ChatClientToServer,
   ChatServerToClient,
   ServerSyncConnector,
+  GameSettings,
+  GamePhase
 } from '@generale/types';
 import { PreGameInstance, PreGameServerConnector } from '../instance/PreGameInstance';
 import { GameInstance, GameInstanceSettings } from '../instance/GameInstance';
@@ -19,21 +21,14 @@ import { GameChatInstance, GameChatConnector } from '../instance/GameChatInstanc
 import { registerDomainHandler, unregisterDomainHandler, DomainHandler, SubConnector } from '../../plugins/websocket';
 import { generateMap } from '../core/map-gen';
 
-/**
- * 游戏阶段枚举
- */
-export enum GamePhase {
-  PREGAME = 'pregame',    // 房间准备阶段
-  INGAME = 'ingame',      // 游戏进行阶段
-  ENDED = 'ended',        // 游戏结束阶段
-  DISBANDED = 'disbanded' // 房间解散
-}
+
 
 /**
  * GameService 配置
  */
 export interface GameServiceConfig {
   gameId: GameId;
+  roomName: string;
   maxPlayers?: number;
   chatMaxMessages?: number;
   gameTimeout?: number;          // Optional: game timeout in ms
@@ -41,6 +36,14 @@ export interface GameServiceConfig {
   gameSettings?: Partial<GameInstanceSettings>;
 }
 
+export type ConnectionInfo = {
+  phase: GamePhase;
+  domains: { primary: string; chat: string };
+};
+
+export type ConnectionResult =
+  | { success: true; data: ConnectionInfo }
+  | { success: false; reason: 'NOT_AUTHORIZED' | 'GAME_UNAVAILABLE' | 'INVALID_STATE'; message: string; };
 
 /**
  * GameService - 游戏总管理服务
@@ -233,12 +236,12 @@ export class GameService {
       gameSetting: {
         speed: 1.0,
         tileGrow: {
-          PLAIN:   { duration: 40,      growth: 1 },
-          THRONE:  { duration: 1,       growth: 1 },
-          BARRACKS:{ duration: 1,       growth: 1 },
-          MOUNTAIN:{ duration: 1e10,    growth: 0 },
-          SWAMP:   { duration: 1,       growth: -1 },
-          FOG:     { duration: 1e10,    growth: 0 },
+          PLAIN: { duration: 40, growth: 1 },
+          THRONE: { duration: 1, growth: 1 },
+          BARRACKS: { duration: 1, growth: 1 },
+          MOUNTAIN: { duration: 1e10, growth: 0 },
+          SWAMP: { duration: 1, growth: -1 },
+          FOG: { duration: 1e10, growth: 0 },
         },
         afkThreshold: 30,
       },
@@ -344,7 +347,7 @@ export class GameService {
 
     // 清理 PreGameInstance
     this.preGameInstance.destroy();
-    this.preGameInstance =  null;
+    this.preGameInstance = null;
 
     // 触发游戏开始回调
     this.onGameStartCallback?.();
@@ -552,43 +555,66 @@ export class GameService {
   }
 
   // ============ HTTP API 支持方法 ============
+  /**
+   * 为指定玩家准备 WebSocket 连接信息。
+   * 这个方法会进行授权检查并返回连接所需的 domains。
+   * @param playerId 要连接的玩家ID
+   * @returns ConnectionResult 包含连接信息或错误原因
+   */
+  public prepareConnectionForPlayer(playerId: PlayerId): ConnectionResult {
+    const phase = this.getPhase();
+    let primary = null;
 
-  /**
-   * 创建游戏（HTTP API）
-   */
-  public static createGameForAPI(config: GameServiceConfig): GameService {
-    return new GameService(config);
-  }
+    switch (phase) {
+      case GamePhase.PREGAME:
+        if (this.getPlayerCount() >= (this.config.maxPlayers ?? 8)) {
+          return { success: false, reason: 'GAME_UNAVAILABLE', message: 'Game is full. Cannot connect.' };
+        }
 
-  /**
-   * 加入游戏（HTTP API）
-   */
-  /**
-   * 加入游戏（HTTP API）
-   */
-  public joinGameForAPI(playerId: PlayerId): { success: false; message: string } | { success: true; domains: any } {
-    // 仅允许 PREGAME 阶段加入
-    if (this.phase !== GamePhase.PREGAME) {
-      return { success: false, message: `Cannot join game in phase ${this.phase}` };
+        primary = `pregame-${this.gameId}`;
+        break;
+
+      case GamePhase.INGAME:
+        if (!this.hasPlayer(playerId)) {
+          return {
+            success: false,
+            reason: 'NOT_AUTHORIZED',
+            message: 'Player not found in this game.'
+          };
+        }
+
+        primary = `game-${this.gameId}`;
+        break;
+
+      case GamePhase.ENDED:
+      case GamePhase.DISBANDED:
+        return {
+          success: false,
+          reason: 'GAME_UNAVAILABLE',
+          message: 'Game has been disbanded'
+        };
     }
 
-    // 动态获取当前玩家列表和最大人数
-    const preGameState = this.preGameInstance?.getState();
-    const players = preGameState?.players ?? [];
-    const maxPlayers = preGameState?.playerLimit ?? this.config.maxPlayers ?? 8;
-
-    if (players.find(p => p.id === playerId)) {
-      return { success: false, message: 'Player already in game' };
+    // 检查是否有可用的 domain
+    if (primary === null) {
+      return {
+        success: false,
+        reason: 'INVALID_STATE',
+        message: `Game is in a state (${phase}) that cannot be connected to.`
+      };
     }
 
-    if (players.length >= maxPlayers) {
-      return { success: false, message: 'Game is full' };
-    }
-
-    // 预注册玩家（实际连接通过 WebSocket 建立）
-    // 这里只做逻辑校验，不做真正添加
-    // domains 可根据需要返回
-    return { success: true, domains: { pregame: true } };
+    // 返回成功结果
+    return {
+      success: true,
+      data: {
+        phase,
+        domains: {
+          primary,
+          chat: `chat-${this.gameId}`
+        },
+      }
+    };
   }
 
   /**
