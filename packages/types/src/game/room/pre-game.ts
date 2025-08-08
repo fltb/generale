@@ -80,3 +80,13 @@ export interface PreGameRoomState {
 }
 
 export { PlayerColor } from './player-colors';
+
+/**
+ * 游戏阶段枚举
+ */
+export enum GamePhase {
+  PREGAME = 'pregame',    // 房间准备阶段
+  INGAME = 'ingame',      // 游戏进行阶段
+  ENDED = 'ended',        // 游戏结束阶段
+  DISBANDED = 'disbanded' // 房间解散
+}
