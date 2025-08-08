@@ -10,17 +10,22 @@
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
-    "@generale/types": "workspace:*",
-    "elysia": "latest",
     "@elysiajs/cors": "latest",
     "@elysiajs/swagger": "latest",
-    "fast-json-patch": "^3.1.1"
+    "@generale/types": "workspace:*",
+    "drizzle-orm": "^0.44.4",
+    "elysia": "latest",
+    "fast-json-patch": "^3.1.1",
+    "nodemailer": "^7.0.5"
   },
   "devDependencies": {
+    "@types/bun": "^1.2.19",
+    "@types/nodemailer": "^6.4.17",
+    "@types/ws": "^8.5.0",
     "bun-types": "latest",
+    "drizzle-kit": "^0.31.4",
     "vitest": "^1.0.0",
-    "ws": "^8.14.0",
-    "@types/ws": "^8.5.0"
+    "ws": "^8.14.0"
   },
   "module": "src/index.js"
 }
