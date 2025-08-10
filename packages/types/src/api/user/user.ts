@@ -1,4 +1,5 @@
 import { t, type Static } from 'elysia';
+import { errorRespSchema, okRespSchema, messageRespSchema } from '../base';
 
 // --- Requests ---
 
@@ -106,34 +107,6 @@ export const logoutRespSchema = t.Object({
 export type LogoutRespBody = Static<typeof logoutRespSchema>;
 
 /**
- * Schema for a generic message response (success/failure messages)
- */
-export const messageRespSchema = t.Object({
-    success: t.Boolean(),
-    message: t.String()
-});
-
-export type MessageRespBody = Static<typeof messageRespSchema>;
-
-/**
- * Schema for an error response
- */
-export const errorRespSchema = t.Object({
-    error: t.String()
-});
-
-export type ErrorRespBody = Static<typeof errorRespSchema>;
-
-/**
- * Schema for a simple OK response
- */
-export const okRespSchema = t.Object({
-    ok: t.Literal(true)
-});
-
-export type OkRespBody = Static<typeof okRespSchema>;
-
-/**
  * Schema for a password reset token validation response
  */
 export const passwordResetTokenRespSchema = t.Object({
@@ -144,3 +117,14 @@ export const passwordResetTokenRespSchema = t.Object({
 
 export type PasswordResetTokenRespBody = Static<typeof passwordResetTokenRespSchema>;
 
+/**
+ * Schema for an error response
+ */
+export type ErrorRespBody = Static<typeof errorRespSchema>;
+
+/**
+ * Static TypeScript type for the ok response.
+ */
+export type OkRespBody = Static<typeof okRespSchema>;
+
+export type MessageRespBody = Static<typeof messageRespSchema>;
