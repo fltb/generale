@@ -73,8 +73,8 @@ vi.mock('../core/map-gen', () => ({
   })
 }));
 
-import { GameService, GamePhase } from '../GameService';
-import { GameId, PlayerId } from '@generale/types';
+import { GameService } from '../GameService';
+import { GameId, GamePhase, PlayerId } from '@generale/types';
 
 describe('GameService 全流程集成测试', () => {
   let gameService: GameService;

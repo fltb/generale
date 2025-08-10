@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { GameService, GamePhase, GameServiceConfig } from '../GameService';
+import { GameService, GameServiceConfig } from '../GameService';
 import { GameInstance } from '../../instance/GameInstance';
-import { GameId } from '@generale/types';
+import { GameId, GamePhase } from '@generale/types';
 
 // Mock SubConnector
 const createMockSubConnector = (context: any = {}) => ({

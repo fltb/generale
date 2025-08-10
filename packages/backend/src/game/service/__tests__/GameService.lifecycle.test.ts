@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { GameService, GamePhase, GameServiceConfig } from '../GameService';
+import { GameService, GameServiceConfig } from '../GameService';
 import { GameInstance } from '../../instance/GameInstance';
 import { PreGameInstance } from '../../instance/PreGameInstance';
 import { PreGameMapType, GameStatus } from '@generale/types';
 import { unregisterDomainHandler, registerDomainHandler } from '../../../plugins/websocket';
-import { GameId } from '@generale/types';
+import { GameId, GamePhase } from '@generale/types';
 
 // Mock dependencies
 vi.mock('../../../plugins/websocket', () => ({
