@@ -7,8 +7,10 @@ import {
   userSuccessRespSchema,
   messageRespSchema,
   errorRespSchema,
-  okRespSchema,
-  verifyReqSchema
+  verifyReqSchema,
+  requestPasswordResetReqSchema,
+  resetPasswordReqSchema,
+  passwordResetTokenRespSchema
 } from '@generale/types/dist/api'
 
 import { verificationTokens } from '../db/schema'
@@ -119,21 +121,38 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     }
   )
   .post(
-    '/logout',
-    async ({ cookie: { sid } }) => {
-      if (sid?.value) {
-        sessionService.delete(sid.value)
-        sid.set({
-          value: '',
-          path: '/',
-          expires: new Date(0)
-        })
+    '/verify',
+    async ({ body, set }) => {
+      const { email, code } = body
+
+      const user = await userService.findByEmail(email)
+      if (!user) {
+        set.status = 404
+        return { error: '用户不存在' }
       }
-      return { ok: true }
+
+      const row = db
+        .select()
+        .from(verificationTokens)
+        .where(eq(verificationTokens.userId, user.id))
+        .get()
+
+      if (!row || row.token !== code || row.expiresAt.getTime() < Date.now()) {
+        set.status = 400
+        return { error: '验证码错误或已过期' }
+      }
+
+      await userService.markVerified(user.id)
+      db.delete(verificationTokens).where(eq(verificationTokens.userId, user.id)).run()
+
+      return { success: true, message: '邮箱验证成功，可登录' }
     },
     {
+      body: verifyReqSchema,
       response: {
-        200: okRespSchema
+        200: messageRespSchema,
+        400: errorRespSchema,
+        404: errorRespSchema
       }
     }
   )
@@ -157,6 +176,65 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         200: userSuccessRespSchema,
         401: errorRespSchema,
         404: errorRespSchema
+      }
+    }
+  )
+  .post(
+    '/request-password-reset',
+    async ({ body }) => {
+      const { email } = body;
+      const user = await userService.findByEmail(email);
+      if (!user) {
+        // Don't reveal whether email exists for security
+        return { success: true, message: '如果邮箱存在，密码重置邮件已发送' }
+      }
+
+      const token = randomUUIDv7();
+      const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
+
+      db.insert(verificationTokens)
+        .values({ token, userId: user.id, expiresAt })
+        .run();
+
+      await sendVerificationEmail(email, token);
+      return { success: true, message: '如果邮箱存在，密码重置邮件已发送' };
+    },
+    {
+      body: requestPasswordResetReqSchema,
+      response: {
+        200: messageRespSchema
+      }
+    }
+  )
+  .post(
+    '/reset-password',
+    async ({ body }) => {
+      const { token, newPassword } = body;
+
+      // Verify token exists and is not expired
+      const verificationToken = await db
+        .select()
+        .from(verificationTokens)
+        .where(eq(verificationTokens.token, token))
+        .get();
+
+      if (!verificationToken || new Date(verificationToken.expiresAt) < new Date()) {
+        return { error: '无效或过期的重置链接', valid: false };
+      }
+
+      // Update user's password
+      await userService.updatePassword(verificationToken.userId, newPassword);
+
+      // Delete used token
+      db.delete(verificationTokens).where(eq(verificationTokens.token, token)).run();
+
+      return { success: true, message: '密码重置成功', valid: true };
+    },
+    {
+      body: resetPasswordReqSchema,
+      response: {
+        200: passwordResetTokenRespSchema,
+        400: errorRespSchema
       }
     }
   )

@@ -50,3 +50,12 @@ export const verificationTokens = sqliteTable('verification_tokens', {
   expiresAt: integer('expires_at', { mode: 'timestamp' })
     .notNull()
 })
+
+// User profiles
+export const profiles = sqliteTable('profiles', {
+  userId: text('user_id').primaryKey().references(() => users.id),
+  avatarUrl: text('avatar_url'),
+  bio: text('bio'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .default(sql`(CURRENT_TIMESTAMP)`),
+});

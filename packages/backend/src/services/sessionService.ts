@@ -16,7 +16,7 @@ class SessionService {
   private sessions = new Map<string, Session>();
   private maxAgeMs: number;
 
-  constructor(maxAgeSeconds = 60 * 60 * 24) {
+  constructor(maxAgeSeconds = 60 * 60 * 24 * 7) {
     this.maxAgeMs = maxAgeSeconds * 1000;
   }
 
@@ -34,17 +34,22 @@ class SessionService {
   }
 
   /**
-   * Get a session by id and automatically expire old sessions.
+   * Get a session by id and automatically renew/expire old sessions.
    */
   get(id: string | undefined | null): Session | undefined {
     if (!id) return undefined;
     const session = this.sessions.get(id);
     if (!session) return undefined;
-    if (session.expiresAt.getTime() < Date.now()) {
-      this.sessions.delete(id);
-      return undefined;
+    
+    // Auto-renew if session is still valid
+    if (session.expiresAt.getTime() > Date.now()) {
+      session.expiresAt = new Date(Date.now() + this.maxAgeMs);
+      return session;
     }
-    return session;
+    
+    // Delete expired session
+    this.sessions.delete(id);
+    return undefined;
   }
 
   delete(id: string) {

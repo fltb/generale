@@ -95,6 +95,17 @@ export class UserService {
   }
 
   /**
+   * Update user password
+   */
+  async updatePassword(userId: string, newPassword: string): Promise<void> {
+    const hashedPassword = this.hashPassword(newPassword);
+    await db.update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.id, userId))
+      .run();
+  }
+
+  /**
    * Map raw DB row to User.
    */
   private map(row: any): User {
