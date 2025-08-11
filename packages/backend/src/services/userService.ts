@@ -1,7 +1,7 @@
 import { db } from '../db/client'
 import { users } from '../db/schema'
 import { randomBytes, pbkdf2Sync, timingSafeEqual } from 'crypto'
-import { randomUUIDv7 } from 'bun'
+import { randomUUID } from 'crypto'
 import { eq } from 'drizzle-orm'
 
 export interface User {
@@ -42,7 +42,7 @@ export class UserService {
     password: string,
     email: string
   ): Promise<User> {
-    const id = randomUUIDv7()
+    const id = randomUUID()
     const now = new Date()
     const hashedPassword = this.hashPassword(password)
 

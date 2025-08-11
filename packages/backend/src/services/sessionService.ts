@@ -1,4 +1,4 @@
-import { randomUUIDv7 } from "bun";
+import { randomUUID } from "crypto";
 
 export interface Session {
   id: string;
@@ -12,7 +12,7 @@ export interface Session {
  * Redis or a database table. For tests and local dev an in-memory map keeps
  * things simple.
  */
-class SessionService {
+export class SessionService {
   private sessions = new Map<string, Session>();
   private maxAgeMs: number;
 
@@ -21,7 +21,7 @@ class SessionService {
   }
 
   create(userId: string): Session {
-    const id = randomUUIDv7();
+    const id = randomUUID();
     const now = new Date();
     const session: Session = {
       id,
