@@ -2,8 +2,10 @@ import { Elysia } from 'elysia';
 import { profileService } from '../services/profileService';
 import { sessionService } from '../services/sessionService';
 import {
-  profileUpdateReqSchema,
   profileRespSchema,
+  profileUpdateReqSchema,
+  avatarUploadReqSchema,
+  avatarUploadRespSchema,
   errorRespSchema,
   messageRespSchema
 } from '@generale/types';
@@ -32,7 +34,8 @@ export const profileRoutes = new Elysia({ prefix: '/api' })
   )
   .post('/profile/update', 
     async ({ body, cookie: { session }, set }) => {
-      const userId = sessionService.get(session?.value)?.userId;
+      const sessionId = session?.value;
+      const userId = sessionId ? sessionService.get(sessionId)?.userId : undefined;
       if (!userId) {
         set.status = 401;
         return { error: 'Unauthorized' };
@@ -44,6 +47,44 @@ export const profileRoutes = new Elysia({ prefix: '/api' })
       body: profileUpdateReqSchema,
       response: {
         200: messageRespSchema,
+        401: errorRespSchema
+      }
+    }
+  )
+  .post('/profile/upload', 
+    async ({ body: { file }, cookie: { session }, set }) => {
+      const sessionId = session?.value;
+      const userId = sessionId ? sessionService.get(sessionId)?.userId : undefined;
+      if (!userId) {
+        set.status = 401;
+        return { error: 'Unauthorized' };
+      }
+      
+      if (!file) {
+        set.status = 400;
+        return { error: 'No file provided' };
+      }
+      
+      const ext = file.name.split('.').pop() || 'png';
+      const filename = `${userId}-${Date.now()}.${ext}`;
+      const filePath = `/uploads/avatars/${filename}`;
+      
+      await Bun.write(`./public${filePath}`, file);
+      
+      const avatarUrl = `/avatars/${filename}`;
+      await profileService.updateAvatar(userId, avatarUrl);
+      
+      return { 
+        success: true, 
+        avatarUrl,
+        message: 'Avatar uploaded successfully' 
+      };
+    },
+    {
+      body: avatarUploadReqSchema,
+      response: {
+        200: avatarUploadRespSchema,
+        400: errorRespSchema,
         401: errorRespSchema
       }
     }
