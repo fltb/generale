@@ -32,6 +32,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   private prevSentState: Map<PlayerId, SyncedPreGameState> = new Map();
   private version = 0;
   private destroyed = false;
+  private onStateChangeCallbacks: Array<(state: PreGameRoomState) => void> = [];
 
   constructor(initialState: PreGameRoomState, initialConnectors: Map<PlayerId, PreGameServerConnector>) {
     this.state = structuredClone(initialState);
@@ -92,6 +93,11 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       synced.lastConfirmedOp = evt.optimisticId;
     }
     this.broadcastState();
+
+    // If nobody left, destroy (destroy does closure)
+    if (this.state.players.length === 0) {
+      this.disbandRoom(this.state.hostId);
+    }
   }
 
   /** 设置准备状态 */
@@ -265,6 +271,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     for (const pid of this.connectors.keys()) {
       this.sendState(pid, forceSnapshot);
     }
+    // after sending to all connectors, notify subscribers about a room-level update
+    for (const cb of this.onStateChangeCallbacks) {
+      try { cb(this.state); } catch (err) { console.error('[PreGameInstance] onStateChange callback error', err); }
+    }
   }
 
   private getAvailableTileColor(): PlayerColor {
@@ -279,6 +289,15 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     for (const [_pid, conn] of this.connectors) conn.close();
     this.connectors.clear();
     this.state.players = [];
+    this.onStateChangeCallbacks = []
+  }
+
+  public onStateChange(callback: (state: PreGameRoomState) => void): () => void {
+    this.onStateChangeCallbacks.push(callback);
+    return () => {
+      const idx = this.onStateChangeCallbacks.indexOf(callback);
+      if (idx >= 0) this.onStateChangeCallbacks.splice(idx, 1);
+    };
   }
 
   /** 获取当前房间状态 */
@@ -286,7 +305,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     return this.state;
   }
 
-  public canJoin(playerId: PlayerId):{success: true} | {success: false, message: string} {
+  public canJoin(playerId: PlayerId): { success: true } | { success: false, message: string } {
     if (this.destroyed) {
       const msg = `[PreGameInstance] Cannot add player to destroyed instance`;
       console.warn(msg);
@@ -309,10 +328,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   }
 
   /** 动态添加玩家（用于 GameService） */
-  public addPlayer(user:{id: PlayerId, name: string}, connector: PreGameServerConnector):  { success: true } | { success: false, message: string }{
+  public addPlayer(user: { id: PlayerId, name: string }, connector: PreGameServerConnector): { success: true } | { success: false, message: string } {
     const playerId = user.id;
     const playerName = user.name;
-    
+
     const res = this.canJoin(playerId);
     if (!res.success) {
       return res;
@@ -336,7 +355,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
     // 设置连接器
     this.connectors.set(playerId, connector);
-    
+
     // 设置连接器回调
     connector.onOpen(() => this.sendState(playerId, true));
     connector.onDisconnect(() => this.removePlayer(playerId));

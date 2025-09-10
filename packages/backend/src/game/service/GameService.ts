@@ -70,6 +70,12 @@ export class GameService {
   private onGameEndCallback?: (result: any) => void;
   private onDisbandCallback?: () => void;
 
+  private roomUpdateEmitter?: (gameId: GameId) => void;
+  private pregameUpdateFilters: Array<(prev?: PreGameRoomState, curr?: PreGameRoomState) => boolean> = [];
+  private lastPregameSnapshot?: PreGameRoomState;
+  // 保存从 pregame 启动游戏前的快照（用于游戏结束后恢复房间）
+  private lastPreGameSnapshot?: PreGameRoomState;
+
   constructor(config: GameServiceConfig) {
     this.config = config;
     this.gameId = config.gameId;
@@ -223,6 +229,15 @@ export class GameService {
     return connector;
   }
 
+  private addPreGameUpdateFilter(
+    fn: (prev?: PreGameRoomState, curr?: PreGameRoomState) => boolean
+  ): () => void {
+    this.pregameUpdateFilters.push(fn);
+    return () => {
+      const i = this.pregameUpdateFilters.indexOf(fn);
+      if (i >= 0) this.pregameUpdateFilters.splice(i, 1);
+    };
+  }
   // ============ 游戏阶段管理 ============
 
   /**
@@ -262,15 +277,67 @@ export class GameService {
 
     this.preGameInstance.onStartGame(this.startGame.bind(this));
 
+    this.lastPregameSnapshot = structuredClone(this.preGameInstance.getState());
+
+    // 过滤器：玩家数量变更
+    const playerCountChanged = (prev?: PreGameRoomState, curr?: PreGameRoomState) =>
+      (prev?.players.length ?? 0) !== (curr?.players.length ?? 0);
+
+    // 过滤器：主持人（host）变化
+    const hostChanged = (prev?: PreGameRoomState, curr?: PreGameRoomState) =>
+      (prev?.hostId ?? '') !== (curr?.hostId ?? '');
+
+    // 过滤器：房间开始标志 changed
+    const startedChanged = (prev?: PreGameRoomState, curr?: PreGameRoomState) =>
+      (prev?.started ?? false) !== (curr?.started ?? false);
+
+    // 组合示例：只在上面任一情况发生时上报
+    const significantChange = (prev?: PreGameRoomState, curr?: PreGameRoomState) =>
+      playerCountChanged(prev, curr) || hostChanged(prev, curr) || startedChanged(prev, curr);
+
+    this.addPreGameUpdateFilter(significantChange);
+
+    this.preGameInstance.onStateChange((newState) => {
+      const prev = this.lastPregameSnapshot;
+      this.lastPregameSnapshot = structuredClone(newState);
+
+      let shouldEmit = false;
+
+      // 如果没有任何过滤器，默认上报（往 manager 发送）
+      if (this.pregameUpdateFilters.length === 0) {
+        shouldEmit = true;
+      } else {
+        for (const filter of this.pregameUpdateFilters) {
+          try {
+            if (filter(prev, newState)) {
+              shouldEmit = true;
+              break;
+            }
+          } catch (err) {
+            console.error('[GameService] pregame update filter error', err);
+          }
+        }
+      }
+
+      if (shouldEmit) {
+        this.emitRoomUpdatedToManager();
+      }
+    });
     console.log(`[GameService ${this.gameId}] PreGame initialized`);
+  }
+
+  private emitRoomUpdatedToManager() {
+    try { this.roomUpdateEmitter?.(this.gameId); } catch (err) { console.error('[GameService] emitRoomUpdatedToManager', err); }
+  }
+
+  public setRoomUpdateEmitter(cb: (gameId: GameId) => void) {
+    this.roomUpdateEmitter = cb;
   }
 
   /**
    * 从 PreGame 转换到 Game 阶段
    */
   public startGame(state: PreGameRoomState): void {
-
-
     if (this.phase !== GamePhase.PREGAME || !this.preGameInstance) {
       console.error(`[GameService ${this.gameId}] Cannot start game from phase: ${this.phase}`);
       return;
@@ -279,7 +346,8 @@ export class GameService {
     console.log(`[GameService ${this.gameId}] Starting game...`);
 
     // 直接使用传入的 PreGame 状态
-    const preGameState = state;
+    const preGameState = structuredClone(state);
+    this.lastPreGameSnapshot = structuredClone(preGameState);
 
     // 创建初始游戏状态
     const nowTick = 0;
@@ -351,6 +419,7 @@ export class GameService {
 
     // 触发游戏开始回调
     this.onGameStartCallback?.();
+    this.emitRoomUpdatedToManager();
 
     console.log(`[GameService ${this.gameId}] Game started with ${playerIds.length} players`);
   }
@@ -359,7 +428,7 @@ export class GameService {
    * 结束游戏
    */
   public endGame(result?: any): void {
-    // Clear tick timer on game end
+    // 清理 tick timer
     this.clearTickTimer();
 
     if (this.phase !== GamePhase.INGAME) {
@@ -369,18 +438,48 @@ export class GameService {
 
     console.log(`[GameService ${this.gameId}] Ending game...`, result);
 
-    this.phase = GamePhase.ENDED;
-
-    // 触发游戏结束回调
+    // 调用结束回调（保留给上层使用，例如统计）
     this.onGameEndCallback?.(result);
 
-    // 清理游戏实例
+    // 清理游戏实例（销毁内部资源）
     if (this.gameInstance) {
+      try {
+        this.gameInstance.destroy();
+      } catch (err) {
+        console.warn(`[GameService ${this.gameId}] Error destroying gameInstance:`, err);
+      }
       this.gameInstance = null;
     }
 
-    console.log(`[GameService ${this.gameId}] Game ended`);
+    // 恢复为 PREGAME：使用 lastPreGameSnapshot（优先），如果没有则从旧的 gameState 尝试构建一个基本的 pregame 状态
+    let restoredPreGameState: PreGameRoomState | null = null;
+
+    if (this.lastPreGameSnapshot) {
+      restoredPreGameState = structuredClone(this.lastPreGameSnapshot);
+    } else {
+      // 尝试从 gameInstance 的残留数据构造（降级方案）
+      console.error(`[GameService ${this.gameId}] Failed to build fallback pregame state, disbanding game`);
+      this.disbandGame();
+      return;
+    }
+
+    // 将房间恢复到 pregame：创建新的 PreGameInstance（connectors 传空 map，客户端连接时会重新打开 pregame 域并加入）
+    this.preGameInstance = new PreGameInstance(restoredPreGameState, new Map());
+    this.phase = GamePhase.PREGAME;
+    this.chatInstance.activeStageInstance = this.preGameInstance;
+
+    // 重新注册 startGame 回调和 pregame -> manager 转发
+    this.preGameInstance.onStartGame(this.startGame.bind(this));
+    this.preGameInstance.onStateChange(() => {
+      this.emitRoomUpdatedToManager();
+    });
+
+    // 通知 manager 房间已变更（从 INGAME -> PREGAME）
+    this.emitRoomUpdatedToManager();
+
+    console.log(`[GameService ${this.gameId}] Game ended and room restored to pregame with ${this.preGameInstance.getState().players.length} players`);
   }
+
 
   /**
    * 解散游戏
@@ -405,6 +504,7 @@ export class GameService {
 
     // 触发解散回调
     this.onDisbandCallback?.();
+    this.emitRoomUpdatedToManager();
 
     console.log(`[GameService ${this.gameId}] Game disbanded`);
   }

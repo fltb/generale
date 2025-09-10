@@ -39,6 +39,17 @@ export const gameInfoRouteSchema = t.Object({
 export type GameInfoRoute = Static<typeof gameInfoRouteSchema>;
 
 
+export const listGamesQuerySchema = t.Object({
+    roomName: t.Optional(t.String()),    // 按房间名模糊匹配
+    mode: t.Optional(t.String()),        // 按模式筛选
+    map: t.Optional(t.String()),         // 按地图筛选
+    full: t.Optional(t.String()),        // "true"/"false"
+    offset: t.Optional(t.String()),      // 偏移量
+    limit: t.Optional(t.String())        // 截断数量
+})
+export type ListGamesQuery = Static<typeof listGamesQuerySchema>
+
+
 // --- Request Schemas ---
 
 export const createGameReqSchema = t.Object({

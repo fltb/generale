@@ -1,6 +1,6 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 import { gameServiceManager } from "../game/service/GameServiceManager";
-import { PlayerId, GameId } from "@generale/types";
+import { PlayerId, GameId, listGamesQuerySchema } from "@generale/types";
 
 // Import schemas from your shared types package
 import {
@@ -55,21 +55,56 @@ export const gameRoutes = new Elysia({ prefix: "/api/game" })
     response: { 200: gameInfoSuccessRespSchema, 404: errorRespSchema, 500: errorRespSchema },
     detail: { tags: ["Game"], summary: "Get game information" }
   })
-  .get("/list", async ({ gameServiceManager }) => {
+  .get("/list", async ({ query, gameServiceManager }) => {
     // Get active game IDs from the manager
     const activeGameIds = gameServiceManager.getActiveGames();
-    const games = activeGameIds
-      .map(id => gameServiceManager.getGame(id)?.getGameInfo())
-      .filter(Boolean); // Filter out any undefined games
 
-    return { success: true, data: games };
+    // Collect game info objects
+    let games = activeGameIds
+      .map(id => gameServiceManager.getGame(id)?.getGameInfo())
+      .filter(Boolean);
+
+    // --- 过滤条件 ---
+    if (query.roomName) {
+      games = games.filter(g =>
+        g.name?.toLowerCase().includes(query.roomName!.toLowerCase())
+      );
+    }
+    if (query.mode) {
+      games = games.filter(g => g.mode === query.mode);
+    }
+    if (query.map) {
+      games = games.filter(g => g.map === query.map);
+    }
+    if (query.full !== undefined) {
+      const wantFull = query.full === "true";
+      games = games.filter(g => {
+        const isFull = g.players.length >= g.maxPlayers;
+        return wantFull ? isFull : !isFull;
+      });
+    }
+
+    // --- offset & limit ---
+    const offset = query.offset ? parseInt(query.offset, 10) : 0;
+    const limit = query.limit ? parseInt(query.limit, 10) : 20;
+
+    const total = games.length;
+    const sliced = games.slice(offset, offset + limit);
+
+    return {
+      success: true,
+      data: sliced,
+      meta: {
+        total,
+        offset,
+        limit,
+        hasMore: offset + limit < total
+      }
+    };
   }, {
-    query: t.Object({
-      includePrivate: t.Optional(t.String()),
-      limit: t.Optional(t.String())
-    }),
+    query: listGamesQuerySchema,
     response: { 200: listGamesSuccessRespSchema, 500: errorRespSchema },
-    detail: { tags: ["Game"], summary: "List active games" }
+    detail: { tags: ["Game"], summary: "List active games with filters & pagination" }
   })
   .get("/connect/:gameId/:playerId", async ({ params, gameServiceManager, set }) => {
     const { gameId, playerId } = params;

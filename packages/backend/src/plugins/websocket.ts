@@ -6,7 +6,7 @@ import type { ServerSyncConnector } from '@generale/types/src/connection/conn-ty
 // =================================================================================
 
 interface WSContextBase {
-  userid: string;
+  userid: string;   // always filled by backend
   username: string;
 };
 
@@ -139,7 +139,7 @@ class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WS
   handleMessage(message: WebSocketMessage<T, Context>) {
     const { domain, type, payload } = message;
     switch (type) {
-      case "open": this.openSubConnector(domain, payload as Context); break;
+      case "open": this.openSubConnector(domain, payload as Partial<Context>); break;
       case "close": {
         let code: number | undefined; let reason: string | undefined;
         if (typeof payload === 'object' && payload !== null) { code = (payload as any).code; reason = (payload as any).reason; }
@@ -154,13 +154,19 @@ class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WS
     }
   }
 
-  openSubConnector(domain: string, context: Context): boolean {
-    if (this.subConnectors.has(domain)) { return false; }
+  openSubConnector(domain: string, context: Partial<Context>): boolean {
+    if (this.subConnectors.has(domain)) return false;
     const handler = domainHandlers.get(domain);
-    if (!handler) { return false; }
-    // FIX: Instantiation updated to remove `this.ws`
-    const subConnector = new SubConnectorImpl(domain, context, this);
+    if (!handler) return false;
+
+    const safeContext = {
+      ...context,
+      ...this.context,   // fill by backend
+    } as Context;
+
+    const subConnector = new SubConnectorImpl(domain, safeContext, this);
     this.subConnectors.set(domain, subConnector);
+
     handler(subConnector);
     subConnector._triggerOpen();
     return true;
@@ -173,7 +179,7 @@ class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WS
     this.ws.send({ type: 'close', domain, payload: { code, reason } });
     return true;
   }
-  
+
   reconnectSubConnector(domain: string): boolean {
     const subConnector = this.subConnectors.get(domain);
     if (!subConnector) { return false; }
@@ -258,40 +264,42 @@ export function sendMessageToConnection(connectionId: string, message: WebSocket
 export const websocketPlugin = new Elysia()
   .ws("/ws", {
     async open(ws) {
-        const wsData = ws.data as any;
+      const wsData = ws.data as any;
+      const { token, reconnectId } = wsData.query;
+      const userId = await authenticateUserByToken(token as string | undefined);
 
-        const { token, reconnectId } = wsData.query;
-        const userId = await authenticateUserByToken(token as string | undefined);
+      if (!userId) {
+        ws.close(4001, "Authentication failed");
+        return;
+      }
 
-        if (!userId) {
-            ws.close(4001, "Authentication failed");
-            return;
-        }
-        
-        wsData.userId = userId;
-        let manager: WebSocketConnectionManager | undefined;
-        let connectionId: string;
+      wsData.userId = userId;
+      let manager: WebSocketConnectionManager | undefined;
+      let connectionId: string;
 
-        if (reconnectId && (manager = connectionManagers.get(reconnectId as string)) && !manager.isConnected) {
-            manager.reattach(ws);
-            connectionId = reconnectId as string;
-            wsData.connectionId = connectionId;
-            wsData.manager = manager;
-            ws.send({ type: "reconnection_ack", payload: { success: true, connectionId } });
-        } else {
-            connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            wsData.connectionId = connectionId;
-            manager = new WebSocketConnectionManager(ws, connectionId);
-            wsData.manager = manager;
-            connectionManagers.set(connectionId, manager);
-            ws.send({ type: "connection_ack", payload: { connectionId } });
-        }
+      if (reconnectId && (manager = connectionManagers.get(reconnectId as string)) && !manager.isConnected) {
+        manager.reattach(ws);
+        connectionId = reconnectId as string;
+        wsData.connectionId = connectionId;
+        wsData.manager = manager;
+        manager.setContext({ userid: userId }); // fill userid
+        ws.send({ type: "reconnection_ack", payload: { success: true, connectionId } });
+      } else {
+        connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        wsData.connectionId = connectionId;
+        manager = new WebSocketConnectionManager(ws, connectionId);
+        wsData.manager = manager;
+        connectionManagers.set(connectionId, manager);
 
-        if (!userConnections.has(userId)) {
-            userConnections.set(userId, new Set());
-        }
-        userConnections.get(userId)!.add(connectionId);
-        console.log(`[OPEN] User '${userId}' connected. Total connections for user: ${userConnections.get(userId)!.size}. (Conn ID: ${connectionId})`);
+        manager.setContext({ userid: userId }); // fill userid
+        ws.send({ type: "connection_ack", payload: { connectionId } });
+      }
+
+      if (!userConnections.has(userId)) {
+        userConnections.set(userId, new Set());
+      }
+      userConnections.get(userId)!.add(connectionId);
+      console.log(`[OPEN] User '${userId}' connected. Total connections: ${userConnections.get(userId)!.size}. (Conn ID: ${connectionId})`);
     },
 
     message(ws, message) {
