@@ -69,7 +69,11 @@ export const gamePlayerParamsReqSchema = t.Object({
 });
 export type GamePlayerParamsReq = Static<typeof gamePlayerParamsReqSchema>;
 
-
+export const verifyReqSchema = t.Object({
+    email: t.String(),
+    code: t.String()
+})
+export type VerifyReqBody = Static<typeof verifyReqSchema>
 
 export const createGameSuccessRespSchema = t.Object({
     success: t.Literal(true),
