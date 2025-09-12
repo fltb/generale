@@ -7,22 +7,25 @@ import {
   userSuccessRespSchema,
   messageRespSchema,
   errorRespSchema,
-  okRespSchema
+  okRespSchema,
+  verifyReqSchema
 } from '@generale/types'
 
 import { verificationTokens } from '../db/schema'
 import { userService } from '../services/userService'
 import { sendVerificationEmail } from '../services/emailService'
 import { sessionService } from '../services/sessionService'
-import { randomUUIDv7 } from 'bun'
 import { eq } from 'drizzle-orm'
+
+function generateCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString()
+}
 
 export const userRoutes = new Elysia({ prefix: '/api' })
   .post(
     '/register',
     async ({ body, set }) => {
-      // `body` is now fully typed, no need for casting
-      const { username, password, email } = body;
+      const { username, password, email } = body
       if (await userService.findByUsername(username)) {
         set.status = 409
         return { error: '用户名已存在' }
@@ -32,13 +35,16 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         return { error: '邮箱已注册' }
       }
       const user = await userService.create(username, password, email)
-      const token = randomUUIDv7()
-      const expiresAt = new Date(Date.now() + 24 * 3600 * 1000)
+
+      // 生成验证码并存储
+      const code = generateCode()
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 分钟有效
       db.insert(verificationTokens)
-        .values({ token, userId: user.id, expiresAt })
+        .values({ token: code, userId: user.id, expiresAt })
         .run()
-      await sendVerificationEmail(email, token)
-      return { success: true, message: '验证邮件已发送，请查收' }
+
+      await sendVerificationEmail(email, code)
+      return { success: true, message: '验证码已发送到邮箱，请查收' }
     },
     {
       body: registerReqSchema,
@@ -48,23 +54,39 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       }
     }
   )
-  .get(
+  .post(
     '/verify',
-    async ({ query, set }) => {
-      const token = String(query['token'])
-      const row = db.select().from(verificationTokens).where(eq(verificationTokens.token, token)).get()
-      if (!row || row.expiresAt.getTime() < Date.now()) {
-        set.status = 400
-        return { error: '验证链接无效或已过期' }
+    async ({ body, set }) => {
+      const { email, code } = body
+
+      const user = await userService.findByEmail(email)
+      if (!user) {
+        set.status = 404
+        return { error: '用户不存在' }
       }
-      await userService.markVerified(row.userId)
-      db.delete(verificationTokens).where(eq(verificationTokens.token, token)).run()
+
+      const row = db
+        .select()
+        .from(verificationTokens)
+        .where(eq(verificationTokens.userId, user.id))
+        .get()
+
+      if (!row || row.token !== code || row.expiresAt.getTime() < Date.now()) {
+        set.status = 400
+        return { error: '验证码错误或已过期' }
+      }
+
+      await userService.markVerified(user.id)
+      db.delete(verificationTokens).where(eq(verificationTokens.userId, user.id)).run()
+
       return { success: true, message: '邮箱验证成功，可登录' }
     },
     {
+      body: verifyReqSchema,
       response: {
         200: messageRespSchema,
-        400: errorRespSchema
+        400: errorRespSchema,
+        404: errorRespSchema
       }
     }
   )

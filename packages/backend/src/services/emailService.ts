@@ -10,12 +10,12 @@ const transporter = nodemailer.createTransport({
     pass: process.env['SMTP_PASS']
   }
 })
-export async function sendVerificationEmail(email: string, token: string) {
-  const link = `${process.env["APP_URL"]}/api/verify?token=${token}`
+
+export async function sendVerificationEmail(email: string, code: string) {
   await transporter.sendMail({
-    from: 'no-reply@example.com',
+    from: process.env['SMTP_USER'],
     to: email,
-    subject: '请验证您的邮箱',
-    html: `<p>请点击以下链接完成验证：</p><a href="${link}">${link}</a>`
+    subject: '邮箱验证码',
+    html: `<p>您的验证码是：</p><h2>${code}</h2><p>10 分钟内有效</p>`
   })
 }
