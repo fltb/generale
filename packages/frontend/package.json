@@ -8,12 +8,17 @@
     "version": "vinxi version"
   },
   "dependencies": {
+    "@generale/types": "workspace:*",
     "@solidjs/meta": "^0.29.4",
     "@solidjs/router": "^0.15.0",
     "@solidjs/start": "^1.1.0",
+    "@tailwindcss/vite": "^4.1.13",
+    "@tanstack/solid-query": "^5.87.4",
+    "@tanstack/solid-query-devtools": "^5.87.4",
+    "daisyui": "^5.1.10",
     "solid-js": "^1.9.5",
-    "vinxi": "^0.5.7",
-    "@generale/types": "workspace:*"
+    "tailwindcss": "^4.1.13",
+    "vinxi": "^0.5.7"
   },
   "engines": {
     "node": ">=22"
