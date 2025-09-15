@@ -1,4 +1,3 @@
-// src/components/MapTile.tsx
 import {
   Component,
   createSignal,
@@ -6,37 +5,37 @@ import {
   createEffect,
   Show,
 } from "solid-js";
-import P from "solid-pixi"; // P.Graphics, P.Sprite, P.Text, P.Container
+import P from "solid-pixi"; // P.Graphics, P.Text, P.Container
 import * as PIXI from "pixi.js";
 
-import type { Coordinates, Tile, PlayerId, PlayerCore } from "@generale/types";
-import { TileType, PlayerColor } from "@generale/types";
+import type { Coordinates, Tile, SyncedGameState } from "@generale/types";
+import { TileType } from "@generale/types";
+import { FaIconKey, getGraphicsContextFromFa } from "~/utils/faIconGraphic";
 
 export interface MapTileProps {
   coord: Coordinates;
   tile: Tile;
   size: number;
-  players: Record<PlayerId, PlayerCore & { color: PlayerColor }>;
-  iconTextures: Record<TileType, PIXI.Texture>;
+  playerDisplay: SyncedGameState["playerDisplay"];
+  iconTextures: Record<TileType, FaIconKey>;
 }
 
 export const MapTile: Component<MapTileProps> = (props) => {
-  // store Graphics instance in a signal (官方示例模式)
   const [g, setG] = createSignal<PIXI.Graphics | undefined>(undefined);
 
-  // cached reactive values
   const tileColor = createMemo(() =>
-    props.tile.type === TileType.Fog ? 0x444444 : 0xaaaaaa
+    props.tile.type === TileType.Fog
+      ? 0x444444
+      : props.tile.ownerId
+      ? props.playerDisplay[props.tile.ownerId]?.tileColor ?? 0xffffff
+      : 0xffffff
   );
-  const iconTexture = createMemo<PIXI.Texture | null>(() =>
+
+  // 选出对应的 FaIconKey
+  const iconGcKey = createMemo<FaIconKey | null>(() =>
     props.tile.type === TileType.Plain || props.tile.type === TileType.Fog
       ? null
       : props.iconTextures[props.tile.type] ?? null
-  );
-  const ownerTint = createMemo(() =>
-    props.tile.ownerId
-      ? props.players[props.tile.ownerId]?.color ?? 0xffffff
-      : 0xffffff
   );
 
   const textStyle = createMemo(
@@ -53,7 +52,6 @@ export const MapTile: Component<MapTileProps> = (props) => {
       })
   );
 
-  // 命令式绘制：当 g()、props.size、props.tile.type、tileColor() 等变化时会重新执行
   createEffect(() => {
     const graphics = g();
     if (!graphics) return;
@@ -62,13 +60,8 @@ export const MapTile: Component<MapTileProps> = (props) => {
     const color = tileColor();
 
     graphics.clear();
-    // 可选：换成 rect(0.5,0.5,size-1,size-1) 做像素对齐
     graphics.rect(0, 0, size, size).fill({ color });
     graphics.stroke({ width: 1, color: 0x000000, alpha: 0.15 });
-
-    if (props.tile.type === TileType.Fog) {
-      graphics.rect(0, 0, size, size).fill({ color: 0x000000, alpha: 0.28 });
-    }
   });
 
   const x = props.coord.x * props.size;
@@ -76,23 +69,23 @@ export const MapTile: Component<MapTileProps> = (props) => {
 
   return (
     <P.Container x={x} y={y}>
-      {/* 按官方示例，把 ref 绑定到 setG（signal setter） */}
+      {/* 背景方块 */}
       <P.Graphics ref={setG} />
 
-      {/* icon：注意这里传入的是 iconTexture()（实际 Texture）而不是 Accessor */}
-      <Show when={iconTexture()}>
-        <P.Sprite
-          texture={iconTexture()!}
-          width={props.size * 0.6}
-          height={props.size * 0.6}
-          x={props.size / 2}
-          y={props.size / 2}
-          anchor={0.5}
-          tint={ownerTint()}
-        />
+      {/* 图标：这里用 GraphicsContext */}
+      <Show when={iconGcKey()}>
+        {(key) => (
+          <P.Graphics
+            context={getGraphicsContextFromFa(key(), 32, 0x000000)} // 复用缓存
+            x={props.size / 2}
+            y={props.size / 2}
+            scale={props.size / 32 * 0.6} // 基于 32px 默认大小，缩放到合适尺寸
+            tint={0x000000}
+          />
+        )}
       </Show>
 
-      {/* 兵力：Text 的文本放 children（solid-pixi 的类型要求） */}
+      {/* 兵力数 */}
       <Show when={props.tile.army > 0}>
         <P.Text
           anchor={0.5}
