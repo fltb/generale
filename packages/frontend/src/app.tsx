@@ -1,13 +1,14 @@
 import { MetaProvider, Title } from "@solidjs/meta";
 import { Router } from "@solidjs/router";
-import { FileRoutes } from "@solidjs/start/router";
 import { Suspense } from "solid-js";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
 
-import "./app.css";
+import "./index.css";
+
 import { AuthProvider } from "./hooks/useAuth";
+import MapRenderTest from "./components/__tests__/MapRenderTest";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,6 +27,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <MapRenderTest />
         <Router
           root={(props) => (
             <MetaProvider>
@@ -36,7 +38,7 @@ export default function App() {
             </MetaProvider>
           )}
         >
-          <FileRoutes />
+          {/* <FileRoutes /> */}
         </Router>
       </AuthProvider>
       <SolidQueryDevtools initialIsOpen={false} />

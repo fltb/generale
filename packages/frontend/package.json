@@ -1,30 +1,32 @@
 {
-  "name": "example-basic",
+  "name": "frontend",
+  "version": "1.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vinxi dev",
-    "build": "vinxi build",
-    "start": "vinxi start",
-    "version": "vinxi version"
+    "build": "rsbuild build",
+    "dev": "rsbuild dev --open",
+    "preview": "rsbuild preview"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.0.1",
     "@fortawesome/free-solid-svg-icons": "^7.0.1",
     "@generale/types": "workspace:*",
     "@solidjs/meta": "^0.29.4",
-    "@solidjs/router": "^0.15.0",
-    "@solidjs/start": "^1.1.0",
-    "@tailwindcss/vite": "^4.1.13",
-    "@tanstack/solid-query": "^5.87.4",
-    "@tanstack/solid-query-devtools": "^5.87.4",
-    "daisyui": "^5.1.10",
+    "@solidjs/router": "^0.15.3",
+    "@tanstack/solid-query": "^5.89.0",
+    "@tanstack/solid-query-devtools": "^5.89.0",
     "pixi.js": "^8.13.2",
     "solid-js": "^1.9.9",
-    "solid-pixi": "^1.0.0",
-    "tailwindcss": "^4.1.13",
-    "vinxi": "^0.5.7"
+    "solid-pixi": "^1.0.0"
   },
-  "engines": {
-    "node": ">=22"
+  "devDependencies": {
+    "@rsbuild/core": "^1.5.6",
+    "@rsbuild/plugin-babel": "^1.0.6",
+    "@rsbuild/plugin-solid": "^1.0.6",
+    "@tailwindcss/postcss": "^4.1.13",
+    "daisyui": "^5.1.12",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2"
   }
 }

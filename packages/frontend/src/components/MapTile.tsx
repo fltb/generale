@@ -1,23 +1,23 @@
 import {
-  Component,
+  type Component,
   createSignal,
   createMemo,
   createEffect,
   Show,
 } from "solid-js";
-import P from "solid-pixi"; // P.Graphics, P.Text, P.Container
+import * as P from "solid-pixi";
 import * as PIXI from "pixi.js";
 
 import type { Coordinates, Tile, SyncedGameState } from "@generale/types";
 import { TileType } from "@generale/types";
-import { FaIconKey, getGraphicsContextFromFa } from "~/utils/faIconGraphic";
+import { type FaIconKey, getGraphicsContextFromFa } from "~/utils/faIconGraphic";
 
 export interface MapTileProps {
   coord: Coordinates;
   tile: Tile;
   size: number;
   playerDisplay: SyncedGameState["playerDisplay"];
-  iconTextures: Record<TileType, FaIconKey>;
+  iconTextures: Record<TileType, FaIconKey | null>;
 }
 
 export const MapTile: Component<MapTileProps> = (props) => {
@@ -26,9 +26,9 @@ export const MapTile: Component<MapTileProps> = (props) => {
   const tileColor = createMemo(() =>
     props.tile.type === TileType.Fog
       ? 0x444444
-      : props.tile.ownerId
-      ? props.playerDisplay[props.tile.ownerId]?.tileColor ?? 0xffffff
-      : 0xffffff
+      : (props.tile.ownerId
+        ? (props.playerDisplay[props.tile.ownerId]?.tileColor ?? 0xffffff)
+        : 0xffffff)
   );
 
   // 选出对应的 FaIconKey

@@ -1,8 +1,9 @@
-import { icon as faIcon, IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { icon as faIcon, type IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
     faArrowRight,
-    faLongArrowAltRight,
-    faArrowUpRightFromSquare,
+    faArrowLeft,
+    faArrowUp,
+    faArrowDown,
     faCrown,
     faHelmetSafety,
     faMountain,
@@ -13,8 +14,9 @@ import { GraphicsContext } from "pixi.js";
 
 export const FA_ICON_MAP = {
     faArrowRight,
-    faLongArrowAltRight,
-    faArrowUpRightFromSquare,
+    faArrowLeft,
+    faArrowUp,
+    faArrowDown,
     faCrown,
     faHelmetSafety,
     faMountain,
