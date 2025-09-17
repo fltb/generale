@@ -1,15 +1,21 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
     "module": "ESNext",
-    "lib": ["ESNext"],
     "moduleResolution": "bundler",
+    "target": "ESNext",
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "outDir": "dist"
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
 }

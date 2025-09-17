@@ -1,5 +1,5 @@
 // src/services/base.ts
-import type { ErrorResp } from "@generale/types";
+import type { ErrorResp } from "@generale/types/dist/api";
 
 /**
  * ApiError 包裹服务器返回的错误结构（通常为 ErrorResp），并保留 http status。

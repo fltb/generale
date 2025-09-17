@@ -9,7 +9,7 @@ import {
   errorRespSchema,
   okRespSchema,
   verifyReqSchema
-} from '@generale/types'
+} from '@generale/types/dist/api'
 
 import { verificationTokens } from '../db/schema'
 import { userService } from '../services/userService'

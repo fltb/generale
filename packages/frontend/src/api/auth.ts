@@ -10,7 +10,7 @@ import type {
     UserProfileRespBody,
     ErrorResp,
     VerifyReqBody
-} from "@generale/types";
+} from "@generale/types/dist/api";
 
 /**
  * GET /api/me

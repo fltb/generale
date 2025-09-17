@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { gameServiceManager } from "../game/service/GameServiceManager";
-import { PlayerId, GameId, listGamesQuerySchema } from "@generale/types";
+import { PlayerId, GameId } from "@generale/types";
 
 // Import schemas from your shared types package
 import {
@@ -11,8 +11,9 @@ import {
   gameInfoSuccessRespSchema,
   listGamesSuccessRespSchema,
   connectWsSuccessRespSchema,
-  errorRespSchema
-} from "@generale/types";
+  errorRespSchema,
+  listGamesQuerySchema
+} from "@generale/types/dist/api";
 
 export const gameRoutes = new Elysia({ prefix: "/api/game" })
   // Decorate with the actual singleton manager instance
