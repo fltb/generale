@@ -17,7 +17,7 @@ import type {
   ErrorResp,
   VerifyReqBody,
   MessageResp,
-} from "@generale/types";
+} from "@generale/types/dist/api";
 
 type User = UserProfileRespBody;
 
