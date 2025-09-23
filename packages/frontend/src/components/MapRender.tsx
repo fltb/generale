@@ -7,7 +7,8 @@ import type { SyncedGameState, Coordinates, PlayerOperation } from "@generale/ty
 import { PlayerOperationType, TileType } from "@generale/types";
 
 import { MapTile } from "./MapTile";
-import { type FaIconKey, getGraphicsContextFromFa } from "~/utils/faIconGraphic";
+import { type FaIconKey, createScaledFaIcon } from "~/utils/faIconGraphic";
+
 export interface MapRenderProps {
   state: SyncedGameState;
 }
@@ -45,12 +46,14 @@ const OperationArrow: Component<{
     // 只处理 MOVE 操作
     if (props.op.type !== PlayerOperationType.Move) {
       graphics.clear();
+      graphics.removeChildren();
       return;
     }
 
     const payload = (props.op as any).payload;
     if (!payload) {
       graphics.clear();
+      graphics.removeChildren();
       return;
     }
 
@@ -63,6 +66,7 @@ const OperationArrow: Component<{
     const ey = (to.y + 0.5) * props.size;
 
     graphics.clear();
+    graphics.removeChildren();
 
     // 判断方向（主要 4 个方向）
     const dx = ex - sx;
@@ -77,12 +81,11 @@ const OperationArrow: Component<{
     // 箭头大小
     const arrowSize = Math.min(24, props.size * 0.6);
 
-    const ctx = getGraphicsContextFromFa(ICON_MAP[dir], arrowSize, 0x222222);
-    const arrow = new PIXI.Graphics(ctx);
-
+    // 创建缩放后的箭头图标
+    const arrow = createScaledFaIcon(ICON_MAP[dir], arrowSize, 0x222222);
     arrow.x = ex;
     arrow.y = ey;
-    arrow.pivot.set(arrowSize / 2, arrowSize / 2); // 对齐中心点
+    
     graphics.addChild(arrow);
   });
 

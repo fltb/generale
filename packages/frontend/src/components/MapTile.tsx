@@ -7,10 +7,9 @@ import {
 } from "solid-js";
 import * as P from "solid-pixi";
 import * as PIXI from "pixi.js";
-
 import type { Coordinates, Tile, SyncedGameState } from "@generale/types";
 import { TileType } from "@generale/types";
-import { type FaIconKey, getGraphicsContextFromFa } from "~/utils/faIconGraphic";
+import { type FaIconKey, createScaledFaIcon } from "~/utils/faIconGraphic";
 
 export interface MapTileProps {
   coord: Coordinates;
@@ -22,13 +21,14 @@ export interface MapTileProps {
 
 export const MapTile: Component<MapTileProps> = (props) => {
   const [g, setG] = createSignal<PIXI.Graphics | undefined>(undefined);
+  const [iconGraphics, setIconGraphics] = createSignal<PIXI.Graphics | undefined>(undefined);
 
   const tileColor = createMemo(() =>
     props.tile.type === TileType.Fog
       ? 0x444444
       : (props.tile.ownerId
-        ? (props.playerDisplay[props.tile.ownerId]?.tileColor ?? 0xffffff)
-        : 0xffffff)
+          ? (props.playerDisplay[props.tile.ownerId]?.tileColor ?? 0xffffff)
+          : 0xffffff)
   );
 
   // 选出对应的 FaIconKey
@@ -52,16 +52,36 @@ export const MapTile: Component<MapTileProps> = (props) => {
       })
   );
 
+  // 背景绘制
   createEffect(() => {
     const graphics = g();
     if (!graphics) return;
-
     const size = Math.max(1, Math.floor(props.size));
     const color = tileColor();
-
     graphics.clear();
     graphics.rect(0, 0, size, size).fill({ color });
     graphics.stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+  });
+
+  // 图标绘制
+  createEffect(() => {
+    const graphics = iconGraphics();
+    const key = iconGcKey();
+    if (!graphics) return;
+
+    graphics.clear();
+    graphics.removeChildren();
+
+    if (key) {
+      const iconSize = Math.round(props.size * 0.6);
+      const scaledIcon = createScaledFaIcon(key, iconSize, 0xff0000);
+      
+      // 设置位置到瓦片中心
+      scaledIcon.x = props.size / 2;
+      scaledIcon.y = props.size / 2;
+      
+      graphics.addChild(scaledIcon);
+    }
   });
 
   const x = props.coord.x * props.size;
@@ -71,19 +91,9 @@ export const MapTile: Component<MapTileProps> = (props) => {
     <P.Container x={x} y={y}>
       {/* 背景方块 */}
       <P.Graphics ref={setG} />
-
-      {/* 图标：这里用 GraphicsContext */}
-      <Show when={iconGcKey()}>
-        {(key) => (
-          <P.Graphics
-            context={getGraphicsContextFromFa(key(), 32, 0x000000)} // 复用缓存
-            x={props.size / 2}
-            y={props.size / 2}
-            scale={props.size / 32 * 0.6} // 基于 32px 默认大小，缩放到合适尺寸
-            tint={0x000000}
-          />
-        )}
-      </Show>
+      
+      {/* 图标容器 */}
+      <P.Graphics ref={setIconGraphics} />
 
       {/* 兵力数 */}
       <Show when={props.tile.army > 0}>
