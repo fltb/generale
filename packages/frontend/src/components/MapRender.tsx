@@ -60,6 +60,7 @@ const OperationArrow: Component<{
     const from: Coordinates = payload.from;
     const to: Coordinates = payload.to;
 
+    // 起点、终点格子中心
     const sx = (from.x + 0.5) * props.size;
     const sy = (from.y + 0.5) * props.size;
     const ex = (to.x + 0.5) * props.size;
@@ -79,13 +80,23 @@ const OperationArrow: Component<{
     }
 
     // 箭头大小
-    const arrowSize = Math.min(24, props.size * 0.6);
+    const arrowSize = Math.min(24, props.size * 0.4);
 
     // 创建缩放后的箭头图标
     const arrow = createScaledFaIcon(ICON_MAP[dir], arrowSize, 0x222222);
-    arrow.x = ex;
-    arrow.y = ey;
-    
+
+    // 计算箭头位置：格子交界处
+    const mx = (sx + ex) / 2;
+    const my = (sy + ey) / 2;
+
+    // 稍微往目标方向偏移，使箭头贴近目标格子
+    const offset = props.size * 0.05;
+    const dxn = Math.sign(dx);
+    const dyn = Math.sign(dy);
+
+    arrow.x = mx + dxn * offset;
+    arrow.y = my + dyn * offset;
+
     graphics.addChild(arrow);
   });
 

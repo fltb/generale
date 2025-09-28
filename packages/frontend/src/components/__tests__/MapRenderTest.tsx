@@ -61,7 +61,7 @@ const testGameState: SyncedGameState = {
             type: PlayerOperationType.Move,
             payload: {
                 from: { x: 1, y: 1 },
-                to: { x: 2, y: 2 },
+                to: { x: 2, y: 1 },
                 percentage: 50
             }
         },
@@ -69,7 +69,7 @@ const testGameState: SyncedGameState = {
             type: PlayerOperationType.Move,
             payload: {
                 from: { x: 3, y: 3 },
-                to: { x: 4, y: 4 },
+                to: { x: 4, y: 3 },
                 percentage: 75
             }
         }
