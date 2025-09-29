@@ -117,7 +117,7 @@ export const MapRender: Component<MapRenderProps> = (props) => {
     return TILE_ICON_MAP;
   });
 
-  const [cursor, setCursor] = createSignal<Coordinates | null>(null);
+  const [cursor, setCursor] = createSignal<Coordinates | null>({x: 1, y: 1});
 
   // container offset (if you want to center map later, adjust here)
   const offsetX = 0;
@@ -146,13 +146,6 @@ export const MapRender: Component<MapRenderProps> = (props) => {
         )}
       </For>
 
-      {/* Operation arrows (render on top of tiles). Draw in order. */}
-      <P.Container>
-        <For each={props.state.playerOperationQueue}>
-          {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} />}
-        </For>
-      </P.Container>
-
       {/* Cursor: if present, draw a highlighted rectangle around the tile */}
       <Show when={cursor()}>
         {(c) => {
@@ -162,8 +155,8 @@ export const MapRender: Component<MapRenderProps> = (props) => {
             if (!graphics) return;
             graphics.clear();
 
-            const cx = (c as any).x;
-            const cy = (c as any).y;
+            const cx = c().x;
+            const cy = c().y;
             if (typeof cx !== "number" || typeof cy !== "number") {
               graphics.clear();
               return;
@@ -184,9 +177,18 @@ export const MapRender: Component<MapRenderProps> = (props) => {
               .stroke({ width: 6, color: 0xffd34d, alpha: 0.12 });
           });
 
-          return <P.Graphics ref={setG} zIndex={999} />;
+          return <P.Graphics ref={setG} />;
         }}
       </Show>
+
+            {/* Operation arrows (render on top of tiles). Draw in order. */}
+      <P.Container>
+        <For each={props.state.playerOperationQueue}>
+          {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} />}
+        </For>
+      </P.Container>
+
+
     </P.Container>
   );
 };
