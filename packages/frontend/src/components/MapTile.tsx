@@ -17,6 +17,7 @@ export interface MapTileProps {
   size: number;
   playerDisplay: SyncedGameState["playerDisplay"];
   iconTextures: Record<TileType, FaIconKey | null>;
+  onClick?: (coord: Coordinates) => void; // 新增：点击回调
 }
 
 export const MapTile: Component<MapTileProps> = (props) => {
@@ -87,8 +88,15 @@ export const MapTile: Component<MapTileProps> = (props) => {
   const x = props.coord.x * props.size;
   const y = props.coord.y * props.size;
 
+  // 处理点击（通过 container 的 pointer 事件）
+  const handlePointerDown: PIXI.FederatedEventHandler<PIXI.FederatedPointerEvent> = (e) => {
+    // 阻止事件冒泡到上层（如果需要）
+    e.stopPropagation();
+    props.onClick?.(props.coord);
+  };
+
   return (
-    <P.Container x={x} y={y}>
+    <P.Container x={x} y={y} interactive buttonMode onpointerdown={handlePointerDown}>
       {/* 背景方块 */}
       <P.Graphics ref={setG} />
       

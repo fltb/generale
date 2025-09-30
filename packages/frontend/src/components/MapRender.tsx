@@ -1,5 +1,5 @@
-// src/components/MapRender.tsx
-import { For, Show, createMemo, createSignal, createEffect, type Component } from "solid-js";
+// MapRender.tsx
+import { For, Show, createMemo, createSignal, createEffect, type Component, onMount, onCleanup } from "solid-js";
 import * as P from "solid-pixi";
 import * as PIXI from "pixi.js";
 
@@ -11,6 +11,8 @@ import { type FaIconKey, createScaledFaIcon } from "~/utils/faIconGraphic";
 
 export interface MapRenderProps {
   state: SyncedGameState;
+  // 可选回调：若宿主想收到新增指令可以传入（非必须）
+  onOperationQueued?: (op: PlayerOperation) => void;
 }
 
 const ICON_MAP = {
@@ -29,12 +31,11 @@ const TILE_ICON_MAP: Record<TileType, FaIconKey | null> = {
   [TileType.Barracks]: "faHelmetSafety",
   [TileType.Mountain]: "faMountain",
   [TileType.Swamp]: "faWater",
-  // 其他类型根据需要加
 };
 
 const OperationArrow: Component<{
   op: PlayerOperation;
-  size: number; // tile size
+  size: number;
   z?: number;
 }> = (props) => {
   const [g, setG] = createSignal<PIXI.Graphics>();
@@ -43,7 +44,6 @@ const OperationArrow: Component<{
     const graphics = g();
     if (!graphics) return;
 
-    // 只处理 MOVE 操作
     if (props.op.type !== PlayerOperationType.Move) {
       graphics.clear();
       graphics.removeChildren();
@@ -60,7 +60,6 @@ const OperationArrow: Component<{
     const from: Coordinates = payload.from;
     const to: Coordinates = payload.to;
 
-    // 起点、终点格子中心
     const sx = (from.x + 0.5) * props.size;
     const sy = (from.y + 0.5) * props.size;
     const ex = (to.x + 0.5) * props.size;
@@ -69,27 +68,21 @@ const OperationArrow: Component<{
     graphics.clear();
     graphics.removeChildren();
 
-    // 判断方向（主要 4 个方向）
     const dx = ex - sx;
     const dy = ey - sy;
-    let dir: DirectionKey = "right"; // 默认
+    let dir: DirectionKey = "right";
     if (Math.abs(dx) > Math.abs(dy)) {
       dir = dx > 0 ? "right" : "left";
     } else {
       dir = dy > 0 ? "down" : "up";
     }
 
-    // 箭头大小
     const arrowSize = Math.min(24, props.size * 0.4);
-
-    // 创建缩放后的箭头图标
     const arrow = createScaledFaIcon(ICON_MAP[dir], arrowSize, 0x222222);
 
-    // 计算箭头位置：格子交界处
     const mx = (sx + ex) / 2;
     const my = (sy + ey) / 2;
 
-    // 稍微往目标方向偏移，使箭头贴近目标格子
     const offset = props.size * 0.05;
     const dxn = Math.sign(dx);
     const dyn = Math.sign(dy);
@@ -103,34 +96,93 @@ const OperationArrow: Component<{
   return <P.Graphics ref={setG} zIndex={props.z ?? 0} />;
 };
 
-/**
- * MapRender: 渲染整个地图（tiles）、操作队列箭头、以及可选的选中框 cursor。
- */
 export const MapRender: Component<MapRenderProps> = (props) => {
-  // conservative constant tile size — 可按需调整 / 改成 prop
   const TILE_SIZE = 36;
-
-  // convenience
   const map = createMemo(() => props.state.map);
+  const iconTextures = createMemo<Record<TileType, FaIconKey | null>>(() => TILE_ICON_MAP);
 
-  const iconTextures = createMemo<Record<TileType, FaIconKey | null>>(() => {
-    return TILE_ICON_MAP;
+  // active cursor
+  const [active, setActive] = createSignal<Coordinates | null>({x: 1, y: 1});
+
+  // 检查坐标是否在地图范围内
+  const inBounds = (c: Coordinates) =>
+    c.x >= 0 && c.y >= 0 && c.x < map().width && c.y < map().height;
+
+  // 点击格子回调（MapTile 会调用）
+  const handleTileClick = (coord: Coordinates) => {
+    const cur = active();
+    if (cur && cur.x === coord.x && cur.y === coord.y) {
+      setActive(null);
+    } else {
+      setActive(coord);
+    }
+  };
+
+  // 将移动指令通过回调上报给宿主（MapRender 不再存 localOps）
+  const enqueueMove = (from: Coordinates, to: Coordinates, percentage = 100) => {
+    if (!inBounds(to)) return;
+    const op: PlayerOperation = {
+      type: PlayerOperationType.Move,
+      payload: { from, to, percentage },
+    } as any;
+    props.onOperationQueued?.(op);
+  };
+
+  // 键盘控制：当有 active 时，按方向键/WASD 会上报一条 move 并把 active 移到目标
+  onMount(() => {
+    const handler = (e: KeyboardEvent) => {
+      const a = active();
+      if (!a) return;
+
+      let dx = 0;
+      let dy = 0;
+      switch (e.key) {
+        case "ArrowUp":
+        case "w":
+        case "W":
+          dy = -1;
+          break;
+        case "ArrowDown":
+        case "s":
+        case "S":
+          dy = 1;
+          break;
+        case "ArrowLeft":
+        case "a":
+        case "A":
+          dx = -1;
+          break;
+        case "ArrowRight":
+        case "d":
+        case "D":
+          dx = 1;
+          break;
+        default:
+          return;
+      }
+
+      e.preventDefault();
+
+      const target = { x: a.x + dx, y: a.y + dy };
+      if (!inBounds(target)) return;
+
+      enqueueMove(a, target, 100);
+      setActive(target);
+    };
+
+    window.addEventListener("keydown", handler);
+    onCleanup(() => window.removeEventListener("keydown", handler));
   });
 
-  const [cursor, setCursor] = createSignal<Coordinates | null>({x: 1, y: 1});
-
-  // container offset (if you want to center map later, adjust here)
   const offsetX = 0;
   const offsetY = 0;
 
   return (
     <P.Container x={offsetX} y={offsetY}>
-      {/* Base tiles: nested For (rows -> cols) */}
       <For each={map().tiles}>
         {(row, yIdx) => (
           <For each={row}>
             {(tile, xIdx) => {
-              // xIdx(), yIdx() are accessors returning number
               const coord: Coordinates = { x: xIdx(), y: yIdx() };
               return (
                 <MapTile
@@ -139,6 +191,7 @@ export const MapRender: Component<MapRenderProps> = (props) => {
                   size={TILE_SIZE}
                   playerDisplay={props.state.playerDisplay}
                   iconTextures={iconTextures()}
+                  onClick={handleTileClick}
                 />
               );
             }}
@@ -146,8 +199,15 @@ export const MapRender: Component<MapRenderProps> = (props) => {
         )}
       </For>
 
-      {/* Cursor: if present, draw a highlighted rectangle around the tile */}
-      <Show when={cursor()}>
+      {/* 只渲染传入 state 的队列（上游 + 测试端如果需要合并，应由宿主提供合并后的 state） */}
+      <P.Container>
+        <For each={props.state.playerOperationQueue ?? []}>
+          {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} />}
+        </For>
+      </P.Container>
+
+      {/* Cursor */}
+      <Show when={active()}>
         {(c) => {
           const [g, setG] = createSignal<PIXI.Graphics | undefined>(undefined);
           createEffect(() => {
@@ -166,12 +226,10 @@ export const MapRender: Component<MapRenderProps> = (props) => {
             const y = cy * TILE_SIZE;
             const pad = 2;
 
-            // 主描边（实心金黄框）
             graphics
               .rect(x + pad / 2, y + pad / 2, TILE_SIZE - pad, TILE_SIZE - pad)
               .stroke({ width: 3, color: 0xffd34d, alpha: 0.95 });
 
-            // 外圈的淡光晕
             graphics
               .rect(x + pad / 2, y + pad / 2, TILE_SIZE - pad, TILE_SIZE - pad)
               .stroke({ width: 6, color: 0xffd34d, alpha: 0.12 });
@@ -180,14 +238,6 @@ export const MapRender: Component<MapRenderProps> = (props) => {
           return <P.Graphics ref={setG} />;
         }}
       </Show>
-
-            {/* Operation arrows (render on top of tiles). Draw in order. */}
-      <P.Container>
-        <For each={props.state.playerOperationQueue}>
-          {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} />}
-        </For>
-      </P.Container>
-
 
     </P.Container>
   );
