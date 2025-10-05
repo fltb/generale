@@ -12,7 +12,7 @@ interface WSContextBase {
 
 export type WebSocketMessage<T = unknown, Context extends WSContextBase = WSContextBase> =
   | { domain: string; type: "open"; payload: Context }
-  | { domain:string; type: "close"; payload?: { code?: number; reason?: string } }
+  | { domain: string; type: "close"; payload?: { code?: number; reason?: string } }
   | { domain: string; type: "message"; payload: T }
   | { domain: string; type: "reconnect"; payload?: unknown };
 
@@ -59,7 +59,7 @@ export class SubConnectorImpl<CEvt = unknown, SEvt = unknown, Ctx extends WSCont
     public readonly context: Ctx,
     // FIX: Removed unused `ws` property. Sending is delegated to the manager.
     private connectionManager: WebSocketConnectionManager<any, any>
-  ) {}
+  ) { }
 
   get ready(): boolean { return this._ready; }
   public isExplicitlyClosed(): boolean { return this._explicitlyClosed; }
@@ -169,6 +169,12 @@ class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WS
 
     handler(subConnector);
     subConnector._triggerOpen();
+
+    // <-- NEW: notify the client that the domain was opened
+    // This sends a message the client-side ClientConnectionManager understands:
+    // { domain, type: 'open', payload: Context }
+    this.sendRaw({ domain, type: 'open', payload: safeContext });
+
     return true;
   }
 
@@ -176,7 +182,7 @@ class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WS
     const subConnector = this.subConnectors.get(domain);
     if (!subConnector) { return false; }
     subConnector._triggerClose(code, reason);
-    this.ws.send({ type: 'close', domain, payload: { code, reason } });
+    this.sendRaw({ type: 'close', domain, payload: { code, reason } });
     return true;
   }
 
@@ -184,11 +190,11 @@ class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WS
     const subConnector = this.subConnectors.get(domain);
     if (!subConnector) { return false; }
     if (subConnector.isExplicitlyClosed()) {
-      this.ws.send({ domain: domain, type: 'close', payload: subConnector.getCloseInfo() });
+      this.sendRaw({ domain: domain, type: 'close', payload: subConnector.getCloseInfo() });
       return false;
     }
     subConnector._triggerReconnect();
-    this.ws.send({ type: 'reconnect_ack', domain, payload: { success: true } });
+    this.sendRaw({ type: 'reconnect_ack', domain, payload: { success: true } });
     return true;
   }
 
@@ -227,34 +233,34 @@ const connectionManagers = new Map<string, WebSocketConnectionManager<any, any>>
 const userConnections = new Map<string, Set<string>>();
 
 interface CustomWsData {
-    userId: string;
-    connectionId: string;
-    manager: WebSocketConnectionManager<any, any>;
+  userId: string;
+  connectionId: string;
+  manager: WebSocketConnectionManager<any, any>;
 }
 
 async function authenticateUserByToken(token: string | undefined | null): Promise<string | null> {
-    if (token && token.startsWith('token_for_')) {
-        return token.replace('token_for_', '');
-    }
-    return null;
+  if (token && token.startsWith('token_for_')) {
+    return token.replace('token_for_', '');
+  }
+  return null;
 }
 
 export function sendMessageToUser(userId: string, message: WebSocketMessage): void {
-    const connectionIds = userConnections.get(userId);
-    if (!connectionIds || connectionIds.size === 0) { return; }
-    for (const connectionId of connectionIds) {
-        const manager = connectionManagers.get(connectionId);
-        if (manager && manager.isConnected) { manager.sendRaw(message); }
-    }
+  const connectionIds = userConnections.get(userId);
+  if (!connectionIds || connectionIds.size === 0) { return; }
+  for (const connectionId of connectionIds) {
+    const manager = connectionManagers.get(connectionId);
+    if (manager && manager.isConnected) { manager.sendRaw(message); }
+  }
 }
 
 export function sendMessageToConnection(connectionId: string, message: WebSocketMessage): boolean {
-    const manager = connectionManagers.get(connectionId);
-    if (manager && manager.isConnected) {
-        manager.sendRaw(message);
-        return true;
-    }
-    return false;
+  const manager = connectionManagers.get(connectionId);
+  if (manager && manager.isConnected) {
+    manager.sendRaw(message);
+    return true;
+  }
+  return false;
 }
 
 // =================================================================================
@@ -303,41 +309,41 @@ export const websocketPlugin = new Elysia()
     },
 
     message(ws, message) {
-        try {
-            // FIX: Use a two-step assertion to satisfy strict type checking
-            const { manager } = ws.data as unknown as CustomWsData;
-            if (!manager) { return; }
-            const parsedMessage = typeof message === 'object' ? message : JSON.parse(message as string);
-            manager.handleMessage(parsedMessage);
-        } catch (error) {
-            console.error("WebSocket message error:", error);
-        }
+      try {
+        // FIX: Use a two-step assertion to satisfy strict type checking
+        const { manager } = ws.data as unknown as CustomWsData;
+        if (!manager) { return; }
+        const parsedMessage = typeof message === 'object' ? message : JSON.parse(message as string);
+        manager.handleMessage(parsedMessage);
+      } catch (error) {
+        console.error("WebSocket message error:", error);
+      }
     },
 
     close(ws, _code, _message) {
-        // FIX: Use a two-step assertion here as well
-        const { connectionId, userId } = ws.data as unknown as CustomWsData;
+      // FIX: Use a two-step assertion here as well
+      const { connectionId, userId } = ws.data as unknown as CustomWsData;
 
-        if (connectionId) {
-            const manager = connectionManagers.get(connectionId);
-            if (manager) { manager.handleClose(); }
+      if (connectionId) {
+        const manager = connectionManagers.get(connectionId);
+        if (manager) { manager.handleClose(); }
+      }
+
+      if (userId && connectionId) {
+        const userConnSet = userConnections.get(userId);
+        if (userConnSet) {
+          userConnSet.delete(connectionId);
+          if (userConnSet.size === 0) {
+            userConnections.delete(userId);
+          }
+          console.log(`[CLOSE] User '${userId}' disconnected. Remaining connections: ${userConnSet.size}. (Conn ID: ${connectionId})`);
         }
-        
-        if (userId && connectionId) {
-            const userConnSet = userConnections.get(userId);
-            if (userConnSet) {
-                userConnSet.delete(connectionId);
-                if (userConnSet.size === 0) {
-                    userConnections.delete(userId);
-                }
-                console.log(`[CLOSE] User '${userId}' disconnected. Remaining connections: ${userConnSet.size}. (Conn ID: ${connectionId})`);
-            }
-        }
+      }
     },
-     
+
     error(context: any) {
-        const connectionId = (context.ws || context)?.data?.connectionId;
-        console.error(`WebSocket error for connection ${connectionId}:`, context.error);
+      const connectionId = (context.ws || context)?.data?.connectionId;
+      console.error(`WebSocket error for connection ${connectionId}:`, context.error);
     }
   });
 

@@ -119,6 +119,13 @@ solidjs SPA, 分成各个路由和页面。
 - 点击 cursor 切换当前 active
 - 上下左右/wasd 移动指令队列
 
+上面的完成之后，就需要前后端联动的逻辑了。
+
+先写一个 ws 的总连接逻辑写好，测试 subconnection. 就适用一个 echo subconnection 即可
+
+把后端写死，固定一个游戏房间 id
+
+然后写出 websocket 的
 
 ### 游戏逻辑
 

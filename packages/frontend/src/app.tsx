@@ -8,6 +8,7 @@ import { MetaProvider, Title } from "@solidjs/meta";
 import { Router } from "@solidjs/router";
 import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
+import WsEchoTester from "./components/__tests__/WsEchoTester";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,7 +30,7 @@ export default function App() {
         >
           <MapRenderTest />
         </Application>
-
+        <WsEchoTester />
         <Router
           root={(props) => (
             <MetaProvider>

@@ -1,3 +1,4 @@
+// src/ws/manager.ts
 import { createSignal } from "solid-js";
 
 /**
@@ -105,6 +106,9 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
 
   private subConnectors = new Map<string, SubConnectorClient<any, any, Ctx>>();
 
+  /** domains we've asked the server to open but haven't yet received server 'open' ack */
+  private pendingOpens = new Set<string>();
+
   /** small reactive signal to allow UI to subscribe */
   public isConnectedSignal = createSignal(false);
 
@@ -126,22 +130,26 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
     if (reattach && this.connectionId) params.set("reconnectId", this.connectionId);
 
     const wsUrl = `${this.url}?${params.toString()}`;
+    console.debug("[WS] connecting to", wsUrl);
     this.ws = new WebSocket(wsUrl);
     this.ws.onopen = () => {
+      console.debug("[WS] onopen");
       this.isConnected = true;
       this.isConnectedSignal[1](true);
       this.reconnectAttempts = 0;
-      // nothing else — server will send connection_ack
+      // server will send connection_ack or reconnection_ack — wait for those before retrying opens
     };
     this.ws.onmessage = (ev) => {
       try {
         const raw = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data;
+        console.debug("[WS] onmessage raw:", raw);
         this._handleIncoming(raw);
       } catch (e) {
-        console.error("ws parse error", e);
+        console.error("ws parse error", e, "raw:", ev.data);
       }
     };
     this.ws.onclose = (ev) => {
+      console.debug("[WS] onclose", ev);
       this.isConnected = false;
       this.isConnectedSignal[1](false);
       // notify subconnectors of disconnect
@@ -158,6 +166,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
     this.reconnectAttempts++;
     if (this.reconnectTimer) window.clearTimeout(this.reconnectTimer);
     this.reconnectTimer = window.setTimeout(() => {
+      console.debug("[WS] reconnect attempt", this.reconnectAttempts);
       this._connectInternal(true);
     }, backoff);
   }
@@ -175,8 +184,16 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
 
   // send out a raw object (encoded to JSON)
   sendRaw(obj: object) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      try { this.ws.send(JSON.stringify(obj)); } catch (e) { console.error("ws send error", e); }
+    try {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const payload = JSON.stringify(obj);
+        this.ws.send(payload);
+        console.debug("[WS] sendRaw ->", obj);
+      } else {
+        console.warn("[WS] sendRaw: socket not open, drop", obj);
+      }
+    } catch (e) {
+      console.error("ws send error", e, obj);
     }
   }
 
@@ -193,8 +210,11 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
   // ask server to open a sub-domain
   openDomain(domain: string, ctx: Partial<Ctx> = {}) {
     const sub = this.getOrCreateSub(domain, ctx);
-    // request server to open the суб-connector
+
+    // mark as pending and send open request
+    this.pendingOpens.add(domain);
     this.sendRaw({ domain, type: "open", payload: ctx });
+    console.debug("[WS] openDomain requested:", domain, ctx);
     return sub;
   }
 
@@ -205,6 +225,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       // tell server
       this.sendRaw({ domain, type: "close", payload: { code, reason } });
       this.subConnectors.delete(domain);
+      this.pendingOpens.delete(domain);
     }
   }
 
@@ -213,12 +234,22 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
     // connection ack
     if ((msg as any).type === "connection_ack") {
       const connectionId = (msg as any).payload?.connectionId;
-      if (connectionId) this.connectionId = connectionId;
+      if (connectionId) {
+        this.connectionId = connectionId;
+        console.debug("[WS] received connection_ack:", connectionId);
+      }
+      // after connection ack, retry pending opens (if any)
+      this._retryPendingOpens();
       return;
     }
     if ((msg as any).type === "reconnection_ack") {
       const payload = (msg as any).payload;
-      if (payload?.success && payload.connectionId) this.connectionId = payload.connectionId;
+      if (payload?.success && payload.connectionId) {
+        this.connectionId = payload.connectionId;
+        console.debug("[WS] received reconnection_ack:", payload);
+        // server has reattached our previous connection; retry opens just in case
+        this._retryPendingOpens();
+      }
       return;
     }
 
@@ -232,7 +263,10 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
         case "open": {
           // server opened subconnector; create if not exists
           const sub = this.getOrCreateSub(domain, payload as Partial<Ctx>);
+          // remove from pending opens since server confirmed open
+          this.pendingOpens.delete(domain);
           sub._triggerOpen(payload as Partial<Ctx>);
+          console.debug("[WS] domain open ack:", domain, payload);
           break;
         }
         case "close": {
@@ -241,7 +275,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
             const code = payload?.code;
             const reason = payload?.reason;
             sub._triggerClose(code, reason);
-            // we keep the sub object but mark closed
+            // keep the sub object but mark closed
           }
           break;
         }
@@ -265,6 +299,17 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
     } else {
       // unknown non-domain message
       console.warn("Unhandled non-domain message", msg);
+    }
+  }
+
+  // when connection ack/reconnect ack arrives, retry opens for domains we asked before
+  private _retryPendingOpens() {
+    if (!this.isConnected || !this.pendingOpens.size) return;
+    for (const domain of Array.from(this.pendingOpens)) {
+      const sub = this.subConnectors.get(domain);
+      const ctx = sub ? sub.getContext() : {};
+      console.debug("[WS] retrying open for pending domain:", domain);
+      this.sendRaw({ domain, type: "open", payload: ctx });
     }
   }
 }

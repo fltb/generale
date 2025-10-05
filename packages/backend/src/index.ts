@@ -4,65 +4,71 @@ import { swagger } from "@elysiajs/swagger";
 import { gameRoutes } from "./routes/game";
 import { userRoutes } from "./routes/user";
 import { authPlugin } from "./middleware/authPlugin";
-import { websocketPlugin } from "./plugins/websocket";
+import { registerDomainHandler, websocketPlugin } from "./plugins/websocket";
 
 const app = new Elysia()
   .use(cors())
   .use(authPlugin)
-  .use(userRoutes)
-  .use(swagger({
-    documentation: {
-      info: {
-        title: 'Generale Game API',
-        version: '1.0.0',
-        description: 'API for Generale multiplayer strategy game'
-      },
-      tags: [
-        { name: 'Game', description: 'Game management endpoints' },
-        { name: 'WebSocket', description: 'Real-time game communication' }
-      ]
-    }
-  }))
-  .use(websocketPlugin)
-  .use(gameRoutes)
-  .get("/", () => ({ message: "Generale Game Server", version: "1.0.0" }))
-  .get("/health", () => ({ status: "ok", timestamp: new Date().toISOString() }))
-  
-  // Test endpoint to register domain handlers
-  .post("/test/register-domain", ({ body }: { body: { domain: string } }) => {
-    const { domain } = body;
-    
-    // Import the registerDomainHandler function
-    const { registerDomainHandler } = require('./plugins/websocket');
-    
-    // Register a test domain handler
-    registerDomainHandler(domain, {
-      onOpen: (connectionId: string, config: any) => {
-        console.log(`Test domain '${domain}' opened for connection: ${connectionId}`, config);
-      },
-      onMessage: (connectionId: string, payload: any) => {
-        console.log(`Test domain '${domain}' received message from ${connectionId}:`, payload);
-        // Echo the message back
-        return {
-          type: 'echo',
-          originalPayload: payload,
-          timestamp: new Date().toISOString()
-        };
-      },
-      onClose: (connectionId: string, code?: number, reason?: string) => {
-        console.log(`Test domain '${domain}' closed for connection: ${connectionId}`, { code, reason });
-      },
-      onDisconnect: (connectionId: string) => {
-        console.log(`Test domain '${domain}' disconnected: ${connectionId}`);
-      },
-      onReconnect: (connectionId: string) => {
-        console.log(`Test domain '${domain}' reconnected: ${connectionId}`);
-      }
-    });
-    
-    return { success: true, message: `Domain '${domain}' registered successfully` };
-  })
-  
+  .group("/api", (api) =>
+    api
+      .use(userRoutes)
+      .use(gameRoutes)
+      .use(swagger({
+        documentation: {
+          info: {
+            title: 'Generale Game API',
+            version: '1.0.0',
+            description: 'API for Generale multiplayer strategy game'
+          },
+          tags: [
+            { name: 'Game', description: 'Game management endpoints' },
+            { name: 'WebSocket', description: 'Real-time game communication' }
+          ]
+        }
+      }))
+      .use(websocketPlugin)
+      // 这里把 handler 改成 (ctx:any) -> 从 ctx.body 读取 domain
+      .post("/test/register-domain", (ctx) => {
+        const { domain } = ctx.body as { domain: string };
+
+        // 导入 registerDomainHandler（你的插件文件里应 export 该函数）
+
+        // registerDomainHandler 接受一个函数 (connector) => void
+        registerDomainHandler(domain, (connector) => {
+          // 在这里为 connector 注册回调（与 SubConnectorImpl 的方法名一致）
+          connector.onOpen(() => {
+            console.log(`Test domain '${domain}' opened for connection: ${connector.getConnectionId()}`, connector.getContext && connector.getContext());
+          });
+
+          // 服务器端收到客户端 message 时触发 onClientMessage 回调
+          connector.onClientMessage((payload) => {
+            console.log(`Test domain '${domain}' received message from ${connector.getConnectionId()}:`, payload);
+            // 直接通过 connector.send 回送（如果你的 SubConnectorImpl 有 send 方法）
+            connector.send?.({
+              type: 'echo',
+              originalPayload: payload,
+              timestamp: new Date().toISOString()
+            });
+          });
+
+          connector.onClose((code?: number, reason?: string) => {
+            console.log(`Test domain '${domain}' closed for connection: ${connector.getConnectionId()}`, { code, reason });
+          });
+
+          connector.onDisconnect(() => {
+            console.log(`Test domain '${domain}' disconnected: ${connector.getConnectionId()}`);
+          });
+
+          connector.onReconnect(() => {
+            console.log(`Test domain '${domain}' reconnected: ${connector.getConnectionId()}`);
+          });
+        });
+
+        return { success: true, message: `Domain '${domain}' registered successfully` };
+      })
+      .get("/", () => ({ message: "Generale Game Server", version: "1.0.0" }))
+      .get("/health", () => ({ status: "ok", timestamp: new Date().toISOString() }))
+  )
   .listen({
     port: process.env["PORT"] || 3000,
     hostname: process.env["HOST"] || "0.0.0.0"
