@@ -9,6 +9,7 @@ import { Router } from "@solidjs/router";
 import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
 import WsEchoTester from "./components/__tests__/WsEchoTester";
+import GameRoomTesterWithHook from "./components/__tests__/GameRoomTester";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +31,8 @@ export default function App() {
         >
           <MapRenderTest />
         </Application>
-        <WsEchoTester />
+        {/* <WsEchoTester /> */}
+        <GameRoomTesterWithHook />
         <Router
           root={(props) => (
             <MetaProvider>

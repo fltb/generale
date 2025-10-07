@@ -15,7 +15,7 @@ import {
   listGamesQuerySchema
 } from "@generale/types/dist/api";
 
-export const gameRoutes = new Elysia({ prefix: "/api/game" })
+export const gameRoutes = new Elysia({ prefix: "/game" })
   // Decorate with the actual singleton manager instance
   .decorate("gameServiceManager", gameServiceManager)
   .post("/create", async ({ body, gameServiceManager }) => {

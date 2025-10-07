@@ -8,10 +8,10 @@ import {
   avatarUploadRespSchema,
   errorRespSchema,
   messageRespSchema
-} from '@generale/types';
+} from '@generale/types/dist/api';
 
-export const profileRoutes = new Elysia({ prefix: '/api' })
-  .get('/profile/:userId', 
+export const profileRoutes = new Elysia({prefix: '/profile'})
+  .get('/:userId', 
     async ({ params: { userId }, set }) => {
       const profile = await profileService.getProfile(userId);
       if (!profile) {
@@ -32,7 +32,7 @@ export const profileRoutes = new Elysia({ prefix: '/api' })
       }
     }
   )
-  .post('/profile/update', 
+  .post('/update', 
     async ({ body, cookie: { session }, set }) => {
       const sessionId = session?.value;
       const userId = sessionId ? sessionService.get(sessionId)?.userId : undefined;
@@ -51,7 +51,7 @@ export const profileRoutes = new Elysia({ prefix: '/api' })
       }
     }
   )
-  .post('/profile/upload', 
+  .post('/upload', 
     async ({ body: { file }, cookie: { session }, set }) => {
       const sessionId = session?.value;
       const userId = sessionId ? sessionService.get(sessionId)?.userId : undefined;

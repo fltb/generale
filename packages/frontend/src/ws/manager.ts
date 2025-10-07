@@ -232,8 +232,8 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
   // route incoming server messages
   private _handleIncoming(msg: WebSocketMessage<any, Ctx>) {
     // connection ack
-    if ((msg as any).type === "connection_ack") {
-      const connectionId = (msg as any).payload?.connectionId;
+    if (msg.type === "connection_ack") {
+      const connectionId = msg.payload?.connectionId;
       if (connectionId) {
         this.connectionId = connectionId;
         console.debug("[WS] received connection_ack:", connectionId);
@@ -242,7 +242,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       this._retryPendingOpens();
       return;
     }
-    if ((msg as any).type === "reconnection_ack") {
+    if (msg.type === "reconnection_ack") {
       const payload = (msg as any).payload;
       if (payload?.success && payload.connectionId) {
         this.connectionId = payload.connectionId;
@@ -256,8 +256,8 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
     // domain messages
     if ((msg as any).domain) {
       const domain = (msg as any).domain as string;
-      const type = (msg as any).type as string;
-      const payload = (msg as any).payload;
+      const type = msg.type;
+      const payload = msg.payload;
       // dispatch by type
       switch (type) {
         case "open": {

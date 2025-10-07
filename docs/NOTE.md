@@ -123,7 +123,16 @@ solidjs SPA, 分成各个路由和页面。
 
 先写一个 ws 的总连接逻辑写好，测试 subconnection. 就适用一个 echo subconnection 即可
 
-把后端写死，固定一个游戏房间 id
+把后端写死，make room 接口，然后测试 subconnection 。
+
+先测试一个 pregame 的 subconnection。目前的流程是：
+
+1. 前端请求 create room, 创建房间
+2. 前端根据返回的数据，调整状态，准备连接 subconnection
+3. 前端的 subconnection 接上状态管理 hooks，自动处理状态同步
+4. 前端展示数据，并尝试修改数据同步到后端。注意共享的事件状态
+
+这边先完成第一步
 
 然后写出 websocket 的
 

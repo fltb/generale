@@ -23,7 +23,7 @@ function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
-export const userRoutes = new Elysia({ prefix: '/api' })
+export const userRoutes = new Elysia({ prefix: '/' })
   .post(
     '/register',
     async ({ body, set }) => {
