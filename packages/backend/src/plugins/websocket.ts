@@ -125,6 +125,7 @@ class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WS
     this.ws = ws;
     this.connectionId = connectionId;
     this.isConnected = true;
+
   }
 
   setContext(ctx: Partial<Context>) {
@@ -138,6 +139,7 @@ class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WS
 
   handleMessage(message: WebSocketMessage<T, Context>) {
     const { domain, type, payload } = message;
+    console.debug(`recv event type ${type} to domain ${domain}`)
     switch (type) {
       case "open": this.openSubConnector(domain, payload as Partial<Context>); break;
       case "close": {
@@ -312,8 +314,12 @@ export const websocketPlugin = new Elysia()
       try {
         // FIX: Use a two-step assertion to satisfy strict type checking
         const { manager } = ws.data as unknown as CustomWsData;
-        if (!manager) { return; }
+        if (!manager) {
+          console.warn("manager not found in ws data")
+          return;
+        }
         const parsedMessage = typeof message === 'object' ? message : JSON.parse(message as string);
+        console.log("parseedMessage", parsedMessage)
         manager.handleMessage(parsedMessage);
       } catch (error) {
         console.error("WebSocket message error:", error);

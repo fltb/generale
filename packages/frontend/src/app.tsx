@@ -10,6 +10,7 @@ import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
 import WsEchoTester from "./components/__tests__/WsEchoTester";
 import GameRoomTesterWithHook from "./components/__tests__/GameRoomTester";
+import GameRoomStateSyncTester from "./components/__tests__/GameRoomStateSyncTester";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ export default function App() {
         </Application>
         {/* <WsEchoTester /> */}
         <GameRoomTesterWithHook />
+        <GameRoomStateSyncTester />
         <Router
           root={(props) => (
             <MetaProvider>

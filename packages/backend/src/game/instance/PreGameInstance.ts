@@ -8,7 +8,8 @@ import {
   SyncedPreGameServerStateUpdatePayloadType,
   ServerSyncConnector,
   SyncedPreGameState,
-  PlayerColor
+  PlayerColor,
+  SyncedPreGameServerEventPayloadType
 } from '@generale/types';
 import { compare } from 'fast-json-patch';
 
@@ -61,6 +62,8 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     if (typeof evt.optimisticId === 'number' && synced.lastConfirmedOp >= evt.optimisticId) {
       return;
     }
+
+    console.log("pregame recv evt", evt);
 
     switch (evt.type) {
       case SyncedPreGameClientActionTypes.READY:
@@ -132,8 +135,11 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
   private sendKickEvent(pid: PlayerId, reason: string) {
     this.connectors.get(pid)?.send({
-      type: SyncedPreGameServerEventType.KICKED,
-      payload: { reason }
+      type: SyncedPreGameServerEventType.CUSTOM,
+      payload: {
+        type: SyncedPreGameServerEventPayloadType.KICKED,
+        reason
+      }
     });
   }
 
@@ -174,8 +180,11 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     if (pid !== this.state.hostId) return;
     for (const [_pid, conn] of this.connectors) {
       conn.send({
-        type: SyncedPreGameServerEventType.DISBANDED,
-        payload: { reason: 'Room has been disbanded.' }
+        type: SyncedPreGameServerEventType.CUSTOM,
+        payload: {
+          type: SyncedPreGameServerEventPayloadType.DISBANDED,
+          reason: 'Room has been disbanded.'
+        }
       });
       conn.close();
     }
@@ -198,8 +207,11 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     const startedAt = Date.now();
     for (const conn of this.connectors.values()) {
       conn.send({
-        type: SyncedPreGameServerEventType.GAME_STARTED,
-        payload: { startedAt }
+        type: SyncedPreGameServerEventType.CUSTOM,
+        payload: {
+          type: SyncedPreGameServerEventPayloadType.GAME_STARTED,
+          startedAt
+        }
       });
     }
     // 触发回调
@@ -229,6 +241,15 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
     const confirmedOp = this.syncData.get(pid)?.lastConfirmedOp ?? 0;
     if (!prev || forceSnapshot) {
+      console.debug("sent state", {
+        type: SyncedPreGameServerEventType.STATE_UPDATE,
+        payload: {
+          type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
+          version: this.version,
+          confirmedOp,
+          payload: curr,
+        },
+      })
       conn.send({
         type: SyncedPreGameServerEventType.STATE_UPDATE,
         payload: {
@@ -243,6 +264,16 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     }
     const patches = compare(prev, curr);
     if (patches.length > 1000) {
+      console.debug("sent state", {
+        type: SyncedPreGameServerEventType.STATE_UPDATE,
+        payload: {
+          type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
+          version: this.version,
+          confirmedOp,
+          payload: curr,
+        },
+      })
+
       conn.send({
         type: SyncedPreGameServerEventType.STATE_UPDATE,
         payload: {
@@ -253,6 +284,17 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
         },
       });
     } else {
+      console.debug("sent state", {
+        type: SyncedPreGameServerEventType.STATE_UPDATE,
+        payload: {
+          type: SyncedPreGameServerStateUpdatePayloadType.PATCH,
+          version: this.version,
+          confirmedOp,
+          payload: patches,
+        },
+      })
+
+
       conn.send({
         type: SyncedPreGameServerEventType.STATE_UPDATE,
         payload: {

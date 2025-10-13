@@ -1,5 +1,6 @@
 // src/types.ts
 import type { Operation } from 'fast-json-patch';
+import type { SyncedGameServerEventType } from '../game';
 
 /**
  * Full synchronization mechanism explanation:
@@ -85,12 +86,10 @@ export type SyncedStateServerStateUpdatePayload<T> =
 export enum SyncedStateServerEventType {
     STATE_UPDATE = "state-update",
     ACTION_RESULT = "action-result",
-    KICKED = "kicked",
-    DISBANDED = "disbanded",
-    GAME_STARTED = "game-started"
+    CUSTOM = "custom",
 }
 
-export type SyncedStateServerEvent<T> = {
+export type SyncedStateServerEvent<T, CUSTOM extends unknown> = {
     type: SyncedStateServerEventType.STATE_UPDATE;
     payload: SyncedStateServerStateUpdatePayload<T>
 } | {
@@ -107,7 +106,10 @@ export type SyncedStateServerEvent<T> = {
         /** Optional message */
         message?: string;
     }
-}
+} | {
+    type: SyncedGameServerEventType.CUSTOM,
+    payload: CUSTOM
+};
 
 export enum SyncedStateClientBaseActionType {
     SYNC_ACTION = 'sync-action',

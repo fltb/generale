@@ -85,32 +85,32 @@ export type SyncedPreGameClientActions =
   | SyncedPreGameClientTransferHostAction
   | SyncedPreGameClientDisbandRoomAction;
 
+export enum SyncedPreGameServerEventPayloadType {
+  KICKED = "kicked",
+  DISBANDED = "disbanded",
+  GAME_STARTED = "gamestarted"
+}
+
+
 // --- 服务端事件类型 ---
 export interface SyncedPreGameServerKickedPayload {
+  type: SyncedPreGameServerEventPayloadType.KICKED,
   reason?: string;
 }
 export interface SyncedPreGameServerDisbandedPayload {
+  type: SyncedPreGameServerEventPayloadType.DISBANDED,
   reason?: string;
 }
 
 export interface SyncedPreGameServerGameStartedPayload {
+  type: SyncedPreGameServerEventPayloadType.GAME_STARTED,
   startedAt: number; // 时间戳，游戏开始时间
 }
 
 
-export type SyncedPreGameServerEvent =
-  | SyncedStateServerEvent<SyncedPreGameState>
-  | {
-      type: typeof import('../../connection/sync-store-type').SyncedStateServerEventType.KICKED;
-      payload: SyncedPreGameServerKickedPayload;
-    }
-  | {
-      type: typeof import('../../connection/sync-store-type').SyncedStateServerEventType.DISBANDED;
-      payload: SyncedPreGameServerDisbandedPayload;
-    }
-  | {
-      type: typeof import('../../connection/sync-store-type').SyncedStateServerEventType.GAME_STARTED;
-      payload: SyncedPreGameServerGameStartedPayload;
-    };
+export type SyncedPreGameServerEventPayload = SyncedPreGameServerKickedPayload | SyncedPreGameServerDisbandedPayload | SyncedPreGameServerGameStartedPayload;
+
+export type SyncedPreGameServerEvent = SyncedStateServerEvent<SyncedPreGameState, SyncedPreGameServerEventPayload>
+
 export { SyncedStateServerEventType as SyncedPreGameServerEventType } from '../../connection/sync-store-type';
 export { SyncedStateServerStateUpdatePayloadType as SyncedPreGameServerStateUpdatePayloadType } from '../../connection/sync-store-type';

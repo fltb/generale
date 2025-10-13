@@ -28,7 +28,7 @@ export type SyncedGameClientActions =
     | SyncedGameClientPlayerOperationPushAction
     | SyncedGameClientPlayerOperationClancelAllAction;
 
-export type SyncedGameServerEvent = SyncedStateServerEvent<SyncedGameState>;
+export type SyncedGameServerEvent = SyncedStateServerEvent<SyncedGameState, never>;
 export { SyncedStateServerEventType as SyncedGameServerEventType } 
   from '../connection/sync-store-type';
 
