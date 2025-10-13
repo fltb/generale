@@ -20,6 +20,7 @@ export function useSyncedState<
   initialVersion = 0,
   applyEvent,
   context = {},
+  onCustomEvent = (_) => {},
   autoOpen = true,
 }: {
   domain: string;
@@ -53,6 +54,7 @@ export function useSyncedState<
 
   // ---- helper: ensure we have local sub and attach handlers ----
   function ensureSubAndAttach() {
+    console.debug("try ensure sub and attatch", wsMgr, sub)
     if (!wsMgr) return;
     if (!sub) {
       // create / reuse a local sub object
@@ -67,6 +69,7 @@ export function useSyncedState<
         }
       });
       sub.onMessage((m: any) => {
+        console.debug(`[useSyncedState:${domain}] onMessage handler recv`, m)
         try {
           _onMessage(m);
         } catch (e) {
@@ -144,8 +147,9 @@ export function useSyncedState<
   // ---- message / lifecycle handlers used by sub callbacks ----
   function _onMessage(msg: SyncedStateServerEvent<TState, Custom>) {
     if (!msg) return;
+      console.debug("got msg from server", msg)
+
     if (msg.type === SyncedStateServerEventType.STATE_UPDATE) {
-      console.debug("got msg from server", msg.payload)
       stateManager.reconcileFromServer(msg.payload);
       if (typeof msg.payload.confirmedOp === "number") {
         for (const [id, rec] of Array.from(pendingRequests.entries())) {
@@ -170,6 +174,10 @@ export function useSyncedState<
         pendingRequests.delete(optimisticId);
       }
       return;
+    }
+
+    if (msg.type === SyncedStateServerEventType.CUSTOM) {
+      onCustomEvent(msg.payload);
     }
 
     console.debug(`[useSyncedState:${domain}] unrecognized sub message`, msg);
@@ -228,7 +236,7 @@ export function useSyncedState<
   // public APIs
 
   function dispatch(action: Omit<TAction, "optimisticId">) {
-    const optimisticId = stateManager.dispatchOptimisticEvent(action as any);
+    const optimisticId = stateManager.dispatchOptimisticEvent(action);
     const out = {
       type: action.type,
       payload: { ...action, optimisticId },
@@ -238,7 +246,7 @@ export function useSyncedState<
   }
 
   function commit(action: Omit<TAction, "optimisticId">, timeoutMs = 10000): Promise<any> {
-    const optimisticId = stateManager.dispatchOptimisticEvent(action as any);
+    const optimisticId = stateManager.dispatchOptimisticEvent(action);
     const out = {
       type: action.type,
       payload: { ...action, optimisticId },

@@ -243,7 +243,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       return;
     }
     if (msg.type === "reconnection_ack") {
-      const payload = (msg as any).payload;
+      const payload = msg.payload;
       if (payload?.success && payload.connectionId) {
         this.connectionId = payload.connectionId;
         console.debug("[WS] received reconnection_ack:", payload);
@@ -252,12 +252,17 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       }
       return;
     }
+    if (msg.type === "error") {
+      console.error(console.debug("[WS] received error:", msg.payload))
+      return;
+    }
 
     // domain messages
-    if ((msg as any).domain) {
-      const domain = (msg as any).domain as string;
+    if (msg.domain) {
+      const domain = msg.domain;
       const type = msg.type;
       const payload = msg.payload;
+      console.debug("[WS] domain got msg:", domain, type, payload);
       // dispatch by type
       switch (type) {
         case "open": {

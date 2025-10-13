@@ -171,7 +171,7 @@ const Inner: Component<{
     const action = { type: actionType };
 
     pushLog(`commit ${actionType} (optimistic)`);
-    const res = await synced.commit(action, 10000);
+    const res = synced.dispatch(action);
     pushLog(`commit resolved: ${JSON.stringify(res)}`);
   }
 
