@@ -183,12 +183,12 @@ const Inner: Component<{
     };
     const action = {
       type: SyncedPreGameClientActionTypes.CHANGE_SETTING,
-      patch,
+      payload: patch,
     };
 
     pushLog(`commit change-setting ${JSON.stringify(patch)}`);
     try {
-      const res = await synced.commit(action, 10000);
+      const res = synced.dispatch(action);
       pushLog("change-setting confirmed: " + JSON.stringify(res));
     } catch (err) {
       pushLog("change-setting failed: " + String(err));

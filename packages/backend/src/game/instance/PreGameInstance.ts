@@ -105,6 +105,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
   /** 设置准备状态 */
   private setReady(pid: PlayerId, ready: boolean) {
+    console.log("set ready to", ready)
     const p = this.state.players.find(p => p.id === pid);
     if (p && !p.isHost) p.ready = ready ? 1 : 0;
   }

@@ -80,7 +80,8 @@ const mergedState = createMemo(() => {
           payload.payload
         );
         const patches = payload.payload;
-        const baseClone = structuredClone(state.base);
+        const basePlain = unwrap(state.base);
+        const baseClone = structuredClone(basePlain);
         const res = applyPatch(baseClone, patches, true, false);
         newBase = res?.newDocument ?? (baseClone as T);
       } else {

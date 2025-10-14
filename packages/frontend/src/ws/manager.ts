@@ -37,7 +37,7 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSContextBas
     public readonly domain: string,
     public readonly context: Partial<Ctx>,
     private manager: ClientConnectionManager<Ctx>
-  ) {}
+  ) { }
 
   get ready() { return this._ready; }
   getConnectionId() { return this.manager.connectionId; }
@@ -48,7 +48,10 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSContextBas
   onClose(cb: (code?: number, reason?: string) => void) { this.closeCallbacks.push(cb); }
   onDisconnect(cb: (err?: Error) => void) { this.disconnectCallbacks.push(cb); }
   onReconnect(cb: () => void) { this.reconnectCallbacks.push(cb); }
-  onMessage(cb: (payload: SEvt) => void) { this.messageCallbacks.push(cb); }
+  onMessage(cb: (payload: SEvt) => void) {
+    console.debug("try register message callback")
+    this.messageCallbacks.push(cb);
+  }
 
   send(evt: CEvt) {
     if (!this._ready) return;
@@ -203,10 +206,12 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
     if (!sub) {
       sub = new SubConnectorClient<CEvt, SEvt, Ctx>(domain, ctx, this);
       this.subConnectors.set(domain, sub);
+      console.debug("[WS] getOrCreateSub: CREATED sub", domain, sub);
+    } else {
+      console.debug("[WS] getOrCreateSub: REUSE sub", domain, sub);
     }
     return sub;
   }
-
   // ask server to open a sub-domain
   openDomain(domain: string, ctx: Partial<Ctx> = {}) {
     const sub = this.getOrCreateSub(domain, ctx);
@@ -295,10 +300,10 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
         }
         case "message": {
           const sub = this.subConnectors.get(domain);
+          console.debug("[WS] delivering domain message:", { domain, payload }, "subExists?", !!sub, "sub_obj:", sub, "msgCbCount:", (sub as any)?.messageCallbacks?.length ?? "unknown");
           if (sub) sub._triggerMessage(payload);
           break;
-        }
-        default:
+        } default:
           console.warn("Unknown domain message type", type);
       }
     } else {
