@@ -136,6 +136,23 @@ solidjs SPA, 分成各个路由和页面。
 
 然后写出 websocket 的
 
+上述基本测试组件已经完成，现在开始写正式的组件。
+
+首先写出表单展示组件。本身对应这个报文：
+
+```ts
+export type SyncedPreGameClientChangeSettingAction = SyncedStateClientGenericSyncAction<
+  SyncedPreGameClientActionTypes.CHANGE_SETTING,
+  Partial<PreGameRoomState['gameSetting']>
+>;
+```
+
+获取数据展示，并使用 onchange 通知父元素
+
+然后剩余的每个事件也都对应一个组件。
+
+最后将每个组件组装成一个 Room，并响应各个 custom event 如 kicked，game-started 等等
+
 ### 游戏逻辑
 
 根据玩家操作，，向后端发送，本地再加上乐观更新。
