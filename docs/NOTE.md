@@ -153,6 +153,10 @@ export type SyncedPreGameClientChangeSettingAction = SyncedStateClientGenericSyn
 
 最后将每个组件组装成一个 Room，并响应各个 custom event 如 kicked，game-started 等等
 
+先写一个测试数据塞进去侧 ui, 然后再街上 hook
+
+检查 AI 写的代码，人工核对逻辑，确保 dispatch 和后端的行为是同步的，并且明确 action 的返回
+
 ### 游戏逻辑
 
 根据玩家操作，，向后端发送，本地再加上乐观更新。
