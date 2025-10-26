@@ -7,16 +7,12 @@ import {
   SyncedPreGameClientActionTypes,
   type PreGameRoomState,
   PreGameMapType,
+  SyncedPreGameServerEventPayloadType,
 } from "@generale/types";
 import { PreGameRoomStateFrom } from "./StateForm";
 import { PlayerList } from "./PlayerList";
 import { PreGameControls } from "./PreGameControls";
 import { useSyncedState } from "~/hooks/useSyncedState";
-
-/**
- * 通用的 send 方法类型（你可以在项目里替换成更严格的 action 联合类型）
- */
-export type SendFn = (action: SyncedPreGameClientActions) => void;
 
 export interface RoomWithSyncProps {
   domain: string;
@@ -33,7 +29,14 @@ const makeEmptyRoom = (gameId = ""): PreGameRoomState => ({
   mapSetting: { type: PreGameMapType.Random, width: 20, height: 20, tileFrequency: {} },
   gameSetting: {
     speed: 1,
-    tileGrow: {} as any,
+    tileGrow: {
+      PLAIN: { duration: 40, growth: 1 },
+      THRONE: { duration: 1, growth: 1 },
+      BARRACKS: { duration: 1, growth: 1 },
+      MOUNTAIN: { duration: 1e10, growth: 0 },
+      SWAMP: { duration: 1, growth: -1 },
+      FOG: { duration: 1e10, growth: 0 },
+    },
     afkThreshold: 30,
   },
   teamCount: 2,
@@ -45,15 +48,14 @@ const makeEmptyRoom = (gameId = ""): PreGameRoomState => ({
  * 本地乐观 applyEvent（给 useVersionedOptimisticState 用）
  * 只做常见修改：ready/unready/change-setting/change-map/change-team 等
  */
-function applyPregameEventLocal(state: SyncedPreGameState | null, action: any): SyncedPreGameState {
+function applyPregameEventLocal(state: SyncedPreGameState | null, action: SyncedPreGameClientActions): SyncedPreGameState {
   const base: SyncedPreGameState = structuredClone(state ?? { room: makeEmptyRoom(""), selfId: "" });
-  const type = action?.type;
-  const payload = action?.payload ?? {};
+  const type = action.type;
 
   try {
     switch (type) {
       case SyncedPreGameClientActionTypes.READY: {
-        const pid = payload?.playerId ?? base.selfId;
+        const pid = base.selfId;
         if (base?.room?.players) {
           const p = base.room.players.find((x: any) => x.id === pid);
           if (p && !p.isHost) p.ready = 1;
@@ -61,7 +63,7 @@ function applyPregameEventLocal(state: SyncedPreGameState | null, action: any): 
         return base;
       }
       case SyncedPreGameClientActionTypes.UNREADY: {
-        const pid = payload?.playerId ?? base.selfId;
+        const pid = base.selfId;
         if (base?.room?.players) {
           const p = base.room.players.find((x: any) => x.id === pid);
           if (p && !p.isHost) p.ready = 0;
@@ -69,19 +71,19 @@ function applyPregameEventLocal(state: SyncedPreGameState | null, action: any): 
         return base;
       }
       case SyncedPreGameClientActionTypes.CHANGE_SETTING: {
-        if (base?.room?.gameSetting && payload && typeof payload === "object") {
-          base.room.gameSetting = { ...base.room.gameSetting, ...payload };
+        if (base?.room?.gameSetting && action.payload && typeof action.payload === "object") {
+          base.room.gameSetting = { ...base.room.gameSetting, ...action.payload };
         }
         return base;
       }
       case SyncedPreGameClientActionTypes.CHANGE_MAP: {
-        if (payload) base.room.mapSetting = payload;
+        base.room.mapSetting = action.payload;
         return base;
       }
       case SyncedPreGameClientActionTypes.CHANGE_TEAM: {
-        if (payload?.teamId && payload?.playerId && base?.room?.players) {
-          const p = base.room.players.find((x: any) => x.id === payload.playerId);
-          if (p) p.teamId = payload.teamId;
+        if (action.payload?.teamId && base?.room?.players) {
+          const p = base.room.players.find((x: any) => x.id === base.selfId);
+          if (p) p.teamId = action.payload.teamId;
         }
         return base;
       }
@@ -113,14 +115,14 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     try {
       const t = evt.type;
       switch (t) {
-        case "kicked":
-          setNotice((evt as any).reason ?? "你已被踢出房间");
+        case SyncedPreGameServerEventPayloadType.KICKED:
+          setNotice(evt.reason ?? "你已被踢出房间");
           setIsKicked(true);
           break;
-        case "disbanded":
-          setNotice((evt as any).reason ?? "房间已被解散");
+        case SyncedPreGameServerEventPayloadType.DISBANDED:
+          setNotice(evt.reason ?? "房间已被解散");
           break;
-        case "gamestarted":
+        case SyncedPreGameServerEventPayloadType.GAME_STARTED:
           setNotice("游戏已开始");
           break;
         default:
@@ -137,7 +139,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     domain: props.domain,
     initialState: initialSyncedState,
     initialVersion: 0,
-    applyEvent: applyPregameEventLocal as any,
+    applyEvent: applyPregameEventLocal,
     onCustomEvent: handleCustomEvent,
     context: { userid: props.playerId, username: props.playerName },
     autoOpen: false, // we'll call connect() below
