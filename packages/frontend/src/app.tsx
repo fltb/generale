@@ -12,6 +12,9 @@ import WsEchoTester from "./components/__tests__/WsEchoTester";
 import GameRoomTesterWithHook from "./components/__tests__/GameRoomTester";
 import GameRoomStateSyncTester from "./components/__tests__/GameRoomStateSyncTester";
 import { TestPlayerList } from "./components/room/__tests__/TestPlayerList";
+import { TestPreGameControls } from "./components/room/__tests__/TestPreGameControls";
+import { TestPreGameRoomStateFrom } from "./components/room/__tests__/TestPreGameRoomStateFrom";
+import TestPreGameMapSettingForm from "./components/room/__tests__/TestPreGameMapSettingForm";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +40,9 @@ export default function App() {
         <GameRoomTesterWithHook />
         <GameRoomStateSyncTester />
         <TestPlayerList />
+        <TestPreGameControls />
+        <TestPreGameRoomStateFrom />
+        <TestPreGameMapSettingForm />
         <Router
           root={(props) => (
             <MetaProvider>
