@@ -12,6 +12,7 @@ import {
 import { PreGameRoomStateFrom } from "./StateForm";
 import { PlayerList } from "./PlayerList";
 import { PreGameControls } from "./PreGameControls";
+import { PreGameMapSettingForm } from "./PreGameMapSettingForm";
 import { useSyncedState } from "~/hooks/useSyncedState";
 
 export interface RoomWithSyncProps {
@@ -168,9 +169,16 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     synced.dispatch({ type: actionType });
   };
 
-  const onToggleReadyForPlayer = () => {
-    // const actionType = ready ? SyncedPreGameClientActionTypes.READY : SyncedPreGameClientActionTypes.UNREADY;
-    // synced.dispatch({ type: actionType });
+  // called by PlayerList when a player's ready button is clicked.
+  // In our UI only the self player's ready button is shown, so only handle self here.
+  const onToggleReadyForPlayer = (playerId: string, ready: boolean) => {
+    if (playerId === synced.state().selfId) {
+      onToggleReadyForSelf(ready);
+    } else {
+      // not allowed in-client to change other players' ready state;
+      // optionally we could send a server request if protocol supports it.
+      console.warn("Attempted to toggle ready for other player (ignored):", playerId);
+    }
   };
 
   const onKick = (playerId: string) => {
@@ -195,6 +203,11 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
 
   const onDisband = () => {
     synced.dispatch({ type: SyncedPreGameClientActionTypes.DISBAND_ROOM });
+  };
+
+  // map change -> dispatch CHANGE_MAP
+  const onMapChange = (nextMapSetting: PreGameRoomState["mapSetting"]) => {
+    synced.dispatch({ type: SyncedPreGameClientActionTypes.CHANGE_MAP, payload: nextMapSetting });
   };
 
   // derived values
@@ -233,7 +246,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
             players={room()?.players ?? []}
             selfId={selfId()}
             hostId={room()?.hostId ?? ""}
-            onToggleReady={(playerId, ready) => onToggleReadyForPlayer()}
+            onToggleReady={(playerId, ready) => onToggleReadyForPlayer(playerId, ready)}
             onKick={isHost() ? onKick : undefined}
             onTransferHost={isHost() ? onTransferHost : undefined}
           />
@@ -257,15 +270,16 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           <div class="text-lg font-semibold mb-2">房间设置</div>
           <PreGameRoomStateFrom
             state={room()?.gameSetting ?? (makeEmptyRoom().gameSetting)}
-            onChange={onSettingChange}
+            onChange={(s) => onSettingChange(s)}
           />
         </div>
 
         <div class="card bg-base-200 p-4">
-          <div class="text-md font-medium mb-2">地图设置（只读）</div>
-          <pre class="whitespace-pre-wrap text-sm">
-            {JSON.stringify(room()?.mapSetting ?? {}, null, 2)}
-          </pre>
+          <div class="text-md font-medium mb-2">地图设置</div>
+          <PreGameMapSettingForm
+            setting={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
+            onChange={(next) => onMapChange(next)}
+          />
         </div>
       </div>
 
