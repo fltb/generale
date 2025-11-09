@@ -8,6 +8,8 @@ import {
   type PreGameRoomState,
   PreGameMapType,
   SyncedPreGameServerEventPayloadType,
+  type GameId,
+  type PlayerId,
 } from "@generale/types";
 import { PreGameRoomStateFrom } from "./StateForm";
 import { PlayerList } from "./PlayerList";
@@ -17,7 +19,8 @@ import { useSyncedState } from "~/hooks/useSyncedState";
 
 export interface RoomWithSyncProps {
   domain: string;
-  playerId: string;
+  playerId: PlayerId;
+  gameId: GameId;
   playerName: string;
   autoOpen?: boolean; // 是否自动 open domain（默认 true）
 }
@@ -107,7 +110,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
 
   // initial synced state: a minimal SyncedPreGameState with empty room
   const initialSyncedState: SyncedPreGameState = {
-    room: makeEmptyRoom(""),
+    room: makeEmptyRoom(props.gameId),
     selfId: props.playerId,
   };
 
@@ -283,28 +286,12 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         </div>
       </div>
 
-      <Show when={notice()}>
-        <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div class="alert alert-info shadow-lg">
-            <div>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="stroke-current flex-shrink-0 h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M13 16h-1v-4h-1m1-4h.01M12 6v2"
-                />
-              </svg>
-              <span>{notice()}</span>
-            </div>
-          </div>
+      <div class="alert alert-info shadow-lg">
+        <div>
+          Notice:
+          <span>{notice()}</span>
         </div>
-      </Show>
+      </div>
     </div>
   );
 };

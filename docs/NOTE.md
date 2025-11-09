@@ -164,3 +164,7 @@ export type SyncedPreGameClientChangeSettingAction = SyncedStateClientGenericSyn
 ### 房间列表和展示
 
 创建房间，房间列表展示，瀑布流，事件订阅更新。
+
+### 开发计划安排
+
+手动绘制页面，然后手写 room, 不用 ai

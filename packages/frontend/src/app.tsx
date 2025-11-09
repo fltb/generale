@@ -15,6 +15,7 @@ import { TestPlayerList } from "./components/room/__tests__/TestPlayerList";
 import { TestPreGameControls } from "./components/room/__tests__/TestPreGameControls";
 import { TestPreGameRoomStateFrom } from "./components/room/__tests__/TestPreGameRoomStateFrom";
 import TestPreGameMapSettingForm from "./components/room/__tests__/TestPreGameMapSettingForm";
+import RoomIntegrationTest from "./components/room/__tests__/RoomIntegrationTest";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,6 +44,7 @@ export default function App() {
         <TestPreGameControls />
         <TestPreGameRoomStateFrom />
         <TestPreGameMapSettingForm />
+        <RoomIntegrationTest />
         <Router
           root={(props) => (
             <MetaProvider>
