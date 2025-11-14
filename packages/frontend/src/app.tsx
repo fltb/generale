@@ -1,21 +1,12 @@
 // src/app.tsx
-import { Suspense } from "solid-js";
-import { Application } from "solid-pixi"; // keep Application, P, useAsset where needed in components
-import MapRenderTest from "./components/__tests__/MapRenderTest";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
-import { MetaProvider, Title } from "@solidjs/meta";
-import { Router } from "@solidjs/router";
+import { MetaProvider } from "@solidjs/meta";
+import { Router, Route } from "@solidjs/router";
 import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
-import WsEchoTester from "./components/__tests__/WsEchoTester";
-import GameRoomTesterWithHook from "./components/__tests__/GameRoomTester";
-import GameRoomStateSyncTester from "./components/__tests__/GameRoomStateSyncTester";
-import { TestPlayerList } from "./components/room/__tests__/TestPlayerList";
-import { TestPreGameControls } from "./components/room/__tests__/TestPreGameControls";
-import { TestPreGameRoomStateFrom } from "./components/room/__tests__/TestPreGameRoomStateFrom";
-import TestPreGameMapSettingForm from "./components/room/__tests__/TestPreGameMapSettingForm";
-import RoomIntegrationTest from "./components/room/__tests__/RoomIntegrationTest";
+import Home from "./routes";
+import Test from "./routes/test";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,37 +18,15 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Application
-          background="#1099bb"
-          resizeTo={window}
-          resolution={window.devicePixelRatio}
-          autoDensity={true}
-          antialias={true}
-        >
-          <MapRenderTest />
-        </Application>
-        {/* <WsEchoTester /> */}
-        <GameRoomTesterWithHook />
-        <GameRoomStateSyncTester />
-        <TestPlayerList />
-        <TestPreGameControls />
-        <TestPreGameRoomStateFrom />
-        <TestPreGameMapSettingForm />
-        <RoomIntegrationTest />
-        <Router
-          root={(props) => (
-            <MetaProvider>
-              <Title>SolidStart - Basic</Title>
-              <a href="/">Index</a>
-              <a href="/about">About</a>
-              <Suspense>{props.children}</Suspense>
-            </MetaProvider>
-          )}
-        >
-          {/* <FileRoutes /> */}
-        </Router>
-      </AuthProvider>
+      {/* MetaProvider must wrap anything that uses Title/useHead */}
+      <MetaProvider>
+        <AuthProvider>
+          <Router>
+              <Route path="/" component={Home} />
+              <Route path="/test" component={Test} />
+          </Router>
+        </AuthProvider>
+      </MetaProvider>
 
       <SolidQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

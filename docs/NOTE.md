@@ -174,7 +174,7 @@ export type SyncedPreGameClientChangeSettingAction = SyncedStateClientGenericSyn
 - 其他玩家打开游戏列表，找到房间并加入
 - 房间内房主调整设置，各玩家准备
 - 在所有玩家准备完成后，进入游戏
-- 游戏内同步玩家哥哥操作，结算并同步状态
+- 游戏内同步玩家操作，结算并同步状态
 - 游戏结束后，各玩家返回房间
 - 房主解散或玩家自行退出房间后自动解散游戏房间
 
