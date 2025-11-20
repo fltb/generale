@@ -7,6 +7,9 @@ import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
 import Home from "./routes";
 import Test from "./routes/test";
+import Nav from "./components/Nav";
+import { Suspense } from "solid-js";
+import LoginPage from "./routes/login";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,15 +18,25 @@ const queryClient = new QueryClient({
   },
 });
 
+
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* MetaProvider must wrap anything that uses Title/useHead */}
       <MetaProvider>
         <AuthProvider>
-          <Router>
-              <Route path="/" component={Home} />
-              <Route path="/test" component={Test} />
+          <Router
+            root={props => (
+              <>
+                <Nav />
+                <Suspense>{props.children}</Suspense>
+              </>
+            )}
+          >
+            <Route path="/" component={Home} />
+            <Route path="/test" component={Test} />
+            <Route path="/login" component={LoginPage} />
           </Router>
         </AuthProvider>
       </MetaProvider>
