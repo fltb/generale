@@ -5,6 +5,9 @@ import { gameRoutes } from "./routes/game";
 import { userRoutes } from "./routes/user";
 import { authPlugin } from "./middleware/authPlugin";
 import { registerDomainHandler, websocketPlugin } from "./plugins/websocket";
+import { initEmailServiceWithEnv } from "./services/emailService";
+
+await initEmailServiceWithEnv();
 
 const app = new Elysia()
   .use(cors())

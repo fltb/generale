@@ -13,8 +13,9 @@
     "@elysiajs/cors": "latest",
     "@elysiajs/swagger": "latest",
     "@generale/types": "workspace:*",
-    "dotenv": "^17.2.1",
-    "drizzle-orm": "^0.44.4",
+    "@libsql/client": "^0.15.15",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.44.7",
     "elysia": "latest",
     "fast-json-patch": "^3.1.1",
     "nodemailer": "^6.9.1"
@@ -24,7 +25,8 @@
     "@types/nodemailer": "^6.4.17",
     "@types/ws": "^8.5.0",
     "bun-types": "latest",
-    "drizzle-kit": "^0.31.4",
+    "drizzle-kit": "^0.31.7",
+    "tsx": "^4.20.6",
     "vitest": "^3.2.4",
     "ws": "^8.14.0"
   },

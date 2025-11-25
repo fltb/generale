@@ -1,5 +1,6 @@
 import { db } from '../db/client'
 import { users } from '../db/schema'
+import { verificationTokens } from '../db/schema' // 用于删除 token
 import { randomBytes, pbkdf2Sync, timingSafeEqual } from 'crypto'
 import { randomUUID } from 'crypto'
 import { eq } from 'drizzle-orm'
@@ -46,7 +47,7 @@ export class UserService {
     const now = new Date()
     const hashedPassword = this.hashPassword(password)
 
-    await db.insert(users).values({
+    db.insert(users).values({
       id,
       username,
       email,
@@ -92,6 +93,39 @@ export class UserService {
       .set({ verified: true, updatedAt: now })
       .where(eq(users.id, id))
       .run()
+  }
+
+    async isVerified(id: string): Promise<boolean> {
+    const row = db.select({ verified: users.verified }).from(users).where(eq(users.id, id)).get()
+    if (!row) return false
+    return Boolean(row.verified)
+  }
+
+    /**
+   * Delete a user and related records.
+   *
+   * IMPORTANT: currently this removes verificationTokens and the users row.
+   * If your system keeps other per-user data (sessions, profiles, game records, etc.)
+   * you SHOULD delete those here as well to avoid orphaned rows.
+   *
+   * If you prefer transactional deletion and your DB client supports transactions,
+   * wrap these operations in a transaction.
+   */
+  async delete(userId: string): Promise<void> {
+    try {
+      // delete verification tokens for user
+      try {
+        db.delete(verificationTokens).where(eq(verificationTokens.userId, userId)).run()
+      } catch (err) {
+        console.warn('userService.delete: failed to delete verificationTokens for', userId, err)
+      }
+      // delete the user row
+      db.delete(users).where(eq(users.id, userId)).run()
+      console.info(`userService.delete: removed user ${userId}`)
+    } catch (err) {
+      console.error('userService.delete: failed to remove user', userId, err)
+      throw err
+    }
   }
 
   /**
