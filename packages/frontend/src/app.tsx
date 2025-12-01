@@ -41,7 +41,7 @@ export default function App() {
         </AuthProvider>
       </MetaProvider>
 
-      {/* <SolidQueryDevtools initialIsOpen={false} /> */}
+      <SolidQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
 }

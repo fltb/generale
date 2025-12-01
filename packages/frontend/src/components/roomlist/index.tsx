@@ -21,12 +21,7 @@ export function RoomList() {
     queryKey: ["games"],
     queryFn: async () => {
       const res = await listGamesApi();
-      // depending on backend shape you might need: return res.data
-      // here assume res has { success: true, data: [...] }
-      // If your API returns { data, meta }, adapt accordingly
-      // Type: ListGamesSuccessResp
-      // return the array itself for UI convenience
-      return (res as any).data ?? res;
+      return res.data ?? [];
     },
     retry: false,
     refetchOnWindowFocus: true,
@@ -34,18 +29,17 @@ export function RoomList() {
 
   // Modal state + detail query (fetch when opening)
   const [openId, setOpenId] = createSignal<string | null>(null);
-  const detailQuery = useQuery(
+  const detailQuery = useQuery<GameInfoRoute>(
     () => ({
       queryKey: ["game", openId()],
       enabled: () => !!openId(),
       queryFn: async () => {
         if (!openId()) throw new Error("no id");
         const res = await getGameInfoApi(openId()!);
-        return (res as any).data as GameInfoRoute;
+        return res.data;
       },
       retry: false,
-    }),
-    { initialValue: undefined } as any
+    })
   );
 
   // connect demo state
@@ -107,7 +101,7 @@ export function RoomList() {
         <Show when={gamesQuery.isError}>
           <div class="alert alert-error shadow-lg">
             <div>
-              <span>载入房间列表失败: {(gamesQuery.error as any)?.message ?? "Unknown"}</span>
+              <span>载入房间列表失败: {gamesQuery.error?.message ?? "Unknown"}</span>
             </div>
           </div>
         </Show>
@@ -119,8 +113,8 @@ export function RoomList() {
 
       <Show when={!gamesQuery.isLoading && !gamesQuery.isError}>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <For each={(gamesQuery.data as any[]) ?? []}>
-            {(g: any) => {
+          <For each={gamesQuery.data}>
+            {(g) => {
               const isFull = typeof g.playerCount === "number" && typeof g.maxPlayers === "number" && g.playerCount >= g.maxPlayers;
               const status = g.status ?? "lobby";
               return (
@@ -129,8 +123,7 @@ export function RoomList() {
                     <div class="flex items-start justify-between">
                       <div>
                         <h3 class="card-title">
-                          {/* Prefer name if exists, fallback to id */}
-                          {g.name ?? g.id}
+                          {g.id}
                         </h3>
                         <p class="text-sm text-muted">ID: <span class="font-mono">{g.id}</span></p>
                       </div>
@@ -186,25 +179,25 @@ export function RoomList() {
               </Show>
 
               <Show when={detailQuery.isError}>
-                <div class="alert alert-error">{(detailQuery.error as any)?.message ?? "Failed to load details"}</div>
+                <div class="alert alert-error">{detailQuery.error?.message ?? "Failed to load details"}</div>
               </Show>
 
               <Show when={detailQuery.data}>
-                {(detail: any) => (
+                {(detail) => (
                   <>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <p><strong>ID:</strong> <span class="font-mono">{detail.id}</span></p>
-                        <p><strong>Host:</strong> {detail.hostId}</p>
-                        <p><strong>Players:</strong> {detail.playerCount} / {detail.maxPlayers}</p>
-                        <p><strong>Status:</strong> {detail.status}</p>
-                        <p><strong>Has password:</strong> {detail.hasPassword ? "Yes" : "No"}</p>
+                        <p><strong>ID:</strong> <span class="font-mono">{detail().id}</span></p>
+                        <p><strong>Host:</strong> {detail().hostId}</p>
+                        <p><strong>Players:</strong> {detail().playerCount} / {detail().maxPlayers}</p>
+                        <p><strong>Status:</strong> {detail().status}</p>
+                        <p><strong>Has password:</strong> {detail().hasPassword ? "Yes" : "No"}</p>
                       </div>
                       <div>
                         <p class="font-semibold">Players list</p>
                         <ul class="menu rounded-box p-2 bg-base-200">
-                          <For each={detail.players ?? []}>
-                            {(p: any) => (
+                          <For each={detail().players ?? []}>
+                            {(p) => (
                               <li>
                                 <div class="flex items-center justify-between">
                                   <div>
@@ -221,7 +214,7 @@ export function RoomList() {
                     </div>
 
                     <div class="mt-4 flex items-center gap-3">
-                      <button class="btn btn-primary btn-sm" onClick={() => handlePrepareConnect(detail.id)} disabled={connecting()}>
+                      <button class="btn btn-primary btn-sm" onClick={() => handlePrepareConnect(detail().id)} disabled={connecting()}>
                         {connecting() ? "Preparing..." : "Prepare Connect"}
                       </button>
 
