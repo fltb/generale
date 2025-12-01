@@ -1,5 +1,58 @@
 import { Elysia } from "elysia"; // FIX: Removed unused 't' import
 import type { ServerSyncConnector } from '@generale/types/src/connection/conn-type';
+import { sessionService } from "../services/sessionService";
+import { userService } from "../services/userService";
+
+
+
+function parseCookieHeader(cookieHeader?: string | null): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (!cookieHeader) return map;
+  cookieHeader.split(';').forEach(part => {
+    const [k, ...v] = part.split('=');
+    if (!k) return;
+    map[k.trim()] = decodeURIComponent((v || []).join('=').trim());
+  });
+  return map;
+}
+
+/**
+ * 从 ws（Elysia 提供的 ws.data）里尽可能多地提取 session id：
+ * - 优先 query 参数 sid
+ * - 兼容老的 token query 参数（保留，便于平滑迁移）
+ * - 尝试从 request headers 的 cookie 中解析 sid
+ * - 尝试读取 x-session-id header
+ */
+function extractSessionIdFromWsData(wsData: any): string | undefined {
+  try {
+    const q = wsData?.query ?? {};
+    if (q.sid) return q.sid as string;
+    if (q.token) return q.token as string; // 兼容旧客户端短期保留
+
+    // 优先从 request.headers.get (Elysia request-like object)
+    const cookieHeader =
+      wsData?.request?.headers?.get?.("cookie") ??
+      wsData?.headers?.cookie ??
+      null;
+    if (cookieHeader) {
+      const cookies = parseCookieHeader(cookieHeader as string);
+      if (cookies["sid"]) return cookies["sid"];
+    }
+
+    // x-session-id header fallback
+    const xSid =
+      wsData?.request?.headers?.get?.("x-session-id") ??
+      wsData?.headers?.["x-session-id"] ??
+      wsData?.headers?.["x-sessionid"];
+    if (xSid) return xSid as string;
+
+    return undefined;
+  } catch (err) {
+    // 若解析失败，返回 undefined
+    return undefined;
+  }
+}
+
 
 // =================================================================================
 // 1. INTERFACES AND TYPE DEFINITIONS
@@ -240,12 +293,6 @@ interface CustomWsData {
   manager: WebSocketConnectionManager<any, any>;
 }
 
-async function authenticateUserByToken(token: string | undefined | null): Promise<string | null> {
-  if (token && token.startsWith('token_for_')) {
-    return token.replace('token_for_', '');
-  }
-  return null;
-}
 
 export function sendMessageToUser(userId: string, message: WebSocketMessage): void {
   const connectionIds = userConnections.get(userId);
@@ -273,36 +320,60 @@ export const websocketPlugin = new Elysia()
   .ws("/ws", {
     async open(ws) {
       const wsData = ws.data as any;
-      const { token, reconnectId } = wsData.query;
-      const userId = await authenticateUserByToken(token as string | undefined);
 
-      if (!userId) {
-        ws.close(4001, "Authentication failed");
+      // 尝试提取 session id（优先 sid query）
+      const sessionId = extractSessionIdFromWsData(wsData);
+      const { reconnectId } = wsData.query ?? {};
+
+      // 校验 session
+      const session = sessionId ? sessionService.get(sessionId) : undefined;
+      if (!session) {
+        ws.close(4001, "Authentication failed: invalid or missing session");
         return;
       }
 
+      // session 有效，取出 userId
+      const userId = session.userId;
+
+      // 尝试拉取 username（可选，但在 open payload 想发送 username 时有用）
+      let username: string | undefined;
+      try {
+        const user = await userService.findById(userId);
+        username = user?.username;
+      } catch (err) {
+        // 如果查询 username 失败，不影响连接，保持 userId 可用
+        console.warn("Failed to fetch username for websocket session:", err);
+      }
+
+      // 填充 ws.data
       wsData.userId = userId;
+
       let manager: WebSocketConnectionManager | undefined;
       let connectionId: string;
 
+      // reconnectId 场景：如果客户端传递 reconnectId 且对应 manager 存在且处于断线状态 -> 复连
       if (reconnectId && (manager = connectionManagers.get(reconnectId as string)) && !manager.isConnected) {
         manager.reattach(ws);
         connectionId = reconnectId as string;
         wsData.connectionId = connectionId;
         wsData.manager = manager;
-        manager.setContext({ userid: userId }); // fill userid
+
+        // 使用 session info 填充 manager context（保持最新）
+        manager.setContext({ userid: userId });
         ws.send({ type: "reconnection_ack", payload: { success: true, connectionId } });
       } else {
+        // 新连接
         connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         wsData.connectionId = connectionId;
         manager = new WebSocketConnectionManager(ws, connectionId);
         wsData.manager = manager;
         connectionManagers.set(connectionId, manager);
 
-        manager.setContext({ userid: userId }); // fill userid
+        manager.setContext({ userid: userId });
         ws.send({ type: "connection_ack", payload: { connectionId } });
       }
 
+      // 将 connectionId 注册到 userConnections（multi-device 支持）
       if (!userConnections.has(userId)) {
         userConnections.set(userId, new Set());
       }

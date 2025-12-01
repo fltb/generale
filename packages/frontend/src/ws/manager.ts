@@ -49,7 +49,6 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSContextBas
   onDisconnect(cb: (err?: Error) => void) { this.disconnectCallbacks.push(cb); }
   onReconnect(cb: () => void) { this.reconnectCallbacks.push(cb); }
   onMessage(cb: (payload: SEvt) => void) {
-    console.debug("try register message callback")
     this.messageCallbacks.push(cb);
   }
 
@@ -62,6 +61,10 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSContextBas
     this._explicitlyClosed = true;
     this._closeInfo = { code, reason };
     this.manager.sendRaw({ domain: this.domain, type: "close", payload: { code, reason } });
+    // locally mark closed
+    this._triggerClose(code, reason);
+    // remove from manager map
+    this.manager.deleteSub(this.domain);
   }
 
   // internal triggers called by manager when receiving server-sent events
@@ -95,14 +98,17 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSContextBas
 /**
  * ClientConnectionManager: manages one websocket connection and multiple sub-connectors.
  * It also handles reconnect & reattach using a connectionId.
+ *
+ * NOTE: This implementation assumes session/auth is handled via httpOnly cookie.
+ * It DOES NOT include session id/token in the WebSocket URL.
  */
 export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> {
   private ws?: WebSocket | null;
   private url: string;
-  private tokenGetter?: () => string | null | undefined;
   private reconnectAttempts = 0;
   private reconnectTimer?: number;
   private manualClose = false;
+  private outbox: object[] = [];
 
   public connectionId: string | null = null;
   public isConnected = false;
@@ -115,55 +121,85 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
   /** small reactive signal to allow UI to subscribe */
   public isConnectedSignal = createSignal(false);
 
-  constructor(url: string, tokenGetter?: () => string | null | undefined) {
+  constructor(url: string) {
     this.url = url;
-    this.tokenGetter = tokenGetter;
   }
 
-  // Establish the websocket. If reconnectId provided, attempt reattach.
+  // Establish the websocket. If reconnectId provided, attempt reattach using persisted connectionId.
   connect(reattach = true) {
     this.manualClose = false;
     this._connectInternal(reattach);
   }
 
   private _connectInternal(reattach = true) {
-    const token = this.tokenGetter ? this.tokenGetter() : undefined;
+    this.manualClose = false;
     const params = new URLSearchParams();
-    if (token) params.set("token", token);
-    if (reattach && this.connectionId) params.set("reconnectId", this.connectionId);
 
-    const wsUrl = `${this.url}?${params.toString()}`;
-    console.debug("[WS] connecting to", wsUrl);
-    this.ws = new WebSocket(wsUrl);
-    this.ws.onopen = () => {
-      console.debug("[WS] onopen");
-      this.isConnected = true;
-      this.isConnectedSignal[1](true);
-      this.reconnectAttempts = 0;
-      // server will send connection_ack or reconnection_ack — wait for those before retrying opens
-    };
-    this.ws.onmessage = (ev) => {
+    try {
+      if (reattach && this.connectionId) params.set("reconnectId", this.connectionId);
+
+      // robust URL construction (handles relative urls too)
+      let u: URL;
       try {
-        const raw = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data;
-        console.debug("[WS] onmessage raw:", raw);
-        this._handleIncoming(raw);
+        u = new URL(this.url);
       } catch (e) {
-        console.error("ws parse error", e, "raw:", ev.data);
+        u = new URL(this.url, `${location.protocol}//${location.host}`);
       }
-    };
-    this.ws.onclose = (ev) => {
-      console.debug("[WS] onclose", ev);
-      this.isConnected = false;
-      this.isConnectedSignal[1](false);
-      // notify subconnectors of disconnect
-      for (const sc of this.subConnectors.values()) sc._triggerDisconnect(new Error("socket closed"));
-      if (!this.manualClose) this._scheduleReconnect();
-    };
-    this.ws.onerror = (err) => {
-      console.error("ws error", err);
-    };
-  }
 
+      for (const [k, v] of params.entries()) u.searchParams.set(k, v);
+      const wsUrl = u.toString();
+      console.debug("[WS] connecting to", wsUrl);
+
+      // create socket
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        console.debug("[WS] onopen readyState", this.ws.readyState);
+        this.isConnected = true;
+        this.isConnectedSignal[1](true);
+        this.reconnectAttempts = 0;
+
+        // flush any queued messages
+        this._flushOutbox();
+      };
+
+      this.ws.onmessage = (ev) => {
+        try {
+          const raw = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data;
+          console.debug("[WS] onmessage raw:", raw);
+          this._handleIncoming(raw);
+        } catch (e) {
+          console.error("ws parse error", e, "raw:", ev.data);
+        }
+      };
+
+      this.ws.onclose = (ev) => {
+        console.debug("[WS] onclose", ev);
+        this.isConnected = false;
+        this.isConnectedSignal[1](false);
+
+        for (const sc of this.subConnectors.values()) sc._triggerDisconnect(new Error("socket closed"));
+
+        // if the server sent an application-level auth-close, don't auto reconnect
+        if (ev && ev.code === 4001) {
+          console.warn("[WS] closed due to auth failure (4001). Will not attempt reconnect.");
+          this.manualClose = true;
+          try { window.dispatchEvent(new CustomEvent("ws:auth-failed")); } catch { }
+          return;
+        }
+
+        if (!this.manualClose) this._scheduleReconnect();
+      };
+
+      this.ws.onerror = (err) => {
+        console.error("[WS] websocket error event:", err);
+      };
+    } catch (err) {
+      console.error("[WS] _connectInternal error:", err);
+      this._scheduleReconnect();
+    }
+  }
+  
   private _scheduleReconnect() {
     const backoff = Math.min(30_000, 1000 * Math.pow(1.5, this.reconnectAttempts));
     this.reconnectAttempts++;
@@ -193,12 +229,30 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
         this.ws.send(payload);
         console.debug("[WS] sendRaw ->", obj);
       } else {
-        console.warn("[WS] sendRaw: socket not open, drop", obj);
+        console.warn("[WS] sendRaw: socket not open, enqueueing", obj);
+        this.outbox.push(obj);
       }
     } catch (e) {
       console.error("ws send error", e, obj);
     }
   }
+
+  private _flushOutbox() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    while (this.outbox.length > 0) {
+      const obj = this.outbox.shift()!;
+      try {
+        this.ws.send(JSON.stringify(obj));
+        console.debug("[WS] flushed outbox item ->", obj);
+      } catch (e) {
+        console.error("[WS] error flushing outbox item", e, obj);
+        // 如果出错，把它放回队列并退出，稍后重试
+        this.outbox.unshift(obj);
+        break;
+      }
+    }
+  }
+
 
   // create or get local subconnector (client-side)
   getOrCreateSub<CEvt = any, SEvt = any>(domain: string, ctx: Partial<Ctx> = {}) {
@@ -212,6 +266,13 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
     }
     return sub;
   }
+
+  // helper to delete a sub when closed by client
+  deleteSub(domain: string) {
+    this.subConnectors.delete(domain);
+    this.pendingOpens.delete(domain);
+  }
+
   // ask server to open a sub-domain
   openDomain(domain: string, ctx: Partial<Ctx> = {}) {
     const sub = this.getOrCreateSub(domain, ctx);
@@ -238,7 +299,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
   private _handleIncoming(msg: WebSocketMessage<any, Ctx>) {
     // connection ack
     if (msg.type === "connection_ack") {
-      const connectionId = msg.payload?.connectionId;
+      const connectionId = msg.payload.connectionId;
       if (connectionId) {
         this.connectionId = connectionId;
         console.debug("[WS] received connection_ack:", connectionId);
@@ -254,11 +315,14 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
         console.debug("[WS] received reconnection_ack:", payload);
         // server has reattached our previous connection; retry opens just in case
         this._retryPendingOpens();
+      } else {
+        console.warn("[WS] reconnection_ack success=false, clearing saved connection id");
+        this.connectionId = null;
       }
       return;
     }
     if (msg.type === "error") {
-      console.error(console.debug("[WS] received error:", msg.payload))
+      console.error("[WS] received error:", msg.payload);
       return;
     }
 
@@ -300,7 +364,6 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
         }
         case "message": {
           const sub = this.subConnectors.get(domain);
-          console.debug("[WS] delivering domain message:", { domain, payload }, "subExists?", !!sub, "sub_obj:", sub, "msgCbCount:", (sub as any)?.messageCallbacks?.length ?? "unknown");
           if (sub) sub._triggerMessage(payload);
           break;
         } default:

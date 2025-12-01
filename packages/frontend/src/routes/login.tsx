@@ -1,6 +1,7 @@
 import { useAuth } from "~/hooks/useAuth";
 import { useNavigate } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
+import { useWS } from "~/hooks/useWebsocket";
 
 type Tab = "login" | "register";
 
@@ -11,6 +12,7 @@ type Tab = "login" | "register";
 export default function LoginPage() {
   const auth = useAuth();
   const nav = useNavigate();
+  const wsManager = useWS();
 
   // Tab 控制
   const [tab, setTab] = createSignal<Tab>("login");
@@ -38,8 +40,24 @@ export default function LoginPage() {
     setLoginError("");
     setLoginLoading(true);
     try {
-      await auth.login({ username: loginUsername(), password: loginPassword() });
-      nav("/profile");
+      await auth.login({
+        username: loginUsername(),
+        password: loginPassword(),
+      });
+      // try {
+      //   if (!wsManager.isConnected) {
+      //     // true 表示尝试使用已有 connectionId 进行 reattach
+      //     wsManager.connect(true);
+      //   }
+      //   // 可选：立即请求打开你常用的 domain（会被入队并在连接后发送）
+      //   // wsManager.openDomain("room"); // 举例：打开 room domain
+      // } catch (wsErr) {
+      //   console.warn("WebSocket connect/open failed:", wsErr);
+      //   // 不要阻塞用户登录流程：仅记录或展示非致命提示
+      // }
+      console.log("try nav")
+      nav("/");
+      console.log("nav called");
     } catch (err: any) {
       setLoginError(err?.message || "登录失败");
     } finally {
@@ -83,14 +101,19 @@ export default function LoginPage() {
 
         // 尝试自动登录（使用刚才填写的用户名/密码）
         try {
-          await auth.login({ username: regUsername(), password: regPassword() });
+          await auth.login({
+            username: regUsername(),
+            password: regPassword(),
+          });
           // 自动登录成功，跳转到 profile
           nav("/profile");
           return; // 已跳转，不再执行后续清理
         } catch (loginErr: any) {
           // 自动登录失败：提示用户并切回登录 tab（可按需改为留在当前页）
           setRegMessage(
-            `验证成功，但自动登录失败，请手动登录。原因：${loginErr?.message || "未知错误"}`
+            `验证成功，但自动登录失败，请手动登录。原因：${
+              loginErr?.message || "未知错误"
+            }`
           );
           setTab("login");
         }
@@ -158,7 +181,11 @@ export default function LoginPage() {
             class="input input-bordered"
             required
           />
-          <button type="submit" class="btn btn-primary" disabled={loginLoading()}>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            disabled={loginLoading()}
+          >
             {loginLoading() ? "登录中..." : "登录"}
           </button>
         </form>
@@ -199,7 +226,11 @@ export default function LoginPage() {
                 class="input input-bordered"
                 required
               />
-              <button type="submit" class="btn btn-primary" disabled={regLoading()}>
+              <button
+                type="submit"
+                class="btn btn-primary"
+                disabled={regLoading()}
+              >
                 {regLoading() ? "提交中..." : "注册"}
               </button>
             </form>

@@ -45,7 +45,7 @@
         "@generale/types": "workspace:*",
         "@solidjs/meta": "^0.29.4",
         "@solidjs/router": "^0.15.4",
-        "@tanstack/solid-query": "^5.89.0",
+        "@tanstack/solid-query": "^5.90.14",
         "@tanstack/solid-query-devtools": "^5.89.0",
         "fast-json-patch": "^3.1.1",
         "pixi.js": "^8.13.2",
@@ -535,11 +535,11 @@
 
     "@tailwindcss/postcss": ["@tailwindcss/postcss@4.1.13", "", { "dependencies": { "@alloc/quick-lru": "^5.2.0", "@tailwindcss/node": "4.1.13", "@tailwindcss/oxide": "4.1.13", "postcss": "^8.4.41", "tailwindcss": "4.1.13" } }, "sha512-HLgx6YSFKJT7rJqh9oJs/TkBFhxuMOfUKSBEPYwV+t78POOBsdQ7crhZLzwcH3T0UyUuOzU/GK5pk5eKr3wCiQ=="],
 
-    "@tanstack/query-core": ["@tanstack/query-core@5.90.10", "", {}, "sha512-EhZVFu9rl7GfRNuJLJ3Y7wtbTnENsvzp+YpcAV7kCYiXni1v8qZh++lpw4ch4rrwC0u/EZRnBHIehzCGzwXDSQ=="],
+    "@tanstack/query-core": ["@tanstack/query-core@5.90.11", "", {}, "sha512-f9z/nXhCgWDF4lHqgIE30jxLe4sYv15QodfdPDKYAk7nAEjNcndy4dHz3ezhdUaR23BpWa4I2EH4/DZ0//Uf8A=="],
 
     "@tanstack/query-devtools": ["@tanstack/query-devtools@5.90.1", "", {}, "sha512-GtINOPjPUH0OegJExZ70UahT9ykmAhmtNVcmtdnOZbxLwT7R5OmRztR5Ahe3/Cu7LArEmR6/588tAycuaWb1xQ=="],
 
-    "@tanstack/solid-query": ["@tanstack/solid-query@5.90.13", "", { "dependencies": { "@tanstack/query-core": "5.90.10" }, "peerDependencies": { "solid-js": "^1.6.0" } }, "sha512-Nl0iXdgmYXnjxO9FT6AcPcUD472r/k0xTFLJmKvP4NUfA8hBP5AxqE7OLUkL/Lzg9Vs1FbnM355b8+IizYilsw=="],
+    "@tanstack/solid-query": ["@tanstack/solid-query@5.90.14", "", { "dependencies": { "@tanstack/query-core": "5.90.11" }, "peerDependencies": { "solid-js": "^1.6.0" } }, "sha512-e/TP+92mOFoQtInffcYKvAExgbQoBSDrarKnGwnindQBItp0ne1VdIg88K2U8rNwwM/wdj15V5azpXIkZkNQDw=="],
 
     "@tanstack/solid-query-devtools": ["@tanstack/solid-query-devtools@5.90.4", "", { "dependencies": { "@tanstack/query-devtools": "5.90.1" }, "peerDependencies": { "@tanstack/solid-query": "^5.90.4", "solid-js": "^1.6.0" } }, "sha512-ygyAiXZ+NR1tw33jVibpjiWB1IoAQWCeqSLmO/6PoSWrI9yDTwaPNAXheniEMrO6/a/vTQq2tB4N+FPNjhGaNw=="],
 

@@ -1,4 +1,4 @@
-import { Elysia } from 'elysia'
+import { Elysia, t } from 'elysia'
 import { db } from '../db/client'
 
 import {
@@ -9,7 +9,8 @@ import {
   errorRespSchema,
   verifyReqSchema,
   resetPasswordReqSchema,
-  passwordResetTokenRespSchema
+  passwordResetTokenRespSchema,
+  logoutRespSchema
 } from '@generale/types/dist/api'
 
 import { verificationTokens, users } from '../db/schema'
@@ -21,6 +22,10 @@ import { eq } from 'drizzle-orm'
 function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
+
+const cookieScheme = t.Cookie({
+  sid: t.String()
+})
 
 export const userRoutes = new Elysia()
   // 替换 register handler 为下面实现（保留其它路由不变）
@@ -158,7 +163,7 @@ export const userRoutes = new Elysia()
         return { error: '用户不存在' }
       }
 
-      const row = await db
+      const row = db
         .select()
         .from(verificationTokens)
         .where(eq(verificationTokens.userId, user.id))
@@ -243,6 +248,26 @@ export const userRoutes = new Elysia()
       }
     }
   )
+  .post(
+    '/logout',
+    async ({ cookie: { sid } }) => {
+      if (sid?.value) {
+        sessionService.delete(sid.value)
+        sid.set({
+          value: '',
+          path: '/',
+          expires: new Date(0)
+        })
+      }
+      return { ok: true }
+    },
+    {
+      response: {
+        200: logoutRespSchema
+      },
+      cookie: cookieScheme
+    }
+  )
   .get(
     '/me',
     async ({ cookie: { sid }, set }) => {
@@ -263,7 +288,8 @@ export const userRoutes = new Elysia()
         200: userSuccessRespSchema,
         401: errorRespSchema,
         404: errorRespSchema
-      }
+      },
+      cookie: cookieScheme
     }
   )
   .post(
