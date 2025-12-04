@@ -53,7 +53,7 @@ export type ListGamesQuery = Static<typeof listGamesQuerySchema>
 // --- Request Schemas ---
 
 export const createGameReqSchema = t.Object({
-    playerName: t.String({ minLength: 1, maxLength: 50 }),
+    roomName: t.String({ minLength: 1, maxLength: 50 }),
     gameSettings: t.Optional(gameCreationSettingsRouteSchema)
 });
 export type CreateGameReqBody = Static<typeof createGameReqSchema>;

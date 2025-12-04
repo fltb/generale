@@ -15,6 +15,8 @@ import {
   listGamesQuerySchema
 } from "@generale/types/dist/api";
 
+import { GameServiceConfig } from "../game/service/GameService";
+
 export const gameRoutes = new Elysia({ prefix: "/game" })
   // Decorate with the actual singleton manager instance
   .decorate("gameServiceManager", gameServiceManager)
@@ -22,7 +24,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
     const gameId = `game_${Date.now()}` as GameId;
 
     // Build the config object, ensuring optional properties are handled correctly.
-    const gameConfig: any = { gameId };
+    const gameConfig: GameServiceConfig = { gameId, roomName: body.roomName };
     if (body.gameSettings?.maxPlayers) {
       gameConfig.maxPlayers = body.gameSettings.maxPlayers;
     }
@@ -60,41 +62,127 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
     // Get active game IDs from the manager
     const activeGameIds = gameServiceManager.getActiveGames();
 
-    // Collect game info objects
+    // Normalize each game's info into the public summary shape required by listGamesSuccessRespSchema
     let games = activeGameIds
-      .map(id => gameServiceManager.getGame(id)?.getGameInfo())
-      .filter(Boolean);
+      .map(id => {
+        const svc = gameServiceManager.getGame(id);
+        if (!svc) return null;
+
+        const info: any = typeof svc.getGameInfo === "function" ? svc.getGameInfo() : {};
+
+        // Attempt to read sensible fallbacks from different possible shapes
+        const settings = info.settings ?? info.gameSettings ?? {};
+        const playersArray = Array.isArray(info.players) ? info.players : (Array.isArray(info.playerList) ? info.playerList : []);
+
+        // Ensure status is one of the allowed values
+        const rawStatus = info.status ?? settings.status ?? "lobby";
+        const status = (rawStatus === "lobby" || rawStatus === "in-progress" || rawStatus === "finished")
+          ? rawStatus
+          : "lobby";
+
+        const playerCount =
+          typeof info.playerCount === "number"
+            ? info.playerCount
+            : (playersArray.length || 0);
+
+        const maxPlayers =
+          typeof info.maxPlayers === "number"
+            ? info.maxPlayers
+            : (typeof settings.maxPlayers === "number" ? settings.maxPlayers : 8);
+
+        return {
+          id: info.id ?? id,
+          playerCount,
+          maxPlayers,
+          status,
+          hasPassword: Boolean(info.hasPassword ?? settings.hasPassword ?? false),
+
+          // keep these for server-side filtering even though schema doesn't require them in list response
+          // they will be filtered on below; they are not returned to client unless you choose to include them
+          _raw: info,
+          _settings: settings,
+          _players: playersArray,
+        };
+      })
+      .filter(Boolean) as Array<{
+        id: string;
+        playerCount: number;
+        maxPlayers: number;
+        status: "lobby" | "in-progress" | "finished";
+        hasPassword: boolean;
+        _raw?: any;
+        _settings?: any;
+        _players?: any[];
+      }>;
 
     // --- 过滤条件 ---
+    // note: allow query.roomName to match settings.roomName or info.name
     if (query.roomName) {
-      games = games.filter(g =>
-        g.name?.toLowerCase().includes(query.roomName!.toLowerCase())
-      );
-    }
-    if (query.mode) {
-      games = games.filter(g => g.mode === query.mode);
-    }
-    if (query.map) {
-      games = games.filter(g => g.map === query.map);
-    }
-    if (query.full !== undefined) {
-      const wantFull = query.full === "true";
+      const q = String(query.roomName).toLowerCase();
+      // filter by either top-level name or settings.roomName (common places to store the room name)
       games = games.filter(g => {
-        const isFull = g.players.length >= g.maxPlayers;
+        const nameCandidates = [
+          (g._raw?.name ?? ""),
+          (g._settings?.roomName ?? ""),
+          (g._raw?.roomName ?? "")
+        ];
+        return nameCandidates.some(n => typeof n === "string" && n.toLowerCase().includes(q));
+      });
+    }
+
+    if (query.mode) {
+      const q = String(query.mode);
+      games = games.filter(g => {
+        const modeCandidates = [
+          g._raw?.mode,
+          g._settings?.gameMode,
+          g._raw?.gameMode
+        ];
+        return modeCandidates.some(m => m === q);
+      });
+    }
+
+    if (query.map) {
+      const q = String(query.map);
+      games = games.filter(g => {
+        const mapCandidates = [
+          g._raw?.map,
+          g._settings?.mapSize,
+          g._raw?.mapSize
+        ];
+        return mapCandidates.some(m => m === q);
+      });
+    }
+
+    if (query.full !== undefined) {
+      const wantFull = String(query.full) === "true";
+      games = games.filter(g => {
+        const isFull = typeof g.playerCount === "number" && typeof g.maxPlayers === "number"
+          ? g.playerCount >= g.maxPlayers
+          : false;
         return wantFull ? isFull : !isFull;
       });
     }
 
     // --- offset & limit ---
-    const offset = query.offset ? parseInt(query.offset, 10) : 0;
-    const limit = query.limit ? parseInt(query.limit, 10) : 20;
+    const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
+    const limit = query.limit ? parseInt(String(query.limit), 10) : 20;
 
     const total = games.length;
     const sliced = games.slice(offset, offset + limit);
 
+    // Return only the fields required by the list schema
+    const responseData = sliced.map(g => ({
+      id: String(g.id),
+      playerCount: Number(g.playerCount),
+      maxPlayers: Number(g.maxPlayers),
+      status: g.status,
+      hasPassword: Boolean(g.hasPassword)
+    }));
+
     return {
       success: true,
-      data: sliced,
+      data: responseData,
       meta: {
         total,
         offset,

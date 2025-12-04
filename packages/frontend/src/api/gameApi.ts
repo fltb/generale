@@ -14,7 +14,7 @@ import type {
  * POST /game/create
  */
 export async function createGameApi(payload: CreateGameReqBody): Promise<CreateGameSuccessResp> {
-  return api<CreateGameSuccessResp, ErrorResp>("/game/create", {
+  return api<CreateGameSuccessResp, ErrorResp>("/api/game/create", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -24,7 +24,7 @@ export async function createGameApi(payload: CreateGameReqBody): Promise<CreateG
  * GET /game/info/:gameId
  */
 export async function getGameInfoApi(gameId: string): Promise<GameInfoSuccessResp> {
-  return api<GameInfoSuccessResp, ErrorResp>(`/game/info/${encodeURIComponent(gameId)}`, {
+  return api<GameInfoSuccessResp, ErrorResp>(`/api/game/info/${encodeURIComponent(gameId)}`, {
     method: "GET",
   });
 }
@@ -37,7 +37,7 @@ export async function listGamesApi(query?: Partial<ListGamesQuery>): Promise<Lis
   const qs = query ? "?" + new URLSearchParams(
     Object.entries(query).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => [k, String(v)])
   ).toString() : "";
-  return api<ListGamesSuccessResp, ErrorResp>(`/game/list${qs}`, {
+  return api<ListGamesSuccessResp, ErrorResp>(`/api/game/list${qs}`, {
     method: "GET",
   });
 }
@@ -48,7 +48,7 @@ export async function listGamesApi(query?: Partial<ListGamesQuery>): Promise<Lis
  */
 export async function prepareConnectApi(gameId: string, playerId: string): Promise<ConnectWsSuccessResp> {
   return api<ConnectWsSuccessResp, ErrorResp>(
-    `/game/connect/${encodeURIComponent(gameId)}/${encodeURIComponent(playerId)}`,
+    `/api/game/connect/${encodeURIComponent(gameId)}/${encodeURIComponent(playerId)}`,
     { method: "GET" }
   );
 }

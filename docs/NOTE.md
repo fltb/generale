@@ -194,6 +194,12 @@ export type SyncedPreGameClientChangeSettingAction = SyncedStateClientGenericSyn
 
 编写一个创建房间页面，玩家填入指定的参数，然后创建一个游戏房间，并同步到列表
 
+记录需要修改的地方：
+
+API 部分，craete game 的 API 使用，size 应该分 mode, custom 和 calssic
+
+gameServoce 的 create 接口也要改
+
 #### 游戏列表功能
 
 使用自己定义的 subconnection 逻辑创建一个 room list 同步列表并显示。点击可以胶乳房间

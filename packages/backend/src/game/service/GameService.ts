@@ -20,6 +20,7 @@ import { GameInstance, GameInstanceSettings } from '../instance/GameInstance';
 import { GameChatInstance, GameChatConnector } from '../instance/GameChatInstance';
 import { registerDomainHandler, unregisterDomainHandler, DomainHandler, SubConnector } from '../../plugins/websocket';
 import { generateMap } from '../core/map-gen';
+import { GameInfoSuccessResp } from '@generale/types/dist/api';
 
 
 
@@ -34,6 +35,7 @@ export interface GameServiceConfig {
   gameTimeout?: number;          // Optional: game timeout in ms
   heartbeatInterval?: number;    // Optional: heartbeat interval in ms
   gameSettings?: Partial<GameInstanceSettings>;
+  mapSetting?: 
 }
 
 export type ConnectionInfo = {
@@ -723,46 +725,87 @@ export class GameService {
   /**
    * 获取游戏信息（HTTP API）
    */
-  public getGameInfo(): any {
-    let players: any[] = [];
+  public getGameInfo(): GameInfoSuccessResp["data"] {
+    const phase = this.phase;
+
+    // --- 1. status (schema requires: lobby | in-progress | finished) ---
+    let status: "lobby" | "in-progress" | "finished";
+    switch (phase) {
+      case GamePhase.PREGAME:
+        status = "lobby";
+        break;
+      case GamePhase.INGAME:
+        status = "in-progress";
+        break;
+      case GamePhase.ENDED:
+      case GamePhase.DISBANDED:
+        status = "finished";
+        break;
+      default:
+        status = "lobby";
+    }
+
+    // --- 2. players (convert your internal structure into schema format) ---
+    let players: Array<{
+      id: string;
+      name: string;
+      isHost: boolean;
+    }> = [];
+
     let maxPlayers = this.config.maxPlayers ?? 8;
-    if (this.phase === GamePhase.PREGAME && this.preGameInstance) {
+
+    if (phase === GamePhase.PREGAME && this.preGameInstance) {
       const state = this.preGameInstance.getState();
-      players = state.players.map(p => ({
-        playerId: p.id,
-        playerName: p.name,
-        connected: {
-          pregame: true,
-          game: false,
-          chat: false
-        },
-        teamId: p.teamId,
-        tileColor: p.tileColor,
-        isHost: p.isHost
+
+      players = state.players.map((p) => ({
+        id: String(p.id),
+        name: "",
+        isHost: Boolean(p.isHost),
       }));
+
       maxPlayers = state.playerLimit ?? maxPlayers;
-    } else if (this.phase === GamePhase.INGAME && this.gameInstance) {
+    }
+
+    else if (phase === GamePhase.INGAME && this.gameInstance) {
       const state = this.gameInstance.getState();
-      players = Object.values(state.players).map((p: any) => ({
-        playerId: p.id,
-        playerName: '', // 可补充
-        connected: {
-          pregame: false,
-          game: true,
-          chat: false
-        },
-        teamId: p.teamId
+
+      players = Object.values(state.players).map((p) => ({
+        id: String(p.id),
+        name: "",   // TODO:: get name in userService
+        isHost: false,               
       }));
+
       maxPlayers = Object.keys(state.players).length;
     }
-    return {
-      gameId: this.gameId,
-      phase: this.phase,
-      playerCount: players.length,
+
+    const playerCount = players.length;
+
+    // --- 3. settings (schema requires object, all fields optional except maxPlayers) ---
+    const settings = {
       maxPlayers,
+      mapSize: this.config.gameSettings ?? undefined,
+      gameMode: this.config.gameMode ?? undefined,
+    };
+
+    // --- 4. hasPassword ---
+    const hasPassword = false; // TODO:: add password
+
+    // --- 5. hostId ---
+    // Pregame 阶段有 host
+    let hostId = "";
+    if (phase === GamePhase.PREGAME && this.preGameInstance) {
+      hostId = this.preGameInstance.getState().hostId;
+    }
+
+    return {
+      id: this.gameId,
+      hostId,
       players,
-      preGameState: this.preGameInstance?.getState(),
-      gameState: this.gameInstance?.getState()
+      settings,
+      status,
+      playerCount,
+      maxPlayers,
+      hasPassword,
     };
   }
 }
