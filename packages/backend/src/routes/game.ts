@@ -20,29 +20,71 @@ import { GameServiceConfig } from "../game/service/GameService";
 export const gameRoutes = new Elysia({ prefix: "/game" })
   // Decorate with the actual singleton manager instance
   .decorate("gameServiceManager", gameServiceManager)
-  .post("/create", async ({ body, gameServiceManager }) => {
+  .post("/create", async ({ body, gameServiceManager, set }) => {
     const gameId = `game_${Date.now()}` as GameId;
 
-    // Build the config object, ensuring optional properties are handled correctly.
     const gameConfig: GameServiceConfig = { gameId, roomName: body.roomName };
-    if (body.gameSettings?.maxPlayers) {
-      gameConfig.maxPlayers = body.gameSettings.maxPlayers;
+
+    // default
+    gameConfig.maxPlayers = body.gameSettings?.maxPlayers ?? 4;
+
+    // default map numeric size — will become { width, height } in final config
+    let finalMapSize: { width: number; height: number };
+
+    if (body.gameSettings) {
+      const settings = body.gameSettings as any;
+
+      // discriminant must be 'type' per new schema
+      if (settings.type === "standard") {
+        // accept optional "small"/"medium"/"large" or default "medium"
+        const m = settings.mapSize ?? "medium";
+        switch (m) {
+          case "small":
+            finalMapSize = { width: 20, height: 20 };
+            break;
+          case "large":
+            finalMapSize = { width: 30, height: 30 };
+            break;
+          case "medium":
+          default:
+            finalMapSize = { width: 40, height: 40 };
+            break;
+        }
+        gameConfig.type = "standard";
+      } else if (settings.type === "custom") {
+        if (!settings.mapSize || typeof settings.mapSize !== "object") {
+          set.status = 400;
+          return { success: false, error: "custom mode requires numeric mapSize {width, height}" };
+        }
+        const { width, height } = settings.mapSize;
+        finalMapSize = { width: Number(width), height: Number(height) };
+        gameConfig.type = "custom";
+      } else {
+        // unexpected discriminant (shouldn't happen if schema validated)
+        set.status = 400;
+        return { success: false, error: "invalid gameSettings.type" };
+      }
+    } else {
+      // no gameSettings: fall back to defaults (standard medium)
+      finalMapSize = { width: 200, height: 200 };
+      gameConfig.type = "standard";
     }
 
-    // Use the manager to create a new game service instance
+    // attach final numeric map size into config
+    gameConfig.mapSize = finalMapSize;
+
+    // create game
     gameServiceManager.createGame(gameConfig);
 
-    // A player ID is not needed on creation, it's generated on join.
     return {
       success: true,
-      data: { gameId, playerId: '', message: "Game created successfully. Player can now join." }
+      data: { gameId, playerId: "", message: "Game created successfully. Player can now join." }
     };
   }, {
     body: createGameReqSchema,
     response: { 200: createGameSuccessRespSchema, 400: errorRespSchema },
     detail: { tags: ["Game"], summary: "Create a new game" }
-  })
-  .get("/info/:gameId", async ({ params, gameServiceManager, set }) => {
+  }).get("/info/:gameId", async ({ params, gameServiceManager, set }) => {
     const gameService = gameServiceManager.getGame(params.gameId as GameId);
 
     if (!gameService) {

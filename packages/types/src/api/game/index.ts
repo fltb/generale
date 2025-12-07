@@ -6,11 +6,31 @@ import { GamePhase } from '../../game';
 /**
  * Schema for game settings, used when creating a game.
  */
-export const gameCreationSettingsRouteSchema = t.Object({
-    maxPlayers: t.Optional(t.Number({ minimum: 2, maximum: 8 })),
-    mapSize: t.Optional(t.Union([t.Literal("small"), t.Literal("medium"), t.Literal("large")])),
-    gameMode: t.Optional(t.Union([t.Literal("classic"), t.Literal("blitz"), t.Literal("custom")]))
-});
+export const gameCreationSettingsRouteSchema = t.Union([
+    // standard variant
+    t.Object({
+        maxPlayers: t.Optional(t.Number({ minimum: 2, maximum: 8 })),
+        // small/medium/large allowed for standard
+        mapSize: t.Optional(t.Union([
+            t.Literal("small"),
+            t.Literal("medium"),
+            t.Literal("large"),
+        ])),
+        // discriminant for variant
+        type: t.Const("standard")
+    }),
+
+    // custom variant
+    t.Object({
+        maxPlayers: t.Optional(t.Number({ minimum: 2, maximum: 8 })),
+        // numeric width/height required for custom
+        mapSize: t.Object({
+            width: t.Number({ minimum: 10, maximum: 500 }),
+            height: t.Number({ minimum: 10, maximum: 500 }),
+        }),
+        type: t.Const("custom")
+    })
+]);
 export type GameCreationSettingsRoute = Static<typeof gameCreationSettingsRouteSchema>;
 
 /**

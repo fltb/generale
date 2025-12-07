@@ -1,16 +1,15 @@
 import { For, Match, Show, Switch, createSignal } from "solid-js";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/solid-query";
-import { listGamesApi, getGameInfoApi, prepareConnectApi, createGameApi } from "~/api/gameApi";
-import type { CreateGameReqBody, CreateGameSuccessResp, ErrorResp, GameInfoRoute } from "@generale/types/dist/api";
+import { useQuery } from "@tanstack/solid-query";
+import { listGamesApi, getGameInfoApi, prepareConnectApi } from "~/api/gameApi";
+import type { GameInfoRoute } from "@generale/types/dist/api";
 import { A } from "@solidjs/router";
-import type { ApiError } from "~/api/base";
+import CreateRoomModal from "./CreateRoomModal";
 
 /**
  * RoomList - show active games using daisyui cards
  * + 新增：Create Room 模态框，调用 createGameApi
  */
 export function RoomList() {
-  const qc = useQueryClient();
 
   // Query to fetch rooms
   const gamesQuery = useQuery(() => ({
@@ -25,38 +24,6 @@ export function RoomList() {
 
   // --- Create room modal state & mutation ---
   const [createOpen, setCreateOpen] = createSignal(false);
-  const [roomName, setRoomName] = createSignal("");
-  const [maxPlayers, setMaxPlayers] = createSignal<number | "">("");
-  const [mapSize, setMapSize] = createSignal<"small" | "medium" | "large" | "">("");
-  const [gameMode, setGameMode] = createSignal<"classic" | "blitz" | "custom" | "">("");
-
-  const createMutation = useMutation<
-    CreateGameSuccessResp,
-    ApiError<ErrorResp>,
-    CreateGameReqBody
-  >(() => ({
-    mutationFn: async (payload: CreateGameReqBody) => {
-      return createGameApi(payload);
-    },
-    onSuccess: (resp) => {
-      // resp.data: { gameId, playerId, message }
-      // 1) 刷新房间列表
-      qc.invalidateQueries({ queryKey: ["games"] as const });
-      // 2) 关闭 modal 并打开新房间详情
-      setCreateOpen(false);
-      setRoomName("");
-      setMaxPlayers("");
-      setMapSize("");
-      setGameMode("");
-      // 打开详情（使用 detail modal flow）
-      setOpenId(resp.data.gameId);
-    },
-    onError: (err: any) => {
-      console.error("create game failed", err);
-      // 这里可以用 toast 或 alert，简单用 alert
-      alert(err?.message ?? "创建房间失败");
-    }
-  }));
 
   // Modal state + detail query (fetch when opening)
   const [openId, setOpenId] = createSignal<string | null>(null);
@@ -108,23 +75,6 @@ export function RoomList() {
   }
 
   /** 提交创建房间 */
-  async function submitCreateRoom() {
-    const name = roomName().trim();
-    if (!name) {
-      alert("请输入房间名字（roomName）");
-      return;
-    }
-
-    const settings: any = {};
-    if (maxPlayers() !== "") settings.maxPlayers = Number(maxPlayers());
-    if (mapSize()) settings.mapSize = mapSize();
-    if (gameMode()) settings.gameMode = gameMode();
-
-    createMutation.mutate({
-      roomName: name,
-      gameSettings: Object.keys(settings).length ? settings : undefined
-    });
-  }
 
   return (
     <div class="container mx-auto p-4">
@@ -293,81 +243,7 @@ export function RoomList() {
 
       {/* Create Room Modal */}
       <Show when={createOpen()}>
-        <div class="modal modal-open">
-          <div class="modal-box">
-            <div class="flex justify-between items-start">
-              <h3 class="font-bold text-lg">新建房间</h3>
-              <button class="btn btn-sm btn-ghost" onClick={() => setCreateOpen(false)}>Close</button>
-            </div>
-
-            <div class="mt-4 space-y-3">
-              <label class="block">
-                <span class="label-text">你的名字（房主 / playerName）</span>
-                <input
-                  class="input input-bordered w-full"
-                  value={roomName()}
-                  onInput={(e: any) => setRoomName(e.target.value)}
-                  placeholder="例如：alice"
-                />
-              </label>
-
-              <label class="block">
-                <span class="label-text">最大玩家数（可选）</span>
-                <input
-                  type="number"
-                  min="2"
-                  max="8"
-                  class="input input-bordered w-full"
-                  value={maxPlayers()}
-                  onInput={(e: any) => {
-                    const v = e.target.value;
-                    setMaxPlayers(v === "" ? "" : Number(v));
-                  }}
-                  placeholder="2 - 8"
-                />
-              </label>
-
-              <div class="grid grid-cols-3 gap-2">
-                <label>
-                  <span class="label-text">地图（可选）</span>
-                  <select class="select select-bordered w-full" value={mapSize()} onInput={(e: any) => setMapSize(e.target.value)}>
-                    <option value="">默认</option>
-                    <option value="small">small</option>
-                    <option value="medium">medium</option>
-                    <option value="large">large</option>
-                  </select>
-                </label>
-
-                <label>
-                  <span class="label-text">模式（可选）</span>
-                  <select class="select select-bordered w-full" value={gameMode()} onInput={(e: any) => setGameMode(e.target.value)}>
-                    <option value="">默认</option>
-                    <option value="classic">classic</option>
-                    <option value="blitz">blitz</option>
-                    <option value="custom">custom</option>
-                  </select>
-                </label>
-
-                <div class="flex items-end">
-                  <button
-                    class="btn btn-primary w-full"
-                    onClick={submitCreateRoom}
-                    disabled={createMutation.isPending}
-                  >
-                    {createMutation.isPending ? "创建中..." : "创建房间"}
-                  </button>
-                </div>
-              </div>
-
-              <Show when={createMutation.isError}>
-                <div class="alert alert-error">
-                  <div>{(createMutation.error)?.message ?? "创建失败"}</div>
-                </div>
-              </Show>
-
-            </div>
-          </div>
-        </div>
+        <CreateRoomModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={(id) => setOpenId(id)} />
       </Show>
     </div>
   );

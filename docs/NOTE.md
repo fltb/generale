@@ -200,6 +200,14 @@ API 部分，craete game 的 API 使用，size 应该分 mode, custom 和 calssi
 
 gameServoce 的 create 接口也要改
 
+创建的游戏类型分两种，
+
+standard, custom
+
+standard: 快速，不可更改设置，只能选择地图大小(small, medium, large)
+
+custom: 可以自定义游戏参数。create 中目前只有游戏地图大小和玩家人数，其他都在创建之后设置，暂时不用放。
+
 #### 游戏列表功能
 
 使用自己定义的 subconnection 逻辑创建一个 room list 同步列表并显示。点击可以胶乳房间

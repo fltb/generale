@@ -32,12 +32,15 @@ export interface GameServiceConfig {
   roomName: string;
   maxPlayers?: number;
   chatMaxMessages?: number;
-  gameTimeout?: number;          // Optional: game timeout in ms
-  heartbeatInterval?: number;    // Optional: heartbeat interval in ms
+  gameTimeout?: number;
+  heartbeatInterval?: number;
+  // optional: raw incoming gameSettings (from create request). Prefer normalized mapSize in gameConfig.mapSizeNormalized below
   gameSettings?: Partial<GameInstanceSettings>;
-  mapSetting?: 
+  // discriminant if provided
+  type?: "standard" | "custom";
+  // if caller provided numeric map size, place here; prefer numeric for runtime
+  mapSize?: { width: number; height: number };
 }
-
 export type ConnectionInfo = {
   phase: GamePhase;
   domains: { primary: string; chat: string };
@@ -246,13 +249,29 @@ export class GameService {
    * 初始化 PreGame 阶段
    */
   private initializePreGame(): void {
+    // determine default map width/height from config
+    let defaultWidth = 20;
+    let defaultHeight = 20;
+
+    // if config.mapSize provided as numeric object, use it
+    if (this.config.mapSize && typeof this.config.mapSize === "object") {
+      defaultWidth = Math.max(10, Math.min(500, Math.floor(this.config.mapSize.width)));
+      defaultHeight = Math.max(10, Math.min(500, Math.floor(this.config.mapSize.height)));
+    } else if (this.config.mapSize && typeof this.config.mapSize === "string") {
+      // mapSize could be small/medium/large -> map to numeric values (adjust as you wish)
+      const m = this.config.mapSize;
+      if (m === "small") { defaultWidth = 10; defaultHeight = 10; }
+      else if (m === "large") { defaultWidth = 40; defaultHeight = 40; }
+      else { defaultWidth = 20; defaultHeight = 20; }
+    }
+
     const initialState: PreGameRoomState = {
       gameId: this.gameId,
-      hostId: '', // 将在第一个玩家加入时设置
+      hostId: '',
       players: [],
       gameSetting: {
         speed: 1.0,
-        tileGrow: {
+        tileGrow: { /* same as before */
           PLAIN: { duration: 40, growth: 1 },
           THRONE: { duration: 1, growth: 1 },
           BARRACKS: { duration: 1, growth: 1 },
@@ -264,8 +283,8 @@ export class GameService {
       },
       mapSetting: {
         type: PreGameMapType.Random,
-        width: 20,
-        height: 20,
+        width: defaultWidth,
+        height: defaultHeight,
         tileFrequency: {}
       },
       teamCount: 2,
@@ -772,7 +791,7 @@ export class GameService {
       players = Object.values(state.players).map((p) => ({
         id: String(p.id),
         name: "",   // TODO:: get name in userService
-        isHost: false,               
+        isHost: false,
       }));
 
       maxPlayers = Object.keys(state.players).length;
@@ -781,11 +800,6 @@ export class GameService {
     const playerCount = players.length;
 
     // --- 3. settings (schema requires object, all fields optional except maxPlayers) ---
-    const settings = {
-      maxPlayers,
-      mapSize: this.config.gameSettings ?? undefined,
-      gameMode: this.config.gameMode ?? undefined,
-    };
 
     // --- 4. hasPassword ---
     const hasPassword = false; // TODO:: add password
@@ -801,7 +815,11 @@ export class GameService {
       id: this.gameId,
       hostId,
       players,
-      settings,
+      settings: {
+        maxPlayers,
+        mapSize: this.config.mapSize!,
+        type: this.config.type!,
+      },
       status,
       playerCount,
       maxPlayers,
