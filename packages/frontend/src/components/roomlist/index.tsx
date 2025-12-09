@@ -2,7 +2,7 @@ import { For, Match, Show, Switch, createSignal } from "solid-js";
 import { useQuery } from "@tanstack/solid-query";
 import { listGamesApi, getGameInfoApi, prepareConnectApi } from "~/api/gameApi";
 import type { GameInfoRoute } from "@generale/types/dist/api";
-import { A } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import CreateRoomModal from "./CreateRoomModal";
 
 /**
@@ -10,7 +10,7 @@ import CreateRoomModal from "./CreateRoomModal";
  * + 新增：Create Room 模态框，调用 createGameApi
  */
 export function RoomList() {
-
+  const navigate = useNavigate();
   // Query to fetch rooms
   const gamesQuery = useQuery(() => ({
     queryKey: ["games"],
@@ -57,15 +57,16 @@ export function RoomList() {
   }
 
   async function handlePrepareConnect(gameId: string) {
-    const playerId = prompt("请输入你的 playerId（示例用，生产应由 join/create 返回）") ?? "";
-    if (!playerId) return;
-
     setConnecting(true);
     setConnectResult(null);
     setConnectError(null);
     try {
-      const resp = await prepareConnectApi(gameId, playerId);
+      // prepareConnectApi now only needs gameId; server uses session cookie to find player
+      const resp = await prepareConnectApi(gameId);
       setConnectResult(resp.data);
+
+      // navigate to room page
+      navigate(`/game/${encodeURIComponent(gameId)}`);
     } catch (err: any) {
       console.error("prepareConnect failed", err);
       setConnectError(err?.message ?? "连接准备失败");

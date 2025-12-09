@@ -43,12 +43,12 @@ export async function listGamesApi(query?: Partial<ListGamesQuery>): Promise<Lis
 }
 
 /**
- * GET /game/connect/:gameId/:playerId
+ * GET /game/connect/:gameId
  * NOTE: server returns domains/phase etc for websocket preparation
  */
-export async function prepareConnectApi(gameId: string, playerId: string): Promise<ConnectWsSuccessResp> {
+export async function prepareConnectApi(gameId: string): Promise<ConnectWsSuccessResp> {
   return api<ConnectWsSuccessResp, ErrorResp>(
-    `/api/game/connect/${encodeURIComponent(gameId)}/${encodeURIComponent(playerId)}`,
+    `/api/game/connect/${encodeURIComponent(gameId)}}`,
     { method: "GET" }
   );
 }

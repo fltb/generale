@@ -210,7 +210,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
 
   // map change -> dispatch CHANGE_MAP
   const onMapChange = (nextMapSetting: PreGameRoomState["mapSetting"]) => {
-    synced.dispatch({ type: SyncedPreGameClientActionTypes.CHANGE_MAP, payload: nextMapSetting });
+    synced.dispatch({ type: SyncedPreGameClientActionTypes.CHANGE_MAP, payload: nextMapSetting } as any);
   };
 
   // derived values

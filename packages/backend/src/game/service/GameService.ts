@@ -27,7 +27,7 @@ import { GameInfoSuccessResp } from '@generale/types/dist/api';
 /**
  * GameService 配置
  */
-export interface GameServiceConfig {
+export type GameServiceConfig = {
   gameId: GameId;
   roomName: string;
   maxPlayers?: number;
@@ -36,11 +36,19 @@ export interface GameServiceConfig {
   heartbeatInterval?: number;
   // optional: raw incoming gameSettings (from create request). Prefer normalized mapSize in gameConfig.mapSizeNormalized below
   gameSettings?: Partial<GameInstanceSettings>;
+} & ({
   // discriminant if provided
-  type?: "standard" | "custom";
+  type: "custom";
   // if caller provided numeric map size, place here; prefer numeric for runtime
-  mapSize?: { width: number; height: number };
-}
+  mapSize: { width: number; height: number };
+
+} | {
+  // discriminant if provided
+  type: "standard";
+  // if caller provided numeric map size, place here; prefer numeric for runtime
+  mapSize: "small" | "medium" | "large";
+
+})
 export type ConnectionInfo = {
   phase: GamePhase;
   domains: { primary: string; chat: string };
@@ -282,7 +290,7 @@ export class GameService {
         afkThreshold: 30,
       },
       mapSetting: {
-        type: PreGameMapType.Random,
+        type: (this.config.type === "standard" ? PreGameMapType.Random : PreGameMapType.Custom),
         width: defaultWidth,
         height: defaultHeight,
         tileFrequency: {}
@@ -817,8 +825,8 @@ export class GameService {
       players,
       settings: {
         maxPlayers,
-        mapSize: this.config.mapSize!,
-        type: this.config.type!,
+        mapSize: this.config.mapSize,
+        type: this.config.type,
       },
       status,
       playerCount,

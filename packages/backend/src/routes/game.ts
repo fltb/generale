@@ -16,6 +16,8 @@ import {
 } from "@generale/types/dist/api";
 
 import { GameServiceConfig } from "../game/service/GameService";
+import { sessionService } from "../services/sessionService";
+import { cookieScheme } from "./user";
 
 export const gameRoutes = new Elysia({ prefix: "/game" })
   // Decorate with the actual singleton manager instance
@@ -23,55 +25,31 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
   .post("/create", async ({ body, gameServiceManager, set }) => {
     const gameId = `game_${Date.now()}` as GameId;
 
-    const gameConfig: GameServiceConfig = { gameId, roomName: body.roomName };
-
-    // default
-    gameConfig.maxPlayers = body.gameSettings?.maxPlayers ?? 4;
-
-    // default map numeric size — will become { width, height } in final config
-    let finalMapSize: { width: number; height: number };
+    let finalMapSize: any = 'medium';
 
     if (body.gameSettings) {
-      const settings = body.gameSettings as any;
+      const settings = body.gameSettings;
 
       // discriminant must be 'type' per new schema
-      if (settings.type === "standard") {
-        // accept optional "small"/"medium"/"large" or default "medium"
-        const m = settings.mapSize ?? "medium";
-        switch (m) {
-          case "small":
-            finalMapSize = { width: 20, height: 20 };
-            break;
-          case "large":
-            finalMapSize = { width: 30, height: 30 };
-            break;
-          case "medium":
-          default:
-            finalMapSize = { width: 40, height: 40 };
-            break;
-        }
-        gameConfig.type = "standard";
-      } else if (settings.type === "custom") {
+      if (settings.type === "custom") {
         if (!settings.mapSize || typeof settings.mapSize !== "object") {
           set.status = 400;
           return { success: false, error: "custom mode requires numeric mapSize {width, height}" };
         }
         const { width, height } = settings.mapSize;
         finalMapSize = { width: Number(width), height: Number(height) };
-        gameConfig.type = "custom";
       } else {
-        // unexpected discriminant (shouldn't happen if schema validated)
-        set.status = 400;
-        return { success: false, error: "invalid gameSettings.type" };
+        finalMapSize = settings.mapSize;
       }
-    } else {
-      // no gameSettings: fall back to defaults (standard medium)
-      finalMapSize = { width: 200, height: 200 };
-      gameConfig.type = "standard";
     }
 
-    // attach final numeric map size into config
-    gameConfig.mapSize = finalMapSize;
+    const gameConfig: GameServiceConfig = {
+      gameId,
+      roomName: body.roomName,
+      mapSize: finalMapSize,
+      type: (body.gameSettings?.type as ("custom" | "standard")) ?? "standard",
+      maxPlayers: body.gameSettings?.maxPlayers ?? 8
+    };
 
     // create game
     gameServiceManager.createGame(gameConfig);
@@ -237,59 +215,65 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
     response: { 200: listGamesSuccessRespSchema, 500: errorRespSchema },
     detail: { tags: ["Game"], summary: "List active games with filters & pagination" }
   })
-  .get("/connect/:gameId/:playerId", async ({ params, gameServiceManager, set }) => {
-    const { gameId, playerId } = params;
-    const gameService = gameServiceManager.getGame(gameId as GameId);
+  .get("/connect/:gameId", async ({ params,  gameServiceManager, set, cookie: { sid } }) => {
+    const { gameId } = params as { gameId: string };
+    // require session
+    const session = sid?.value ? sessionService.get(sid.value) : undefined
+    if (!session) {
+      set.status = 401;
+      return { success: false, error: "Not authenticated (missing/expired session)" };
+    }
 
-    // 1. Check if the game resource exists at all.
+    const playerId = session.userId as PlayerId;
+
+    const gameService = gameServiceManager.getGame(gameId as GameId);
     if (!gameService) {
       set.status = 404;
       return { success: false, error: "Game not found" };
     }
 
-    // 2. Call the new, single service method to handle all logic.
-    const result = gameService.prepareConnectionForPlayer(playerId as PlayerId);
+    // service handles authorization/availability
+    const result = gameService.prepareConnectionForPlayer(playerId);
 
-    // 3. Handle failure cases based on the reason provided by the service.
     if (!result.success) {
       switch (result.reason) {
         case 'NOT_AUTHORIZED':
-          set.status = 403; // Forbidden
+          set.status = 403;
           break;
         case 'GAME_UNAVAILABLE':
-          set.status = 410; // Gone (more specific than 404)
+          set.status = 410;
           break;
         case 'INVALID_STATE':
-          set.status = 400; // Bad Request
+          set.status = 400;
           break;
         default:
-          set.status = 500; // Internal Server Error for unexpected reasons
+          set.status = 500;
       }
       return { success: false, error: result.message };
     }
 
-    // 4. Build the success response directly from the service's data.
+    // success: return domains/phase/message, but do NOT expose internal session details
     return {
       success: true,
       data: {
         gameId,
-        playerId,
-        // The service now provides the phase and domains
+        playerId, // ok to return if you want but front-end should not rely on it
         phase: result.data.phase,
         domains: result.data.domains,
         message: "Ready to connect. Please open the provided domains."
       }
     };
   }, {
-    params: gamePlayerParamsReqSchema,
-    // IMPORTANT: Update the response schema to include the new status codes and response body
+    params: gameParamsReqSchema, // update schema in shared types to only include gameId
     response: {
-      200: connectWsSuccessRespSchema, // This schema must be updated for the new 'data' shape
+      200: connectWsSuccessRespSchema,
       400: errorRespSchema,
+      401: errorRespSchema,
       403: errorRespSchema,
       404: errorRespSchema,
-      410: errorRespSchema, // Add 410 for disbanded/ended games
+      410: errorRespSchema,
       500: errorRespSchema
     },
-    detail: { tags: ["WebSocket"], summary: "Prepare WebSocket connection" }
-  })
+    detail: { tags: ["WebSocket"], summary: "Prepare WebSocket connection (session-based player)" },
+    cookie: cookieScheme
+  });
