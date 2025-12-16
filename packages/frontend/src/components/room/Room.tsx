@@ -227,8 +227,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   const isHost = () => (room()?.hostId ?? "") === selfId();
 
   return (
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
-      <div class="md:col-span-1 space-y-4">
+    <div class="p-6">
         <div class="card bg-base-200 p-4">
           <div class="flex items-center justify-between">
             <div>
@@ -256,20 +255,6 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         </div>
 
         <div class="card bg-base-200 p-4">
-          <div class="text-md font-medium mb-2">操作</div>
-          <PreGameControls
-            isHost={isHost()}
-            started={room()?.started ?? false}
-            onReadyToggle={(ready: boolean) => onToggleReadyForSelf(ready)}
-            onStartGame={isHost() ? onStartGame : undefined}
-            onLeave={onLeave}
-            onDisband={isHost() ? onDisband : undefined}
-          />
-        </div>
-      </div>
-
-      <div class="md:col-span-2 space-y-4">
-        <div class="card bg-base-200 p-4">
           <div class="text-lg font-semibold mb-2">房间设置</div>
           <PreGameRoomStateFrom
             state={room()?.gameSetting ?? (makeEmptyRoom().gameSetting)}
@@ -284,7 +269,19 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
             onChange={(next) => onMapChange(next)}
           />
         </div>
-      </div>
+
+
+        <div class="card bg-base-200 p-4">
+          <div class="text-md font-medium mb-2">操作</div>
+          <PreGameControls
+            isHost={isHost()}
+            started={room()?.started ?? false}
+            onReadyToggle={(ready: boolean) => onToggleReadyForSelf(ready)}
+            onStartGame={isHost() ? onStartGame : undefined}
+            onLeave={onLeave}
+            onDisband={isHost() ? onDisband : undefined}
+          />
+        </div>
 
       <div class="alert alert-info shadow-lg">
         <div>

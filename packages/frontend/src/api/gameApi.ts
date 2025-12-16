@@ -48,7 +48,7 @@ export async function listGamesApi(query?: Partial<ListGamesQuery>): Promise<Lis
  */
 export async function prepareConnectApi(gameId: string): Promise<ConnectWsSuccessResp> {
   return api<ConnectWsSuccessResp, ErrorResp>(
-    `/api/game/connect/${encodeURIComponent(gameId)}}`,
+    `/api/game/connect/${encodeURIComponent(gameId)}`,
     { method: "GET" }
   );
 }

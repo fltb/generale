@@ -208,6 +208,18 @@ standard: 快速，不可更改设置，只能选择地图大小(small, medium, 
 
 custom: 可以自定义游戏参数。create 中目前只有游戏地图大小和玩家人数，其他都在创建之后设置，暂时不用放。
 
+在游戏房间中，对 standard 模式隐藏 gamesettings，隐藏地图频率等设置，仅保留 small medium large 等预置 size
+
+对 custom 模式开放所有修改
+
+暂时隐藏 imported
+
+bug：
+
+- 需要在玩家连接之后主动发送状态，让玩家列表在连接之后能正常显示
+- 需要修复下方的准备按钮功能
+- 隐藏 fog 的设置
+
 #### 游戏列表功能
 
 使用自己定义的 subconnection 逻辑创建一个 room list 同步列表并显示。点击可以胶乳房间

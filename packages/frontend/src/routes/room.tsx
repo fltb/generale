@@ -5,18 +5,16 @@ import {
   Show,
   onCleanup,
 } from "solid-js";
-import { useLocation, useNavigate, useParams } from "@solidjs/router";
+import { useNavigate, useParams } from "@solidjs/router";
 import RoomWithSync from "~/components/room/Room";
 import { prepareConnectApi } from "~/api/gameApi"; // 使用你提供的 service
 // 如果你有 useAuth，可以在这里使用以显示用户名等
 // import { useAuth } from "~/hooks/useAuth";
 
 const RoomRoute: Component = () => {
-  const loc = useLocation();
   const params = useParams<{ id?: string }>();
   const navigate = useNavigate();
 
-  const [gameId, setGameId] = createSignal<string | null>(null);
   const [playerId, setPlayerId] = createSignal<string | null>(null); // 前端不再负责提供 playerId，但 接受后端返回（可选）
   const [playerName, setPlayerName] = createSignal<string | null>(null);
   const [domainPrimary, setDomainPrimary] = createSignal<string | null>(null);
@@ -24,31 +22,11 @@ const RoomRoute: Component = () => {
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
-  // read game id from route param (/game/:id) or fallback to ?id=...
-  createEffect(() => {
-    const paramId = params.id ?? null;
-    if (paramId) {
-      setError(null);
-      setGameId(paramId);
-      return;
-    }
-
-    const q = new URLSearchParams(loc.search);
-    const qid = q.get("id");
-    if (qid) {
-      setError(null);
-      setGameId(qid);
-    } else {
-      setGameId(null);
-      setError("Missing game id in URL — use route /game/:id or add ?id=...");
-    }
-  });
-
   // When we have a gameId, call prepareConnectApi once to get domains/phase (server uses session to find player)
   createEffect(() => {
-    const id = gameId();
-    if (!id) return;
-
+    if (!params.id) return;
+    const id = params.id;
+    console.log('id', id)
     // reset previous state
     setError(null);
     setDomainPrimary(null);
@@ -149,7 +127,7 @@ const RoomRoute: Component = () => {
         <RoomWithSync
           domain={domainPrimary()!}
           playerId={playerId() ?? ""}
-          gameId={gameId()!}
+          gameId={params.id!}
           playerName={playerName() ?? "Guest"}
           autoOpen={true}
         />

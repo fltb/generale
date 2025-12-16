@@ -23,7 +23,7 @@ function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
-const cookieScheme = t.Cookie({
+export const cookieScheme = t.Cookie({
   sid: t.String()
 })
 

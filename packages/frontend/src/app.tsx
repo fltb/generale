@@ -11,6 +11,7 @@ import Nav from "./components/Nav";
 import { Suspense } from "solid-js";
 import LoginPage from "./routes/login";
 import { WebSocketProvider } from "./hooks/useWebsocket";
+import RoomRoute from "./routes/room";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="/" component={Home} />
               <Route path="/test" component={Test} />
               <Route path="/login" component={LoginPage} />
+              <Route path="/game/:id" component={RoomRoute} />
             </Router>
           </WebSocketProvider>
         </AuthProvider>

@@ -62,11 +62,8 @@ export function RoomList() {
     setConnectError(null);
     try {
       // prepareConnectApi now only needs gameId; server uses session cookie to find player
-      const resp = await prepareConnectApi(gameId);
-      setConnectResult(resp.data);
-
       // navigate to room page
-      navigate(`/game/${encodeURIComponent(gameId)}`);
+      navigate(`/game/${gameId}`);
     } catch (err: any) {
       console.error("prepareConnect failed", err);
       setConnectError(err?.message ?? "连接准备失败");
