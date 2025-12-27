@@ -23,8 +23,9 @@ function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
+// 将 sid 设为可选，避免在没有 cookie 时触发 422 校验错误
 export const cookieScheme = t.Cookie({
-  sid: t.String()
+  sid: t.Optional(t.String())
 })
 
 export const userRoutes = new Elysia()

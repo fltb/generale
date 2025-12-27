@@ -1,4 +1,4 @@
-import { type PreGameRoomState, TileType } from "@generale/types";
+import { PreGameMapType, type PreGameRoomState, TileType } from "@generale/types";
 import {
     type Component,
     For,
@@ -7,6 +7,7 @@ import {
 
 export interface PreGameRoomStateFromProps {
     state: PreGameRoomState["gameSetting"];
+    map: PreGameRoomState["mapSetting"];
     onChange: (state: PreGameRoomState["gameSetting"]) => void;
 }
 
@@ -101,7 +102,7 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
                 />
             </div>
 
-            <Show when={Object.keys(props.state.tileGrow ?? {}).length > 0}>
+            <Show when={Object.keys(props.state.tileGrow ?? {}).length > 0 && props.map.type != PreGameMapType.Random}>
                 <div>
                     <label class="label">
                         <span class="label-text">地块增长规则 (tileGrow)</span>
@@ -109,7 +110,11 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
                     </label>
 
                     <div class="grid gap-4">
-                        <For each={Object.entries(props.state.tileGrow ?? {}) as [TileType, { duration?: number; growth?: number }][]}>
+                        <For each={(Object.entries(
+                            props.state.tileGrow ?? {}) as
+                            [TileType, { duration?: number; growth?: number }][])
+                            .filter(([type, _]) => type != TileType.Fog)
+                        }>
                             {([tileType, cfg]) => {
                                 const dur = cfg?.duration ?? 0;
                                 const growth = cfg?.growth ?? 0;

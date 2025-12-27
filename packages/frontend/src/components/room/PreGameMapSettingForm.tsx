@@ -25,17 +25,25 @@ export interface PreGameMapSettingFormProps {
 export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (props) => {
   const tileTypes = Object.values(TileType) as TileType[];
 
+  // 前端写死的预置 size（与 GameService 中的映射一致）
+  const presetSizes = {
+    small: { width: 10, height: 10 },
+    medium: { width: 20, height: 20 },
+    large: { width: 40, height: 40 },
+  } as const;
+
   // 切换地图类型时尽量保留公共字段（width/height/tileFrequency）
   const switchTo = (type: PreGameMapType) => {
     let next: PreGameMapSetting;
     const current = props.setting as any;
 
     if (type === PreGameMapType.Random) {
+      // compactRandom: 默认选 medium（20x20），并不暴露 tileFrequency
       next = {
         type,
-        width: current.width ?? 32,
-        height: current.height ?? 24,
-        tileFrequency: { ...(current.tileFrequency ?? {}) },
+        width: current.width ?? presetSizes.medium.width,
+        height: current.height ?? presetSizes.medium.height,
+        tileFrequency: {}, // keep an empty object (not shown in compact mode)
       } as PreGameRandomMapSetting;
     } else if (type === PreGameMapType.Custom) {
       next = {
@@ -97,6 +105,25 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
     }
   };
 
+  // 预置尺寸选择（仅在 compactRandom 模式下对 Random 可见）
+  const applyPresetSize = (preset: keyof typeof presetSizes) => {
+    const cur = props.setting;
+    if (cur.type === PreGameMapType.Random || cur.type === PreGameMapType.Custom) {
+      const { width, height } = presetSizes[preset];
+      const next = { ...(cur as any), width, height } as PreGameRandomMapSetting | PreGameCustomMapSetting;
+      props.onChange(next);
+    } else {
+      // 如果当前不是 Random，但在 UI 点击了 preset，我们先切换到 Random（compact），然后赋值
+      const next: PreGameMapSetting = {
+        type: PreGameMapType.Random,
+        width: presetSizes[preset].width,
+        height: presetSizes[preset].height,
+        tileFrequency: {},
+      } as PreGameRandomMapSetting;
+      props.onChange(next);
+    }
+  };
+
   // 一些快速操作：均衡所有地形频率、重置为默认尺寸
   const balanceFrequencies = () => {
     const cur = props.setting;
@@ -116,6 +143,8 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
       props.onChange(next);
     }
   };
+
+  const isCompactRandom = true;
 
   return (
     <div class="p-4 bg-base-100 rounded-lg shadow-sm space-y-4">
@@ -145,6 +174,7 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
         </div>
       </div>
 
+      {/* 如果是 Random 或 Custom 才需要显示尺寸；但当 compactRandom 且当前为 Random 时，尺寸以预置呈现 */}
       <Show when={props.setting.type === PreGameMapType.Random || props.setting.type === PreGameMapType.Custom}>
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
@@ -155,9 +185,10 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
               type="number"
               min={1}
               step={1}
-              value={String((props.setting as any).width ?? 32)}
+              value={String((props.setting as any).width ?? (isCompactRandom ? presetSizes.medium.width : 32))}
               class="input input-bordered w-40"
               onInput={(e) => setWidth(Number((e.currentTarget as HTMLInputElement).value))}
+              disabled={isCompactRandom && props.setting.type === PreGameMapType.Random} // compact 模式下，尺寸通过 preset 控制，文本框禁用以避免歧义
             />
           </div>
 
@@ -169,50 +200,69 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
               type="number"
               min={1}
               step={1}
-              value={String((props.setting as any).height ?? 24)}
+              value={String((props.setting as any).height ?? (isCompactRandom ? presetSizes.medium.height : 24))}
               class="input input-bordered w-40"
               onInput={(e) => setHeight(Number((e.currentTarget as HTMLInputElement).value))}
+              disabled={isCompactRandom && props.setting.type === PreGameMapType.Random}
             />
           </div>
         </div>
 
-        <div>
-          <label class="label">
-            <span class="label-text">地形频率 (tileFrequency)</span>
-            <span class="label-text-alt">{'数值越大越常见 (>=0)'}</span>
-          </label>
-
-          <div class="grid gap-3">
-            <For each={tileTypes}>
-              {(t) => {
-                const val = ((props.setting as any).tileFrequency ?? {})[t] ?? 0;
-                return (
-                  <div class="flex items-center gap-3">
-                    <div class="w-32">{t}</div>
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={String(val)}
-                      class="input input-bordered w-28"
-                      onInput={(e) => setTileFreq(t, Number((e.currentTarget as HTMLInputElement).value))}
-                    />
-                    <div class="text-sm opacity-60">当前: {val}</div>
-                  </div>
-                );
-              }}
-            </For>
+        {/* compactRandom: 显示预置按钮（small/medium/large），并隐藏 tileFrequency 等详细项 */}
+        <Show when={isCompactRandom && props.setting.type === PreGameMapType.Random}>
+          <div>
+            <label class="label">
+              <span class="label-text">预置尺寸（房间模式）</span>
+              <span class="label-text-alt">前端临时写死 small / medium / large</span>
+            </label>
+            <div class="btn-group">
+              <button class={`btn btn-xs`} onClick={() => applyPresetSize("small")}>Small (10×10)</button>
+              <button class={`btn btn-xs`} onClick={() => applyPresetSize("medium")}>Medium (20×20)</button>
+              <button class={`btn btn-xs`} onClick={() => applyPresetSize("large")}>Large (40×40)</button>
+            </div>
           </div>
+        </Show>
 
-          <div class="flex gap-2 mt-3">
-            <button class="btn btn-xs" onClick={() => balanceFrequencies()}>
-              均衡频率
-            </button>
-            <button class="btn btn-xs" onClick={() => resetSize()}>
-              重置尺寸
-            </button>
+        {/* 当不是 compactRandom 时，显示地形频率编辑 */}
+        <Show when={!isCompactRandom}>
+          <div>
+            <label class="label">
+              <span class="label-text">地形频率 (tileFrequency)</span>
+              <span class="label-text-alt">{'数值越大越常见 (>=0)'}</span>
+            </label>
+
+            <div class="grid gap-3">
+              <For each={tileTypes}>
+                {(t) => {
+                  const val = ((props.setting as any).tileFrequency ?? {})[t] ?? 0;
+                  return (
+                    <div class="flex items-center gap-3">
+                      <div class="w-32">{t}</div>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={String(val)}
+                        class="input input-bordered w-28"
+                        onInput={(e) => setTileFreq(t, Number((e.currentTarget as HTMLInputElement).value))}
+                      />
+                      <div class="text-sm opacity-60">当前: {val}</div>
+                    </div>
+                  );
+                }}
+              </For>
+            </div>
+
+            <div class="flex gap-2 mt-3">
+              <button class="btn btn-xs" onClick={() => balanceFrequencies()}>
+                均衡频率
+              </button>
+              <button class="btn btn-xs" onClick={() => resetSize()}>
+                重置尺寸
+              </button>
+            </div>
           </div>
-        </div>
+        </Show>
 
         <Show when={props.setting.type === PreGameMapType.Custom}>
           <div>

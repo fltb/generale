@@ -258,6 +258,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           <div class="text-lg font-semibold mb-2">房间设置</div>
           <PreGameRoomStateFrom
             state={room()?.gameSetting ?? (makeEmptyRoom().gameSetting)}
+            map={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
             onChange={(s) => onSettingChange(s)}
           />
         </div>

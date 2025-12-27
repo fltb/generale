@@ -155,6 +155,8 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     }
     // 如果没人了，自动销毁
     if (this.state.players.length === 0) this.destroy();
+
+    this.broadcastState();
   }
 
   /** 房主转让 */

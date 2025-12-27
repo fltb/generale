@@ -33,8 +33,8 @@ export const profileRoutes = new Elysia({prefix: '/profile'})
     }
   )
   .post('/update', 
-    async ({ body, cookie: { session }, set }) => {
-      const sessionId = session?.value;
+    async ({ body, cookie: { sid }, set }) => {
+      const sessionId = sid?.value;
       const userId = sessionId ? sessionService.get(sessionId)?.userId : undefined;
       if (!userId) {
         set.status = 401;
@@ -52,8 +52,8 @@ export const profileRoutes = new Elysia({prefix: '/profile'})
     }
   )
   .post('/upload', 
-    async ({ body: { file }, cookie: { session }, set }) => {
-      const sessionId = session?.value;
+    async ({ body: { file }, cookie: { sid }, set }) => {
+      const sessionId = sid?.value;
       const userId = sessionId ? sessionService.get(sessionId)?.userId : undefined;
       if (!userId) {
         set.status = 401;
