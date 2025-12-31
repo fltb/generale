@@ -10,6 +10,7 @@ import {
   SyncedPreGameServerEventPayloadType,
   type GameId,
   type PlayerId,
+  GamePhase,
 } from "@generale/types";
 import { PreGameRoomStateFrom } from "./StateForm";
 import { PlayerList } from "./PlayerList";
@@ -23,6 +24,10 @@ export interface RoomWithSyncProps {
   gameId: GameId;
   playerName: string;
   autoOpen?: boolean; // 是否自动 open domain（默认 true）
+    onStateUpdate?: (payload: {
+    phase: GamePhase;
+    event?: SyncedPreGameServerEventPayload;
+  }) => void;
 }
 
 /** 提供一个 minimal empty PreGameRoomState，供初始 state 使用 */
@@ -122,16 +127,21 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         case SyncedPreGameServerEventPayloadType.KICKED:
           setNotice(evt.reason ?? "你已被踢出房间");
           setIsKicked(true);
+          // notify parent
+          props.onStateUpdate?.({ phase: GamePhase.PREGAME, event: evt });
           break;
         case SyncedPreGameServerEventPayloadType.DISBANDED:
           setNotice(evt.reason ?? "房间已被解散");
+          props.onStateUpdate?.({ phase: GamePhase.DISBANDED, event: evt });
           break;
         case SyncedPreGameServerEventPayloadType.GAME_STARTED:
           setNotice("游戏已开始");
+          // 当收到 GAME_STARTED 时，告知父组件 phase 已切为 INGAME（由服务器权威决定）
+          props.onStateUpdate?.({ phase: GamePhase.INGAME, event: evt });
           break;
         default:
-          // fallback: show generic custom payload
           setNotice(JSON.stringify(evt));
+          props.onStateUpdate?.({ phase: GamePhase.PREGAME, event: evt });
       }
     } catch (e) {
       console.warn("handleCustomEvent error", e, evt);
