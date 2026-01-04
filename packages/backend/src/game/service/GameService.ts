@@ -151,6 +151,7 @@ export class GameService {
 
       // 将玩家添加到 PreGameInstance
       if (this.preGameInstance) {
+        console.debug(`[GameService]: Adding player: ${userid} ${username} to preGameInstance`)
         const result = this.preGameInstance.addPlayer({ id: userid, name: username }, this.adaptToPregameConnector(connector));
         if (!result.success) {
           connector.close(4003, 'Failed to add to pregame');

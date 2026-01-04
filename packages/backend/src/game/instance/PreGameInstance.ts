@@ -35,6 +35,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   private destroyed = false;
   private onStateChangeCallbacks: Array<(state: PreGameRoomState) => void> = [];
 
+  private bannedUntil: Map<PlayerId, number> = new Map();
+  private DEFAULT_KICK_BAN_MS = 60 * 1000; // 1 minute, 可改
+
+
   constructor(initialState: PreGameRoomState, initialConnectors: Map<PlayerId, PreGameServerConnector>) {
     this.state = structuredClone(initialState);
     this.connectors = new Map(initialConnectors);
@@ -130,8 +134,26 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
   /** 踢人（仅房主） */
   private kickPlayer(target: PlayerId) {
+    // set ban
+    const until = Date.now() + this.DEFAULT_KICK_BAN_MS;
+    this.bannedUntil.set(target, until);
+
+    // send kicked event (so client can show reason)
     this.sendKickEvent(target, 'You have been kicked from the room.');
-    this.removePlayer(target);
+
+    // ensure we close their connector and remove player
+    try {
+      // try to close connector (if exists)
+      const conn = this.connectors.get(target);
+      if (conn) {
+        try { conn.close(4000, "kicked"); } catch { }
+        // connector close will call handleDisconnect/removePlayer via handlers (idempotent)
+      }
+      // defensively remove player now
+      this.removePlayer(target);
+    } catch (e) {
+      console.warn('[PreGameInstance] kickPlayer removal error', e);
+    }
   }
 
   private sendKickEvent(pid: PlayerId, reason: string) {
@@ -357,6 +379,16 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       return { success: false, message: msg };
     }
 
+    // ban check
+    const now = Date.now();
+    const until = this.bannedUntil.get(playerId);
+    if (until && now < until) {
+      const remain = Math.ceil((until - now) / 1000);
+      const msg = `[PreGameInstance] Player ${playerId} is temporarily banned (${remain}s left)`;
+      console.warn(msg);
+      return { success: false, message: `You were kicked. Please try again in ${remain} seconds.` };
+    }
+
     if (this.state.players.length >= this.state.playerLimit) {
       const msg = `[PreGameInstance] Room is full, cannot add player ${playerId}`;
       console.warn(msg);
@@ -371,7 +403,6 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
     return { success: true };
   }
-
   /** 动态添加玩家（用于 GameService） */
   public addPlayer(user: { id: PlayerId, name: string }, connector: PreGameServerConnector): { success: true } | { success: false, message: string } {
     const playerId = user.id;

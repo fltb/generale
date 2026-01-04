@@ -94,6 +94,10 @@ export function useSyncedState<
           console.error(`[useSyncedState:${domain}] onClose handler error`, e);
         }
       });
+
+      if (!sub.ready) {
+        wsMgr.openDomain(domain, context);
+      }
     }
   }
 
