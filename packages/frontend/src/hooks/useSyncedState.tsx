@@ -18,7 +18,8 @@ export function useSyncedState<
   initialVersion = 0,
   applyEvent,
   context = {},
-  onCustomEvent = (_) => {},
+  onCustomEvent = () => {},
+  onConnectionClosed = () => {},
   autoOpen = true,
 }: {
   domain: string;
@@ -27,6 +28,7 @@ export function useSyncedState<
   applyEvent: (state: TState, event: TAction) => TState;
   onCustomEvent?: (event: Custom) => void;
   context?: Record<string, any>;
+  onConnectionClosed?: (info: { code?: number; reason?: string }) => void;
   autoOpen?: boolean;
 }) {
   // manager from hook (the ClientConnectionManager)
@@ -221,6 +223,7 @@ export function useSyncedState<
 
   function _onClose(code?: number, reason?: string) {
     console.debug(`[useSyncedState:${domain}] sub closed`, code, reason);
+    onConnectionClosed({ code, reason });
   }
 
   // mount: if sub already exists (unlikely), attach handlers; else do nothing here.

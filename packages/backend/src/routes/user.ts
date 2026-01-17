@@ -227,7 +227,12 @@ export const userRoutes = new Elysia()
       // `body` is now fully typed
       const { username, password } = body;
       const user = await userService.findByUsername(username)
-      if (!user || !userService.verifyPassword(password, user.password)) {
+      if (!user) {
+        set.status = 401
+        return { error: 'user not found' }
+
+      }
+      if (!userService.verifyPassword(password, user.password)) {
         set.status = 401
         return { error: 'invalid credentials' }
       }

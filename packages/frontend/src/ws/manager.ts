@@ -349,7 +349,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
             const code = payload?.code;
             const reason = payload?.reason;
             sub._triggerClose(code, reason);
-            // keep the sub object but mark closed
+            this.deleteSub(domain);
           }
           break;
         }

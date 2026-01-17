@@ -1,4 +1,3 @@
-// src/components/RoomWithSync.tsx
 import { type Component, createSignal, createEffect, Show } from "solid-js";
 import {
   type SyncedPreGameState,
@@ -23,9 +22,14 @@ export interface RoomWithSyncProps {
   playerId: PlayerId;
   gameId: GameId;
   playerName: string;
-  autoOpen?: boolean; // 是否自动 open domain（默认 true）
-    onStateUpdate?: (payload: {
-    phase: GamePhase;
+  autoOpen?: boolean;
+  /**
+   * 父级回调：RoomWithSync 会在本地 state 更新 / server custom event 等场景调用此回调
+   * 参数示例:
+   * { phase: GamePhase.PREGAME, state: SyncedPreGameState }
+   * { phase: GamePhase.INGAME, event: { type: 'GAME_STARTED', payload: {...} } }
+   */
+  onStateUpdate?: (payload: {
     event?: SyncedPreGameServerEventPayload;
   }) => void;
 }
@@ -113,13 +117,12 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   const [notice, setNotice] = createSignal<string | null>(null);
   const [isKicked, setIsKicked] = createSignal(false);
 
-  // initial synced state: a minimal SyncedPreGameState with empty room
   const initialSyncedState: SyncedPreGameState = {
     room: makeEmptyRoom(props.gameId),
     selfId: props.playerId,
   };
 
-  // onCustomEvent handler (server CUSTOM events)
+  // handle custom events (and notify parent)
   function handleCustomEvent(evt: SyncedPreGameServerEventPayload) {
     try {
       const t = evt.type;
@@ -128,20 +131,20 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           setNotice(evt.reason ?? "你已被踢出房间");
           setIsKicked(true);
           // notify parent
-          props.onStateUpdate?.({ phase: GamePhase.PREGAME, event: evt });
+          props.onStateUpdate?.({ event: evt });
           break;
         case SyncedPreGameServerEventPayloadType.DISBANDED:
           setNotice(evt.reason ?? "房间已被解散");
-          props.onStateUpdate?.({ phase: GamePhase.DISBANDED, event: evt });
+          props.onStateUpdate?.({ event: evt });
           break;
         case SyncedPreGameServerEventPayloadType.GAME_STARTED:
           setNotice("游戏已开始");
           // 当收到 GAME_STARTED 时，告知父组件 phase 已切为 INGAME（由服务器权威决定）
-          props.onStateUpdate?.({ phase: GamePhase.INGAME, event: evt });
+          props.onStateUpdate?.({ event: evt });
           break;
         default:
           setNotice(JSON.stringify(evt));
-          props.onStateUpdate?.({ phase: GamePhase.PREGAME, event: evt });
+          props.onStateUpdate?.({ event: evt });
       }
     } catch (e) {
       console.warn("handleCustomEvent error", e, evt);
@@ -156,7 +159,16 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     applyEvent: applyPregameEventLocal,
     onCustomEvent: handleCustomEvent,
     context: { userid: props.playerId, username: props.playerName },
-    autoOpen: false, // we'll call connect() below
+    onConnectionClosed: ({ code, reason }) => {
+      console.warn("connection closed", code, reason);
+      if (code === 4003) {
+        handleCustomEvent({
+          type: SyncedPreGameServerEventPayloadType.KICKED,
+          reason: reason || "无法加入房间",
+        });
+      }
+    },
+    autoOpen: false,
   });
 
   // auto connect when domain + playerId available
@@ -170,26 +182,20 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     }
   });
 
-  // UI callbacks adapted from original Room implementation
   const onSettingChange = (nextSetting: Partial<PreGameRoomState["gameSetting"]>) => {
     const action = { type: SyncedPreGameClientActionTypes.CHANGE_SETTING, payload: nextSetting };
     synced.dispatch(action);
   };
 
-  // ready toggles for self
   const onToggleReadyForSelf = (ready: boolean) => {
     const actionType = ready ? SyncedPreGameClientActionTypes.READY : SyncedPreGameClientActionTypes.UNREADY;
     synced.dispatch({ type: actionType });
   };
 
-  // called by PlayerList when a player's ready button is clicked.
-  // In our UI only the self player's ready button is shown, so only handle self here.
   const onToggleReadyForPlayer = (playerId: string, ready: boolean) => {
     if (playerId === synced.state().selfId) {
       onToggleReadyForSelf(ready);
     } else {
-      // not allowed in-client to change other players' ready state;
-      // optionally we could send a server request if protocol supports it.
       console.warn("Attempted to toggle ready for other player (ignored):", playerId);
     }
   };
@@ -210,7 +216,6 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
 
   const onLeave = () => {
     synced.dispatch({ type: SyncedPreGameClientActionTypes.LEAVE_ROOM });
-    // optionally close sub
     synced.disconnect();
   };
 
@@ -218,12 +223,10 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     synced.dispatch({ type: SyncedPreGameClientActionTypes.DISBAND_ROOM });
   };
 
-  // map change -> dispatch CHANGE_MAP
   const onMapChange = (nextMapSetting: PreGameRoomState["mapSetting"]) => {
     synced.dispatch({ type: SyncedPreGameClientActionTypes.CHANGE_MAP, payload: nextMapSetting } as any);
   };
 
-  // derived values
   const syncedState = () => {
     try {
       return synced.state();
@@ -238,61 +241,61 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
 
   return (
     <div class="p-6">
-        <div class="card bg-base-200 p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="text-lg font-semibold">房间信息</div>
-              <div class="text-sm opacity-70">Game ID: {room()?.gameId}</div>
-            </div>
-            <div>
-              <div class="opacity-70 text-sm">
-                玩家上限 {room()?.playerLimit} · 队伍数 {room()?.teamCount}
-              </div>
+      <div class="card bg-base-200 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-lg font-semibold">房间信息</div>
+            <div class="text-sm opacity-70">Game ID: {room()?.gameId}</div>
+          </div>
+          <div>
+            <div class="opacity-70 text-sm">
+              玩家上限 {room()?.playerLimit} · 队伍数 {room()?.teamCount}
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="card bg-base-200 p-4">
-          <div class="text-md font-medium mb-2">玩家列表</div>
-          <PlayerList
-            players={room()?.players ?? []}
-            selfId={selfId()}
-            hostId={room()?.hostId ?? ""}
-            onToggleReady={(playerId, ready) => onToggleReadyForPlayer(playerId, ready)}
-            onKick={isHost() ? onKick : undefined}
-            onTransferHost={isHost() ? onTransferHost : undefined}
-          />
-        </div>
+      <div class="card bg-base-200 p-4">
+        <div class="text-md font-medium mb-2">玩家列表</div>
+        <PlayerList
+          players={room()?.players ?? []}
+          selfId={selfId()}
+          hostId={room()?.hostId ?? ""}
+          onToggleReady={(playerId, ready) => onToggleReadyForPlayer(playerId, ready)}
+          onKick={isHost() ? onKick : undefined}
+          onTransferHost={isHost() ? onTransferHost : undefined}
+        />
+      </div>
 
-        <div class="card bg-base-200 p-4">
-          <div class="text-lg font-semibold mb-2">房间设置</div>
-          <PreGameRoomStateFrom
-            state={room()?.gameSetting ?? (makeEmptyRoom().gameSetting)}
-            map={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
-            onChange={(s) => onSettingChange(s)}
-          />
-        </div>
+      <div class="card bg-base-200 p-4">
+        <div class="text-lg font-semibold mb-2">房间设置</div>
+        <PreGameRoomStateFrom
+          state={room()?.gameSetting ?? (makeEmptyRoom().gameSetting)}
+          map={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
+          onChange={(s) => onSettingChange(s)}
+        />
+      </div>
 
-        <div class="card bg-base-200 p-4">
-          <div class="text-md font-medium mb-2">地图设置</div>
-          <PreGameMapSettingForm
-            setting={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
-            onChange={(next) => onMapChange(next)}
-          />
-        </div>
+      <div class="card bg-base-200 p-4">
+        <div class="text-md font-medium mb-2">地图设置</div>
+        <PreGameMapSettingForm
+          setting={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
+          onChange={(next) => onMapChange(next)}
+        />
+      </div>
 
 
-        <div class="card bg-base-200 p-4">
-          <div class="text-md font-medium mb-2">操作</div>
-          <PreGameControls
-            isHost={isHost()}
-            started={room()?.started ?? false}
-            onReadyToggle={(ready: boolean) => onToggleReadyForSelf(ready)}
-            onStartGame={isHost() ? onStartGame : undefined}
-            onLeave={onLeave}
-            onDisband={isHost() ? onDisband : undefined}
-          />
-        </div>
+      <div class="card bg-base-200 p-4">
+        <div class="text-md font-medium mb-2">操作</div>
+        <PreGameControls
+          isHost={isHost()}
+          started={room()?.started ?? false}
+          onReadyToggle={(ready: boolean) => onToggleReadyForSelf(ready)}
+          onStartGame={isHost() ? onStartGame : undefined}
+          onLeave={onLeave}
+          onDisband={isHost() ? onDisband : undefined}
+        />
+      </div>
 
       <div class="alert alert-info shadow-lg">
         <div>
