@@ -105,8 +105,8 @@ export default function LoginPage() {
             username: regUsername(),
             password: regPassword(),
           });
-          // 自动登录成功，跳转到 profile
-          nav("/profile");
+          // 自动登录成功，跳转到 /
+          nav("/");
           return; // 已跳转，不再执行后续清理
         } catch (loginErr: any) {
           // 自动登录失败：提示用户并切回登录 tab（可按需改为留在当前页）

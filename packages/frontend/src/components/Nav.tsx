@@ -74,12 +74,6 @@ export default function Nav(): JSX.Element {
                   >
                     Login
                   </A>
-                  <A
-                    href="/register"
-                    class="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20"
-                  >
-                    Register
-                  </A>
                 </div>
               }
             >
