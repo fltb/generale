@@ -133,10 +133,16 @@ export class GameService {
       const ctx = connector.context;
       const { userid, username } = ctx;
 
-      if (!userid || !username) {
-        connector.close(4001, 'Missing userid or username');
+      if (!userid) {
+        connector.close(4001, 'Missing userid');
         return;
       }
+
+      if (!username) {
+        connector.close(4001, 'Missing username');
+        return;
+      }
+
 
       // 检查阶段是否允许 pregame 连接
       if (this.phase !== GamePhase.PREGAME) {
@@ -169,8 +175,13 @@ export class GameService {
       const ctx = connector.context;
       const { userid, username } = ctx;
 
-      if (!userid || !username) {
-        connector.close(4001, 'Missing userid or username');
+      if (!userid) {
+        connector.close(4001, 'Missing userid');
+        return;
+      }
+
+      if (!username) {
+        connector.close(4001, 'Missing username');
         return;
       }
 
@@ -199,8 +210,13 @@ export class GameService {
       const ctx = connector.context;
       const { userid, username } = ctx;
 
-      if (!userid || !username) {
-        connector.close(4001, 'Missing userid or username');
+      if (!userid) {
+        connector.close(4001, 'Missing userid');
+        return;
+      }
+
+      if (!username) {
+        connector.close(4001, 'Missing username');
         return;
       }
 

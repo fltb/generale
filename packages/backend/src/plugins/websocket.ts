@@ -359,7 +359,7 @@ export const websocketPlugin = new Elysia()
         wsData.manager = manager;
 
         // 使用 session info 填充 manager context（保持最新）
-        manager.setContext({ userid: userId });
+        manager.setContext({ userid: userId, username: username || "no-name" });
         ws.send({ type: "reconnection_ack", payload: { success: true, connectionId } });
       } else {
         // 新连接
@@ -369,7 +369,7 @@ export const websocketPlugin = new Elysia()
         wsData.manager = manager;
         connectionManagers.set(connectionId, manager);
 
-        manager.setContext({ userid: userId });
+        manager.setContext({ userid: userId, username: username || "no-name" });
         ws.send({ type: "connection_ack", payload: { connectionId } });
       }
 
