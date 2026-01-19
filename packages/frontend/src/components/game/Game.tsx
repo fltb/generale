@@ -175,8 +175,17 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
                 >
 
                     <MapRender state={mergedState()} onOperationQueued={handleOperationQueued} />
-                 </Application>
+                </Application>
             </div>
+            <div class="card bg-base-200 p-3">
+                <div class="font-semibold mb-2">
+                    SyncedGameState（实时）
+                </div>
+                <pre class="text-xs bg-base-300 p-2 rounded overflow-auto max-h-[400px]">
+                    {JSON.stringify(mergedState(), null, 2)}
+                </pre>
+            </div>
+
 
             <div class="card bg-base-200 p-3 mt-3">
                 <div>通知：{notice()}</div>

@@ -143,15 +143,19 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     
     private handleClientEvent(pid: PlayerId, evt: SyncedGameClientActions) {
         const synced = this.syncData.get(pid)!;
+        console.debug(`[game instance (pid: ${pid})] recv event`, evt);
         if (synced.lastConfirmedOp >= evt.optimisticId) {
+            console.debug(`[game instance (pid: ${pid})] lastConfirmedOp(${synced.lastConfirmedOp}) >= evt.optimisticId(${evt.optimisticId}), giveup`);
             return;
         }
         switch (evt.type) {
             case SyncedGameClientActionTypes.PUSH: {
                 synced.syncedState.playerOperationQueue = [...synced.syncedState.playerOperationQueue, ...evt.payload];
+                console.debug(`[game instance (pid: ${pid})] set playerOperationQueue to`, synced.syncedState.playerOperationQueue);
             } break;
             case SyncedGameClientActionTypes.CLEAN_ALL: {
                 synced.syncedState.playerOperationQueue = [];
+                console.debug(`[game instance (pid: ${pid})] clear playerOperationQueue to`, synced.syncedState.playerOperationQueue);
             } break;
         }
         synced.lastConfirmedOp = evt.optimisticId;
