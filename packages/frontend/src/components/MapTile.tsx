@@ -64,14 +64,19 @@ export const MapTile: Component<MapTileProps> = (props) => {
     graphics.stroke({ width: 1, color: 0x000000, alpha: 0.15 });
   });
 
-  // 图标绘制
+  // 图标绘制（防御性：clear + removeChildren）
   createEffect(() => {
     const graphics = iconGraphics();
     const key = iconGcKey();
     if (!graphics) return;
 
     graphics.clear();
-    graphics.removeChildren();
+    // removeChildren 可能将 child 移除并触发销毁/parent 变更，保持 try/catch
+    try {
+      graphics.removeChildren();
+    } catch (err) {
+      console.warn("iconGraphics.removeChildren failed", err);
+    }
 
     if (key) {
       const iconSize = Math.round(props.size * 0.6);
@@ -95,15 +100,12 @@ export const MapTile: Component<MapTileProps> = (props) => {
     props.onClick?.(props.coord);
   };
 
+  // --- 关键改动：ref wrapper，必须返回函数或 undefined ---
   return (
     <P.Container x={x} y={y} interactive buttonMode onpointerdown={handlePointerDown}>
-      {/* 背景方块 */}
-      <P.Graphics ref={setG} />
-      
-      {/* 图标容器 */}
-      <P.Graphics ref={setIconGraphics} />
+      <P.Graphics ref={(inst) => { setG(inst); return () => setG(undefined); }} />
+      <P.Graphics ref={(inst) => { setIconGraphics(inst); return () => setIconGraphics(undefined); }} />
 
-      {/* 兵力数 */}
       <Show when={props.tile.army > 0}>
         <P.Text
           anchor={0.5}

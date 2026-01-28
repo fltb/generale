@@ -22,7 +22,7 @@ export default function Test() {
                 <MapRenderTest />
             </Application>
 
-            <Title>Test Page</Title>
+            {/* <Title>Test Page</Title>
             <h1>Test</h1>
             <GameRoomTesterWithHook />
             <GameRoomStateSyncTester />
@@ -30,7 +30,7 @@ export default function Test() {
             <TestPreGameControls />
             <TestPreGameRoomStateFrom />
             <TestPreGameMapSettingForm />
-            <RoomIntegrationTest />
+            <RoomIntegrationTest /> */}
 
         </main>
     );

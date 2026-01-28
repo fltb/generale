@@ -1,4 +1,3 @@
-// MapRender.tsx
 import { For, Show, createMemo, createSignal, createEffect, type Component, onMount, onCleanup } from "solid-js";
 import * as P from "solid-pixi";
 import * as PIXI from "pixi.js";
@@ -38,7 +37,7 @@ const OperationArrow: Component<{
   size: number;
   z?: number;
 }> = (props) => {
-  const [g, setG] = createSignal<PIXI.Graphics>();
+  const [g, setG] = createSignal<PIXI.Graphics | undefined>(undefined);
 
   createEffect(() => {
     const graphics = g();
@@ -46,14 +45,14 @@ const OperationArrow: Component<{
 
     if (props.op.type !== PlayerOperationType.Move) {
       graphics.clear();
-      graphics.removeChildren();
+      try { graphics.removeChildren(); } catch {}
       return;
     }
 
     const payload = (props.op as any).payload;
     if (!payload) {
       graphics.clear();
-      graphics.removeChildren();
+      try { graphics.removeChildren(); } catch {}
       return;
     }
 
@@ -66,7 +65,7 @@ const OperationArrow: Component<{
     const ey = (to.y + 0.5) * props.size;
 
     graphics.clear();
-    graphics.removeChildren();
+    try { graphics.removeChildren(); } catch {}
 
     const dx = ex - sx;
     const dy = ey - sy;
@@ -87,18 +86,22 @@ const OperationArrow: Component<{
     const dxn = Math.sign(dx);
     const dyn = Math.sign(dy);
 
-    arrow.x = mx + dxn * offset;
-    arrow.y = my + dyn * offset;
-
-    graphics.addChild(arrow);
+    try {
+      arrow.x = mx + dxn * offset;
+      arrow.y = my + dyn * offset;
+      graphics.addChild(arrow);
+    } catch (err) {
+      console.warn("OperationArrow.addChild failed", err);
+    }
   });
 
-  return <P.Graphics ref={setG} zIndex={props.z ?? 0} />;
+  // ref wrapper — 必须返回 cleanup 函数或 undefined
+  return <P.Graphics ref={(inst) => { setG(inst); return () => setG(undefined); }} zIndex={props.z ?? 0} />;
 };
 
 export const MapRender: Component<MapRenderProps> = (props) => {
   const TILE_SIZE = 36;
-  const map = createMemo(() => props.state.map);
+  const map = createMemo(() => props.state?.map ?? { width: 0, height: 0, tiles: [] });
   const iconTextures = createMemo<Record<TileType, FaIconKey | null>>(() => TILE_ICON_MAP);
 
   // active cursor
@@ -106,7 +109,7 @@ export const MapRender: Component<MapRenderProps> = (props) => {
 
   // 检查坐标是否在地图范围内
   const inBounds = (c: Coordinates) =>
-    c.x >= 0 && c.y >= 0 && c.x < map().width && c.y < map().height;
+    c.x >= 0 && c.y >= 0 && c.x < (map()?.width ?? 0) && c.y < (map()?.height ?? 0);
 
   // 点击格子回调（MapTile 会调用）
   const handleTileClick = (coord: Coordinates) => {
@@ -181,7 +184,7 @@ export const MapRender: Component<MapRenderProps> = (props) => {
     <P.Container x={offsetX} y={offsetY}>
       <For each={map().tiles}>
         {(row, yIdx) => (
-          <For each={row}>
+          <For each={row ?? []}>
             {(tile, xIdx) => {
               const coord: Coordinates = { x: xIdx(), y: yIdx() };
               return (
@@ -209,9 +212,9 @@ export const MapRender: Component<MapRenderProps> = (props) => {
       {/* Cursor */}
       <Show when={active()}>
         {(c) => {
-          const [g, setG] = createSignal<PIXI.Graphics | undefined>(undefined);
+          const [gCursor, setGCursor] = createSignal<PIXI.Graphics | undefined>(undefined);
           createEffect(() => {
-            const graphics = g();
+            const graphics = gCursor();
             if (!graphics) return;
             graphics.clear();
 
@@ -235,7 +238,7 @@ export const MapRender: Component<MapRenderProps> = (props) => {
               .stroke({ width: 6, color: 0xffd34d, alpha: 0.12 });
           });
 
-          return <P.Graphics ref={setG} />;
+          return <P.Graphics ref={(inst) => { setGCursor(inst); return () => setGCursor(undefined); }} />;
         }}
       </Show>
 

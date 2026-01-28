@@ -209,6 +209,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
                 }
             });
         } else {
+            console.debug(`[game instance (pid: ${pid})] send update patch: `, patches)
             conn.send({
                 type: SyncedGameServerEventType.STATE_UPDATE,
                 payload: {

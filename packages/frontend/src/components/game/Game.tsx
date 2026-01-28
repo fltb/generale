@@ -1,4 +1,4 @@
-import { type Component, createSignal, createEffect, Show, onCleanup } from "solid-js";
+import { type Component, createSignal, createEffect, Show, onCleanup, createMemo } from "solid-js";
 import { useSyncedState } from "~/hooks/useSyncedState";
 import {
     type SyncedGameState,
@@ -68,22 +68,21 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
         initialVersion: 0,
         // just apply move event to show arrows
         applyEvent: (s, a) => {
+            const base = structuredClone(s);
             switch (a.type) {
                 case SyncedGameClientActionTypes.PUSH: {
                     const ops = a.payload ?? [];
-                    return {
-                        ...s,
-                        playerOperationQueue: [...(s.playerOperationQueue ?? []), ...ops],
-                    };
+                    base.playerOperationQueue = [...(base.playerOperationQueue ?? []), ...ops]
+                    console.debug(`[game: apply useSynced]: push`, ops, base.playerOperationQueue);
+                    return base;
                 }
                 case SyncedGameClientActionTypes.CLEAN_ALL: {
-                    return {
-                        ...s,
-                        playerOperationQueue: [],
-                    };
+                    base.playerOperationQueue = [];
+                    console.debug(`[game: apply useSynced]: clean all`, base.playerOperationQueue);
+                    return base;
                 }
                 default:
-                    return s;
+                    return base;
             }
         },
         onCustomEvent: handleCustomEvent,
@@ -118,7 +117,7 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
     // helper: clear all pending ops locally & send CLEAN_ALL
     function handleClearQueue() {
         try {
-            const action = { type: SyncedGameClientActionTypes.CLEAN_ALL } as any;
+            const action = { type: SyncedGameClientActionTypes.CLEAN_ALL };
             synced.dispatch(action);
         } catch (e) {
             console.warn("GameWithSync clear queue error", e);
@@ -151,12 +150,15 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
         }
     };
 
+    const prettyState = createMemo(() =>
+        JSON.stringify(mergedState(), null, 2)
+    );
     return (
         <div class="p-4">
             <div class="card bg-base-200 p-3 mb-3 flex items-center justify-between">
                 <div>
                     <div class="text-lg font-semibold">游戏中 — {props.gameId}</div>
-                    <div class="text-sm opacity-70">Tick: {mergedState()?.tick ?? 0}</div>
+                    <div class="text-sm opacity-70">Tick: {mergedState()?.tick}</div>
                 </div>
 
                 <div class="flex items-center gap-2">
@@ -182,7 +184,7 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
                     SyncedGameState（实时）
                 </div>
                 <pre class="text-xs bg-base-300 p-2 rounded overflow-auto max-h-[400px]">
-                    {JSON.stringify(mergedState(), null, 2)}
+                    {prettyState()}
                 </pre>
             </div>
 
