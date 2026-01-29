@@ -45,14 +45,14 @@ const OperationArrow: Component<{
 
     if (props.op.type !== PlayerOperationType.Move) {
       graphics.clear();
-      try { graphics.removeChildren(); } catch {}
+      try { graphics.removeChildren(); } catch { }
       return;
     }
 
     const payload = (props.op as any).payload;
     if (!payload) {
       graphics.clear();
-      try { graphics.removeChildren(); } catch {}
+      try { graphics.removeChildren(); } catch { }
       return;
     }
 
@@ -65,7 +65,7 @@ const OperationArrow: Component<{
     const ey = (to.y + 0.5) * props.size;
 
     graphics.clear();
-    try { graphics.removeChildren(); } catch {}
+    try { graphics.removeChildren(); } catch { }
 
     const dx = ex - sx;
     const dy = ey - sy;
@@ -105,7 +105,38 @@ export const MapRender: Component<MapRenderProps> = (props) => {
   const iconTextures = createMemo<Record<TileType, FaIconKey | null>>(() => TILE_ICON_MAP);
 
   // active cursor
-  const [active, setActive] = createSignal<Coordinates | null>({x: 1, y: 1});
+  const [active, setActive] = createSignal<Coordinates | null>({ x: 1, y: 1 });
+  const [gCursor, setGCursor] = createSignal<PIXI.Graphics | undefined>(undefined);
+
+  createEffect(() => {
+    const graphics = gCursor();
+    graphics?.clear();
+    const c = active();
+    if (!graphics || !c) return;
+
+    const cx = c.x;
+    const cy = c.y;
+    if (typeof cx !== "number" || typeof cy !== "number") {
+      graphics.clear();
+      return;
+    }
+
+    const x = cx * TILE_SIZE;
+    const y = cy * TILE_SIZE;
+    const pad = 2;
+
+    // 直接设置 graphics 的位置到瓦片左上角（世界坐标下）
+    graphics.x = x;
+    graphics.y = y;
+
+    graphics
+      .rect(pad / 2, pad / 2, TILE_SIZE - pad, TILE_SIZE - pad)
+      .stroke({ width: 3, color: 0xffd34d, alpha: 0.95 });
+
+    graphics
+      .rect(pad / 2, pad / 2, TILE_SIZE - pad, TILE_SIZE - pad)
+      .stroke({ width: 6, color: 0xffd34d, alpha: 0.12 });
+  });
 
   // 检查坐标是否在地图范围内
   const inBounds = (c: Coordinates) =>
@@ -181,67 +212,51 @@ export const MapRender: Component<MapRenderProps> = (props) => {
   const offsetY = 0;
 
   return (
-    <P.Container x={offsetX} y={offsetY}>
-      <For each={map().tiles}>
-        {(row, yIdx) => (
-          <For each={row ?? []}>
-            {(tile, xIdx) => {
-              const coord: Coordinates = { x: xIdx(), y: yIdx() };
-              return (
-                <MapTile
-                  coord={coord}
-                  tile={tile}
-                  size={TILE_SIZE}
-                  playerDisplay={props.state.playerDisplay}
-                  iconTextures={iconTextures()}
-                  onClick={handleTileClick}
-                />
-              );
-            }}
-          </For>
-        )}
-      </For>
-
-      {/* 只渲染传入 state 的队列（上游 + 测试端如果需要合并，应由宿主提供合并后的 state） */}
-      <P.Container>
-        <For each={props.state.playerOperationQueue ?? []}>
-          {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} />}
+    // world container：所有地图内容都在这里（由外层的 Application 决定缩放/分辨率）
+    <P.Container x={offsetX} y={offsetY} name="world" sortableChildren>
+      {/* ===== map layer: tiles ===== */}
+      <P.Container name="mapLayer">
+        <For each={map().tiles}>
+          {(row, yIdx) => (
+            <For each={row ?? []}>
+              {(tile, xIdx) => {
+                const coord: Coordinates = { x: xIdx(), y: yIdx() };
+                return (
+                  <MapTile
+                    coord={coord}
+                    tile={tile}
+                    size={TILE_SIZE}
+                    playerDisplay={props.state.playerDisplay}
+                    iconTextures={iconTextures()}
+                    onClick={handleTileClick}
+                  />
+                );
+              }}
+            </For>
+          )}
         </For>
       </P.Container>
 
-      {/* Cursor */}
-      <Show when={active()}>
-        {(c) => {
-          const [gCursor, setGCursor] = createSignal<PIXI.Graphics | undefined>(undefined);
-          createEffect(() => {
-            const graphics = gCursor();
-            if (!graphics) return;
-            graphics.clear();
+      {/* ===== entity layer: (units / players) - keep separate in case you add sprites later ===== */}
+      <P.Container name="entityLayer" />
 
-            const cx = c().x;
-            const cy = c().y;
-            if (typeof cx !== "number" || typeof cy !== "number") {
-              graphics.clear();
-              return;
-            }
+      {/* ===== overlay layer: arrows / cursor / highlights - still in world space ===== */}
+      <P.Container name="overlayLayer">
+        {/* operation arrows (world-space coordinates inside OperationArrow) */}
+        <For each={props.state.playerOperationQueue ?? []}>
+          {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} />}
+        </For>
 
-            const x = cx * TILE_SIZE;
-            const y = cy * TILE_SIZE;
-            const pad = 2;
-
-            graphics
-              .rect(x + pad / 2, y + pad / 2, TILE_SIZE - pad, TILE_SIZE - pad)
-              .stroke({ width: 3, color: 0xffd34d, alpha: 0.95 });
-
-            graphics
-              .rect(x + pad / 2, y + pad / 2, TILE_SIZE - pad, TILE_SIZE - pad)
-              .stroke({ width: 6, color: 0xffd34d, alpha: 0.12 });
-          });
-
-          return <P.Graphics ref={(inst) => { setGCursor(inst); return () => setGCursor(undefined); }} />;
-        }}
-      </Show>
-
+        {/* single cursor graphics (we reuse and update it via gCursor signal + createEffect above) */}
+        <P.Graphics
+          ref={(inst) => {
+            // 必须返回 cleanup 函数或 undefined
+            setGCursor(inst);
+            return () => setGCursor(undefined);
+          }}
+          zIndex={999}
+        />
+      </P.Container>
     </P.Container>
   );
 };

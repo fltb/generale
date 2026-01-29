@@ -151,7 +151,7 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
     };
 
     const prettyState = createMemo(() =>
-        JSON.stringify(mergedState(), null, 2)
+        JSON.stringify(mergedState().playerOperationQueue, null, 2)
     );
     return (
         <div class="p-4">
