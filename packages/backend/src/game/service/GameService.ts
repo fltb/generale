@@ -318,6 +318,9 @@ export class GameService {
     };
 
     this.preGameInstance = new PreGameInstance(initialState, new Map());
+    this.preGameInstance.onDisband(() => {
+      this.disbandGame();
+    });
     this.phase = GamePhase.PREGAME;
     this.chatInstance.activeStageInstance = this.preGameInstance;
 
@@ -519,18 +522,41 @@ export class GameService {
     this.preGameInstance.onStateChange(() => {
       this.emitRoomUpdatedToManager();
     });
-
+    this.preGameInstance.onDisband(() => {
+      this.disbandGame();
+    })
     // 通知 manager 房间已变更（从 INGAME -> PREGAME）
     this.emitRoomUpdatedToManager();
 
     console.log(`[GameService ${this.gameId}] Game ended and room restored to pregame with ${this.preGameInstance.getState().players.length} players`);
   }
 
+  public forceDispose():void {
+    if (this.phase === GamePhase.DISBANDED) return;
+    
+        // Clear tick timer on disband
+    this.clearTickTimer();
+
+    console.log(`[GameService ${this.gameId}] disposing game...`);
+
+    this.phase = GamePhase.DISBANDED;
+    this.preGameInstance?.destroy();
+    this.preGameInstance = null;
+    this.gameInstance?.destroy();
+    this.gameInstance = null;
+    this.chatInstance.destroy();
+    // 注销域名处理器
+    this.unregisterDomainHandlers();
+
+    console.log(`[GameService ${this.gameId}] Game disposed`);
+  }
 
   /**
    * 解散游戏
    */
-  public disbandGame(): void {
+  private disbandGame(): void {
+    if (this.phase === GamePhase.DISBANDED) return;
+
     // Clear tick timer on disband
     this.clearTickTimer();
 

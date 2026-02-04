@@ -121,7 +121,7 @@ export class GameServiceManager {
     if (!gameService) return false;
 
     // ensure game disbanded
-    gameService.disbandGame();
+    gameService.forceDispose();
     this.gameServices.delete(gameId);
 
     // --- new: emit deleted event ---
@@ -150,7 +150,7 @@ export class GameServiceManager {
    */
   public cleanup(): void {
     for (const [_gameId, gameService] of this.gameServices) {
-      gameService.disbandGame();
+      gameService.forceDispose();
     }
     this.gameServices.clear();
     console.log(`[GameServiceManager] All games cleaned up`);

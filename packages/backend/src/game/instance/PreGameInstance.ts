@@ -37,6 +37,9 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
   private bannedUntil: Map<PlayerId, number> = new Map();
   private DEFAULT_KICK_BAN_MS = 60 * 1000; // 1 minute, 可改
+  // PreGameInstance: 增加 onDestroy 回调支持
+  private onDisbandCallbacks: Array<() => void> = [];
+  private disbanded = false;
 
 
   constructor(initialState: PreGameRoomState, initialConnectors: Map<PlayerId, PreGameServerConnector>) {
@@ -51,6 +54,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       conn.onClose(() => this.removePlayer(pid));
     }
   }
+
 
   private handleClientAction(pid: PlayerId, evt: SyncedPreGameClientActions) {
     if (this.destroyed) return;
@@ -100,11 +104,6 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       synced.lastConfirmedOp = evt.optimisticId;
     }
     this.broadcastState();
-
-    // If nobody left, destroy (destroy does closure)
-    if (this.state.players.length === 0) {
-      this.disbandRoom(this.state.hostId);
-    }
   }
 
   /** 设置准备状态 */
@@ -175,10 +174,12 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     if (this.state.hostId === pid) {
       this.autoTransferHost();
     }
-    // 如果没人了，自动销毁
-    if (this.state.players.length === 0) this.destroy();
-
-    this.broadcastState();
+    if (this.state.players.length === 0) {
+      console.debug("[PreGameInstance] all players left, auto destory")
+      this.destroy();
+    } else {
+      this.broadcastState();
+    }
   }
 
   /** 房主转让 */
@@ -203,6 +204,9 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   /** 解散房间（仅房主） */
   private disbandRoom(pid: PlayerId) {
     if (pid !== this.state.hostId) return;
+
+    this.disbanded = true;
+
     for (const [_pid, conn] of this.connectors) {
       conn.send({
         type: SyncedPreGameServerEventType.CUSTOM,
@@ -213,6 +217,12 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       });
       conn.close();
     }
+    // notify listeners
+    for (const cb of this.onDisbandCallbacks) {
+      try { cb(); } catch (err) { console.error('[PreGameInstance] onDisband callback error', err); }
+    }
+    this.onDisbandCallbacks = [];
+
     this.destroy();
   }
 
@@ -352,11 +362,27 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
   /** 主动销毁实例 */
   public destroy() {
+    if (this.destroyed) return;
     this.destroyed = true;
+    if (!this.disbanded) {
+      for (const cb of this.onDisbandCallbacks) {
+        try { cb(); } catch (err) { console.error('[PreGameInstance] onDisband callback error', err); }
+      }
+      this.onDisbandCallbacks = [];
+      this.disbanded = true;
+    }
     for (const [_pid, conn] of this.connectors) conn.close();
     this.connectors.clear();
     this.state.players = [];
-    this.onStateChangeCallbacks = []
+    this.onStateChangeCallbacks = [];
+  }
+
+  public onDisband(cb: () => void): () => void {
+    this.onDisbandCallbacks.push(cb);
+    return () => {
+      const i = this.onDisbandCallbacks.indexOf(cb);
+      if (i >= 0) this.onDisbandCallbacks.splice(i, 1);
+    };
   }
 
   public onStateChange(callback: (state: PreGameRoomState) => void): () => void {
