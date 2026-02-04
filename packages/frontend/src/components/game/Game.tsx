@@ -15,6 +15,7 @@ import {
 } from "@generale/types";
 import { MapRender } from "../MapRender";
 import { Application } from "solid-pixi";
+import PlayerList from "./PlayerList";
 
 /**
  * Props:
@@ -166,6 +167,8 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
                     <button class="btn btn-sm btn-ghost" onClick={handleLeave}>离开游戏</button>
                 </div>
             </div>
+
+            <PlayerList state={synced.state} />
 
             <div class="card bg-base-200 p-3">
                 <Application

@@ -5,7 +5,6 @@ import {
   Show,
   Switch,
   Match,
-  onCleanup,
 } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 
@@ -13,6 +12,7 @@ import RoomWithSync, {
   type RoomWithSyncProps,
 } from "~/components/room/Room";
 import GameWithSync from "~/components/game/Game";
+import ChatPanel from "~/components/ChatPanel"; // <-- 确认路径
 import { prepareConnectApi } from "~/api/gameApi";
 
 import {
@@ -27,11 +27,15 @@ const RoomRoute: Component = () => {
   const [playerId, setPlayerId] = createSignal<string | null>(null);
   const [playerName, setPlayerName] = createSignal<string | null>(null);
   const [domainPrimary, setDomainPrimary] = createSignal<string | null>(null);
+  const [domainChat, setDomainChat] = createSignal<string | null>(null);
 
   const [phase, setPhase] = createSignal<GamePhase>(GamePhase.PREGAME);
 
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+
+  // chat floating visible (默认在拿到 chat 域后打开)
+  const [chatVisible, setChatVisible] = createSignal(false);
 
   /**
    * 初始 / 刷新连接信息（authoritative）
@@ -55,6 +59,9 @@ const RoomRoute: Component = () => {
       setPlayerName("Guest"); // TODO:: get player name by api
       setPhase(data.phase);
       setDomainPrimary(data.domains.primary);
+
+      setDomainChat(data.domains.chat);
+      setChatVisible(true);
     } catch (err: any) {
       setError(err?.message ?? String(err));
     } finally {
@@ -175,6 +182,64 @@ const RoomRoute: Component = () => {
           </div>
         </Match>
       </Switch>
+
+      {/* ---------- Chat floating window (bottom-right) ---------- */}
+      <Show when={domainChat() && playerId()}>
+        <div class="fixed bottom-4 right-4 z-50">
+          {/* Minimized button */}
+          <Show when={!chatVisible()}>
+            <button
+              class="btn btn-circle btn-primary shadow-lg"
+              aria-label="打开聊天"
+              onClick={() => setChatVisible(true)}
+              title="打开聊天"
+            >
+              💬
+            </button>
+          </Show>
+
+          {/* Expanded panel */}
+          <Show when={chatVisible()}>
+            <div class="w-80 md:w-96 bg-base-100 border border-base-300 rounded-lg shadow-lg overflow-hidden">
+              <div class="flex items-center justify-between p-2 border-b border-base-300">
+                <div class="text-sm font-medium">聊天</div>
+                <div class="flex items-center gap-2">
+                  <button
+                    class="btn btn-xs btn-ghost"
+                    onClick={() => {
+                      // collapse to minimized button
+                      setChatVisible(false);
+                    }}
+                    title="收起"
+                  >
+                    收起
+                  </button>
+                  <button
+                    class="btn btn-xs btn-ghost"
+                    onClick={() => {
+                      // close & disconnect from chat domain (optional)
+                      // 如果需要断开可以清 domainChat / 调用 wsMgr.closeDomain(domainChat())
+                      setChatVisible(false);
+                    }}
+                    title="关闭"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div class="p-2">
+                <ChatPanel
+                  domain={domainChat()!}
+                  userId={playerId()!}
+                  userName={playerName() ?? "Guest"}
+                  autoOpen
+                />
+              </div>
+            </div>
+          </Show>
+        </div>
+      </Show>
     </main>
   );
 };
