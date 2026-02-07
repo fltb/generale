@@ -1,6 +1,9 @@
 import { type Component, For, createMemo } from "solid-js";
 import type { SyncedGameState, PlayerId } from "@generale/types";
 
+const colorHex = (c: number | undefined) =>
+  c == null ? "#cccccc" : `#${c.toString(16).padStart(6, "0")}`;
+
 type Props = {
   state: () => SyncedGameState;
   /** 可选：如果外面有 pregame 的 name map，可以传进来（id -> name） */
@@ -36,14 +39,10 @@ export const PlayerList: Component<Props> = (props) => {
     // 2. 构造 summary 数组
     const arr = Object.values(players).map((p) => {
       const id = p.id;
-      // 优先取：server 提供 playersSummary -> props.nameMap -> 回退 id
-      const serverName = s.playersSummary?.find((ss: any) => ss.id === id)?.name ?? null;
-      const name = serverName ?? (props.nameMap?.[id]) ?? id;
+      const name = playerDisplay[p.id]?.name;
 
       const colorNum = playerDisplay[id].tileColor;
-
-      // 若没有 playerDisplay color，再尝试 PlayerColor 枚举随机/规律取（以 id hash）
-      let colorCss = colorNum;
+      const colorCss = colorHex(colorNum);
 
       return {
         id,

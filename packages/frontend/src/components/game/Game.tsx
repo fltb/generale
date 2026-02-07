@@ -12,6 +12,7 @@ import {
     type PlayerOperation,
     type PlayerId,
     type GameId,
+    SyncedPreGameServerEventPayloadType,
 } from "@generale/types";
 import { MapRender } from "../MapRender";
 import { Application } from "solid-pixi";
@@ -34,6 +35,7 @@ export interface GameWithSyncProps {
 
 export const GameWithSync: Component<GameWithSyncProps> = (props) => {
     const [notice, setNotice] = createSignal<string | null>(null);
+    const [gameEndedInfo, setGameEndedInfo] = createSignal<SyncedPreGameServerEventPayload | null>(null);
 
     // minimal initial game state fallback (masked shape)
     const emptyState: SyncedGameState = {
@@ -56,10 +58,28 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
             //  - { type: 'game_ended' } etc.
 
             // just notify parent with ingame phase and the event
-            props.onStateUpdate?.({ event: evt });
+
+            switch (evt.type) {
+                case SyncedPreGameServerEventPayloadType.GAME_ENDED:
+                    console.debug("[GameWithSync] Game ended");
+                    setGameEndedInfo(evt);
+                    break;
+                default:
+                    props.onStateUpdate?.({ event: evt });
+                    break;
+            }
+
         } catch (e) {
             console.warn("GameWithSync handleCustomEvent error", e, evt);
         }
+    }
+
+    function handleLeaveToRoom() : void {
+        const evt = gameEndedInfo();
+        if (!evt) {
+            return;
+        }
+        props.onStateUpdate?.({event: evt});
     }
 
     // useSyncedState for game domain
@@ -89,6 +109,18 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
         onCustomEvent: handleCustomEvent,
         context: { userid: props.playerId },
         autoOpen: false,
+    });
+
+
+    createEffect(() => {
+        const evt = gameEndedInfo();
+        if (!evt) return;
+
+        console.log("Game ended -> show result UI");
+
+        setTimeout(() => {
+            handleLeaveToRoom();
+        }, 5000);
     });
 
     // auto connect when domain + playerId available
@@ -182,6 +214,29 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
                     <MapRender state={mergedState()} onOperationQueued={handleOperationQueued} />
                 </Application>
             </div>
+
+            <Show when={gameEndedInfo()}>
+                <div class="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white">
+
+                    <h1 class="text-4xl font-bold mb-4">
+                        游戏结束
+                    </h1>
+
+                    <p class="mb-4">
+                        5 秒后返回房间
+                    </p>
+
+                    <button
+                        class="btn btn-primary"
+                        onClick={handleLeaveToRoom}
+                    >
+                        立即返回房间
+                    </button>
+
+                </div>
+
+            </Show>
+            
             <div class="card bg-base-200 p-3">
                 <div class="font-semibold mb-2">
                     SyncedGameState（实时）

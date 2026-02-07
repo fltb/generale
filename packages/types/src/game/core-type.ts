@@ -51,7 +51,7 @@ export interface Tile {
 }
 
 
-export type TeamId = string;
+export type TeamId = `team${number}`;
 
 /** 队伍核心信息 */
 export interface TeamCore {

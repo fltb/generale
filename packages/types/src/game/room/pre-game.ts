@@ -2,6 +2,11 @@
 import type { PlayerId, TeamId, GameId, TileType } from '../core-type';
 import { PlayerColor } from './player-colors';
 
+export interface TeamInfo {
+  id: TeamId;
+  name?: string;
+}
+
 // 地图类型
 export enum PreGameMapType {
   Random = 'random',
@@ -74,7 +79,8 @@ export interface PreGameRoomState {
   players: PreGamePlayerInfo[];
   mapSetting: PreGameMapSetting;
   gameSetting: PreGameGameSetting;
-  teamCount: number;
+  teams: TeamInfo[];
+  teamCount: number; // synced as teams.length
   playerLimit: number;
   started: boolean;
 }

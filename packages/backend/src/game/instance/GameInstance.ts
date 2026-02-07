@@ -9,7 +9,8 @@ import {
     ServerSyncConnector,
     SyncedGameClientActions,
     SyncedGameState,
-    SyncedGameClientActionTypes
+    SyncedGameClientActionTypes,
+    SyncedPreGameServerEventPayloadType
 } from '@generale/types';
 import { tick, mask } from '../core';
 import { GameStatus, PlayerStatus } from '@generale/types';
@@ -32,9 +33,9 @@ export interface SyncEntry {
 import { IBaseInstance } from './interface';
 
 export interface GameEndResult {
-  winnerId: PlayerId;
-  reason: string;
-  [key: string]: any;
+    winnerId: PlayerId;
+    reason: string;
+    [key: string]: any;
 }
 
 export class GameInstance implements IBaseInstance<SyncedGameClientActions, SyncedGameServerEvent> {
@@ -140,7 +141,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     public removeConnector(playerId: PlayerId) {
         this.connectors.delete(playerId);
     }
-    
+
     private handleClientEvent(pid: PlayerId, evt: SyncedGameClientActions) {
         const synced = this.syncData.get(pid)!;
         console.debug(`[game instance (pid: ${pid})] recv event`, evt);
@@ -224,6 +225,18 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         this.prevSentState.set(pid, structuredClone(current));
     }
 
+    private broadcastGameEnded(): void {
+        for (const conn of this.connectors.values()) {
+            conn.send({
+                type: SyncedGameServerEventType.CUSTOM,
+                payload: {
+                    type: SyncedPreGameServerEventPayloadType.GAME_ENDED,
+                    endedAt: Date.now()
+                }
+            })
+        }
+    }
+
     /** 推进游戏并触发同步 */
     public advance() {
         if (this.state.status === GameStatus.Ended) {
@@ -265,6 +278,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
                 reason: 'Game ended',
                 // 可扩展更多字段
             };
+            this.broadcastGameEnded();
             this.triggerEndGame(result);
         }
     }

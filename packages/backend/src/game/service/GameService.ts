@@ -312,6 +312,10 @@ export class GameService {
         height: defaultHeight,
         tileFrequency: {}
       },
+      teams: [
+        { id: "team1", name: "Team 1" },
+        { id: "team2", name: "Team 2" }
+      ],
       teamCount: 2,
       playerLimit: this.config.maxPlayers ?? 8,
       started: false
@@ -446,7 +450,7 @@ export class GameService {
     const gameInstanceSettings: GameInstanceSettings = {
       playerDisplay: preGameState.players.reduce(
         (acc, p) => {
-          acc[p.id] = { tileColor: p.tileColor };
+          acc[p.id] = { tileColor: p.tileColor, name: p.name };
           return acc;
         },
         {} as SyncedGameState["playerDisplay"]
@@ -458,6 +462,7 @@ export class GameService {
     this.gameInstance = new GameInstance(initialGameState, gameInstanceSettings, playerIds);
     this.phase = GamePhase.INGAME;
     this.chatInstance.activeStageInstance = this.gameInstance;
+    this.gameInstance.onEndGame(this.endGame.bind(this));
 
     // 开始调度 Tick（必须在 phase 设置为 INGAME 且 gameInstance 创建后）
     this.scheduleGameTicks(state.gameSetting?.speed ?? 1.0);
@@ -533,7 +538,7 @@ export class GameService {
 
   public forceDispose():void {
     if (this.phase === GamePhase.DISBANDED) return;
-    
+
         // Clear tick timer on disband
     this.clearTickTimer();
 

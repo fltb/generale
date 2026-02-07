@@ -9,7 +9,8 @@ import {
   ServerSyncConnector,
   SyncedPreGameState,
   PlayerColor,
-  SyncedPreGameServerEventPayloadType
+  SyncedPreGameServerEventPayloadType,
+  TeamId
 } from '@generale/types';
 import { compare } from 'fast-json-patch';
 
@@ -41,9 +42,20 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   private onDisbandCallbacks: Array<() => void> = [];
   private disbanded = false;
 
+  private nextTeamSeq = 1; // 用于自动生成 team id
+  private readonly MIN_TEAMS = 2;
+
 
   constructor(initialState: PreGameRoomState, initialConnectors: Map<PlayerId, PreGameServerConnector>) {
     this.state = structuredClone(initialState);
+    this.nextTeamSeq = 1;
+    for (const t of this.state.teams) {
+      const m = /^team(\d+)$/.exec(t.id);
+      if (m) {
+        const n = Number(m[1]);
+        if (!Number.isNaN(n)) this.nextTeamSeq = Math.max(this.nextTeamSeq, n + 1);
+      }
+    }
     this.connectors = new Map(initialConnectors);
 
     for (const [pid, conn] of this.connectors) {
@@ -53,6 +65,52 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       conn.onClientMessage(evt => this.handleClientAction(pid, evt));
       conn.onClose(() => this.removePlayer(pid));
     }
+  }
+
+  /** Helper: create a new team id (unique) */
+  private createTeamId(proposed?: TeamId): TeamId {
+    if (proposed && !this.state.teams.find(t => t.id === proposed)) return proposed;
+    // find next free teamN
+    while (true) {
+      const id: TeamId = `team${this.nextTeamSeq++}`;
+      if (!this.state.teams.find(t => t.id === id)) return id;
+    }
+  }
+
+  /** ensure team exists; create if not */
+  private ensureTeamExists(teamId?: TeamId, name?: string): TeamId {
+    if (!teamId) {
+      const id = this.createTeamId();
+      this.state.teams.push({ id, name: name ?? id });
+      this.state.teamCount = this.state.teams.length;
+      return id;
+    }
+    const found = this.state.teams.find(t => t.id === teamId);
+    if (found) return found.id;
+    // not found -> create new with that id (accept provided id)
+    const id = this.createTeamId(teamId);
+    this.state.teams.push({ id, name: name ?? id });
+    this.state.teamCount = this.state.teams.length;
+    return id;
+  }
+
+  /** Remove any teams that have zero members, but keep at least MIN_TEAMS teams. */
+  private removeEmptyTeams() {
+    // compute counts
+    const counts = new Map<string, number>();
+    for (const t of this.state.teams) counts.set(t.id, 0);
+    for (const p of this.state.players) {
+      if (p.teamId) counts.set(p.teamId, (counts.get(p.teamId) ?? 0) + 1);
+    }
+    // filter out empty teams
+    const newTeams = this.state.teams.filter(t => (counts.get(t.id) ?? 0) > 0);
+    // ensure min teams
+    while (newTeams.length < this.MIN_TEAMS) {
+      const id = this.createTeamId();
+      newTeams.push({ id, name: id });
+    }
+    this.state.teams = newTeams;
+    this.state.teamCount = newTeams.length;
   }
 
 
@@ -83,7 +141,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       case SyncedPreGameClientActionTypes.CHANGE_MAP:
         this.changeMap(pid, evt.payload); break;
       case SyncedPreGameClientActionTypes.CHANGE_TEAM:
-        this.changeTeam(pid, evt.payload.teamId); break;
+        this.changeTeam(pid, evt.payload.teamId, evt.payload.playerId); break;
       case SyncedPreGameClientActionTypes.KICK_PLAYER:
         this.kickPlayer(evt.payload.playerId); break;
       case SyncedPreGameClientActionTypes.LEAVE_ROOM:
@@ -126,9 +184,31 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   }
 
   /** 换队 */
-  private changeTeam(pid: PlayerId, teamId: string) {
-    const p = this.state.players.find(p => p.id === pid);
-    if (p) p.teamId = teamId;
+  private changeTeam(pid: PlayerId, teamId: TeamId | undefined, targetPlayerId?: PlayerId) {
+    // 默认 target 为 requester（即玩家修改自己）
+    const targetId = targetPlayerId ?? pid;
+    // permission: only host can change others
+    if (targetId !== pid && this.state.hostId !== pid) {
+      console.warn(`[PreGameInstance] Player ${pid} tried to change team for ${targetId} but is not host`);
+      return;
+    }
+    const target = this.state.players.find(p => p.id === targetId);
+    if (!target) {
+      console.warn(`[PreGameInstance] changeTeam: target ${targetId} not found`);
+      return;
+    }
+
+    // If teamId is falsy (empty string), treat as "join team1" => a player must have a team
+    if (!teamId) {
+      target.teamId = "team1";
+    } else {
+      // ensure team exists (create if needed)
+      const realTeamId = this.ensureTeamExists(teamId);
+      target.teamId = realTeamId;
+    }
+
+    // after changing, remove any empty teams and sync teamCount
+    this.removeEmptyTeams();
   }
 
   /** 踢人（仅房主） */
@@ -174,6 +254,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     if (this.state.hostId === pid) {
       this.autoTransferHost();
     }
+
+    // clean up empty teams (auto remove)
+    this.removeEmptyTeams();
+
     if (this.state.players.length === 0) {
       console.debug("[PreGameInstance] all players left, auto destory")
       this.destroy();
@@ -235,7 +319,18 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   /** 检查是否可开始游戏并广播 */
   private tryStartGame(pid: PlayerId) {
     if (pid !== this.state.hostId) return;
-    if (!this.canStart()) return;
+    const res = this.canStart();
+    if (!res.ok) {
+      const conn = this.connectors.get(pid);
+      conn?.send({
+        type: SyncedPreGameServerEventType.CUSTOM,
+        payload: {
+          type: SyncedPreGameServerEventPayloadType.START_REJECTED,
+          reason: res.reason
+        }
+      });
+      return;
+    }
     // 可扩展: 通知 GameService 切换为正式游戏阶段
     this.state.started = true;
     // 广播游戏开始事件
@@ -256,12 +351,27 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   }
 
   /** 判断是否所有非房主都准备好且人数足够 */
-  private canStart(): boolean {
+  private canStart(): { ok: false, reason: string } | { ok: true } {
     const readyPlayers = this.state.players.filter(p => !p.isHost && p.ready === 1);
-    return (
-      this.state.players.length >= 2 &&
-      readyPlayers.length === this.state.players.length - 1
-    );
+
+    // count non-empty teams via teams array
+    const teamMemberCounts = new Map<string, number>();
+    for (const t of this.state.teams) teamMemberCounts.set(t.id, 0);
+    for (const p of this.state.players) {
+      if (p.teamId) teamMemberCounts.set(p.teamId, (teamMemberCounts.get(p.teamId) ?? 0) + 1);
+    }
+    const nonEmptyTeamCount = Array.from(teamMemberCounts.values()).filter(n => n > 0).length;
+
+    if (this.state.players.length < 2) {
+      return { ok: false, reason: "No enough players to start the game." };
+    }
+    if (readyPlayers.length !== this.state.players.length - 1) {
+      return { ok: false, reason: "Not all players are ready or insufficient players to start the game." };
+    }
+    if (nonEmptyTeamCount < this.MIN_TEAMS) {
+      return { ok: false, reason: "No enough teams to start the game" };
+    }
+    return { ok: true };
   }
 
   /** 全量同步/patch同步 */
@@ -364,12 +474,20 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   public destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
-    if (!this.disbanded) {
+    // 只有在显式 disband 或房间已无人时才通知 onDisband
+    const shouldNotifyDisband = this.disbanded || (Array.isArray(this.state.players) && this.state.players.length === 0);
+
+    if (shouldNotifyDisband) {
       for (const cb of this.onDisbandCallbacks) {
         try { cb(); } catch (err) { console.error('[PreGameInstance] onDisband callback error', err); }
       }
       this.onDisbandCallbacks = [];
       this.disbanded = true;
+      console.debug('[PreGameInstance] notified onDisband callbacks during destroy');
+    } else {
+      // 不将普通的 destroy 视为 disband —— 只是清理回调列表避免内存泄露
+      this.onDisbandCallbacks = [];
+      console.debug('[PreGameInstance] destroy without disband (normal lifecycle transition)');
     }
     for (const [_pid, conn] of this.connectors) conn.close();
     this.connectors.clear();
@@ -445,13 +563,25 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       this.state.hostId = playerId;
     }
 
+    // ensure at least MIN_TEAMS exist
+    if (!this.state.teams || this.state.teams.length < this.MIN_TEAMS) {
+      while (!this.state.teams || this.state.teams.length < this.MIN_TEAMS) {
+        const id = this.createTeamId();
+        if (!this.state.teams) this.state.teams = [];
+        this.state.teams.push({ id, name: id });
+      }
+      this.state.teamCount = this.state.teams.length;
+    }
+
+    const defaultTeamId = (this.state.teams && this.state.teams[0]) ? this.state.teams[0].id : this.ensureTeamExists();
+
     // 添加玩家到状态
     this.state.players.push({
       id: playerId,
       name: playerName,
       isHost,
       ready: isHost ? 1 : 0, // 房主默认准备
-      teamId: 'team1', // 默认队伍
+      teamId: defaultTeamId,
       tileColor: this.getAvailableTileColor(), // 默认队伍
     });
 
@@ -485,6 +615,6 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
   /** 检查是否可以开始游戏 */
   public canStartGame(): boolean {
-    return this.canStart();
+    return this.canStart().ok;
   }
 }

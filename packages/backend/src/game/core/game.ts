@@ -70,40 +70,77 @@ export function tick(
 
 /**
  * 生成单个玩家视角的战雾快照
+ *
+ * 原则：
+ * - 玩家本人拥有的格子可见
+ * - 队友拥有的格子可见
+ * - 与玩家/队友拥有格子相邻（3x3）格子可见
+ * - 其它格子替换成 FOG
  */
 export function mask(state: GameState, playerId: PlayerId): MaskedGameState {
-    const copy = structuredClone(state);
-    const player = state.players[playerId];
+  // 直接深拷贝一份 state 用于返回（但我们仍然以原始 state 为“真值”来源）
+  const copy = structuredClone(state);
+  const player = state.players[playerId];
 
-    // FIX: Add a guard to ensure 'player' exists. This resolves all subsequent errors.
-    if (!player) {
-        // If the player is not found, returning the unmodified map is a safe default.
-        return copy;
-    }
+  // 容错：若玩家不存在，返回原始拷贝（不做遮罩）
+  if (!player) return copy;
 
-    const teamId = player.teamId;
-    const team = teamId ? state.teams[teamId] : null;
+  const teamId = player.teamId;
+  const team = teamId ? state.teams[teamId] : null;
 
-    // 地图遮蔽
-    for (let y = 0; y < copy.map.height; y++) {
-        for (let x = 0; x < copy.map.width; x++) {
-            const t = copy.map.tiles[y]![x]!;
+  const height = state.map.height;
+  const width = state.map.width;
 
-            // This logic is now safe because the guard above ensures 'player' and 'team' are handled correctly.
-            const isOwnedByTeammate = !!(team && t.ownerId && team.memberIds.includes(t.ownerId));
-            
-            const shouldHide = !(t.ownerId === playerId || isOwnedByTeammate) && 
-                              !isAdjacentToPlayer(state, playerId, { x, y });
-            
-            if (shouldHide) {
-                copy.map.tiles[y]![x] = {
-                    type: TileType.Fog,
-                    ownerId: null,
-                    army: 0,
-                };
-            }
+  // visible[y][x] === true 表示该坐标对 playerId 可见
+  const visible: boolean[][] = new Array(height);
+  for (let y = 0; y < height; y++) {
+    visible[y] = new Array(width).fill(false);
+  }
+
+  // Helper: mark a tile and its 3x3 neighborhood visible (bounds-checked)
+  function markNeighborsVisible(cx: number, cy: number) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const ny = cy + dy;
+        const nx = cx + dx;
+        if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+          visible[ny]![nx] = true;
         }
+      }
     }
+  }
 
-    return copy;
+  // 一次遍历：对所有被玩家或队友拥有的格子，标记自身及邻居为可见
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const tile = state.map.tiles[y]![x]!;
+      if (!tile) continue;
+
+      // 属于玩家本人
+      if (tile.ownerId === playerId) {
+        markNeighborsVisible(x, y);
+        continue;
+      }
+
+      // 属于队友
+      if (team && tile.ownerId && team.memberIds.includes(tile.ownerId)) {
+        markNeighborsVisible(x, y);
+      }
+    }
+  }
+
+  // 最后一次遍历：把不可见格子替换为 Fog（只改 copy.map）
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!visible[y]![x]!) {
+        copy.map.tiles[y]![x] = {
+          type: TileType.Fog,
+          ownerId: null,
+          army: 0,
+        };
+      }
+    }
+  }
+
+  return copy;
 }

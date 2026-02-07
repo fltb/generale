@@ -52,6 +52,10 @@ const makeEmptyRoom = (gameId = ""): PreGameRoomState => ({
     },
     afkThreshold: 30,
   },
+  teams: [
+    { id: "team1", name: "Team 1" },
+    { id: "team2", name: "Team 2" }
+  ],
   teamCount: 2,
   playerLimit: 8,
   started: false,
@@ -142,6 +146,10 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           // 当收到 GAME_STARTED 时，告知父组件 phase 已切为 INGAME（由服务器权威决定）
           props.onStateUpdate?.({ event: evt });
           break;
+        case SyncedPreGameServerEventPayloadType.START_REJECTED:
+          // 显示原因（通常只由 host 收到），不需要向上传递
+          setNotice(evt.reason ?? "开始被拒绝，队伍或准备条件不满足");
+          break;
         default:
           setNotice(JSON.stringify(evt));
           props.onStateUpdate?.({ event: evt });
@@ -227,6 +235,18 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     synced.dispatch({ type: SyncedPreGameClientActionTypes.CHANGE_MAP, payload: nextMapSetting } as any);
   };
 
+  const onChangeTeam = (playerId: string, teamId: string) => {
+    const action = {
+      type: SyncedPreGameClientActionTypes.CHANGE_TEAM,
+      payload: {
+        teamId,
+        playerId
+      }
+    };
+    // 注意：服务端在 handleClientAction 会检查发起者 pid，只允许玩家修改自己的 teamId
+    synced.dispatch({ ...action });
+  };
+
   const syncedState = () => {
     try {
       return synced.state();
@@ -261,9 +281,11 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           players={room()?.players ?? []}
           selfId={selfId()}
           hostId={room()?.hostId ?? ""}
+          teamCount={room()?.teamCount ?? 2}
           onToggleReady={(playerId, ready) => onToggleReadyForPlayer(playerId, ready)}
           onKick={isHost() ? onKick : undefined}
           onTransferHost={isHost() ? onTransferHost : undefined}
+          onChangeTeam={onChangeTeam}
         />
       </div>
 

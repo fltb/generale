@@ -1,10 +1,12 @@
 import type { SyncedStateClientGenericSyncAction, SyncedStateServerEvent } from "../connection/sync-store-type";
 import type { MaskedGameState, PlayerId, PlayerOperation } from "./core-type";
+import type { SyncedPreGameServerEventPayload } from "./room/synced-pre-game-state-type";
 
 export interface SyncedGameState extends MaskedGameState {
     playerDisplay: {
         [k: PlayerId]: {
             tileColor: number; // hex color value
+            name: string; // player name to display
         }
     },
     playerOperationQueue: PlayerOperation[];
@@ -28,7 +30,7 @@ export type SyncedGameClientActions =
     | SyncedGameClientPlayerOperationPushAction
     | SyncedGameClientPlayerOperationClancelAllAction;
 
-export type SyncedGameServerEvent = SyncedStateServerEvent<SyncedGameState, never>;
+export type SyncedGameServerEvent = SyncedStateServerEvent<SyncedGameState, SyncedPreGameServerEventPayload>;
 export { SyncedStateServerEventType as SyncedGameServerEventType } 
   from '../connection/sync-store-type';
 

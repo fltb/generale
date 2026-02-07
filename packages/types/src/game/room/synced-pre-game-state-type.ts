@@ -1,6 +1,6 @@
 import type { SyncedStateClientGenericSyncAction, SyncedStateServerEvent } from '../../connection/sync-store-type';
 import type { PreGameRoomState, PreGamePlayerInfo } from './pre-game';
-import type { PlayerId } from '../core-type';
+import type { PlayerId, TeamId } from '../core-type';
 
 /**
  * 用于前端同步的房间状态（全量同步，类似于 SyncedGameState）
@@ -48,7 +48,7 @@ export type SyncedPreGameClientChangeMapAction = SyncedStateClientGenericSyncAct
 
 export type SyncedPreGameClientChangeTeamAction = SyncedStateClientGenericSyncAction<
   SyncedPreGameClientActionTypes.CHANGE_TEAM,
-  { teamId: string }
+  { teamId: TeamId; playerId?: PlayerId } // playerId 可选：仅当 host 想改别人的队伍才会提供
 >;
 
 export type SyncedPreGameClientKickPlayerAction = SyncedStateClientGenericSyncAction<
@@ -88,7 +88,9 @@ export type SyncedPreGameClientActions =
 export enum SyncedPreGameServerEventPayloadType {
   KICKED = "kicked",
   DISBANDED = "disbanded",
-  GAME_STARTED = "gamestarted"
+  GAME_STARTED = "gamestarted",
+  GAME_ENDED = "gameended",
+  START_REJECTED = "startrejected"
 }
 
 
@@ -107,8 +109,22 @@ export interface SyncedPreGameServerGameStartedPayload {
   startedAt: number; // 时间戳，游戏开始时间
 }
 
+export interface SyncedPreGameServerGameEndedPayload {
+  type: SyncedPreGameServerEventPayloadType.GAME_ENDED,
+  endedAt?: number;
+}
 
-export type SyncedPreGameServerEventPayload = SyncedPreGameServerKickedPayload | SyncedPreGameServerDisbandedPayload | SyncedPreGameServerGameStartedPayload;
+export interface SyncedPreGameServerStartRejectedPayload {
+  type: SyncedPreGameServerEventPayloadType.START_REJECTED;
+  reason?: string;
+}
+
+export type SyncedPreGameServerEventPayload =
+  | SyncedPreGameServerKickedPayload
+  | SyncedPreGameServerDisbandedPayload
+  | SyncedPreGameServerGameStartedPayload
+  | SyncedPreGameServerGameEndedPayload
+  | SyncedPreGameServerStartRejectedPayload;
 
 export type SyncedPreGameServerEvent = SyncedStateServerEvent<SyncedPreGameState, SyncedPreGameServerEventPayload>
 
