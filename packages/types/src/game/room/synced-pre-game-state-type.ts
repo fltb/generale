@@ -26,6 +26,9 @@ export enum SyncedPreGameClientActionTypes {
   START_GAME = 'start-game',
   TRANSFER_HOST = 'transfer-host', // 房主转让
   DISBAND_ROOM = 'disband-room',   // 房间解散
+  CREATE_TEAM = 'create-team',
+  RENAME_TEAM = 'rename-team',
+  DELETE_TEAM = 'delete-team',
 }
 
 export type SyncedPreGameClientReadyAction = SyncedStateClientGenericSyncAction<
@@ -73,6 +76,22 @@ export type SyncedPreGameClientDisbandRoomAction = SyncedStateClientGenericSyncA
   SyncedPreGameClientActionTypes.DISBAND_ROOM
 >;
 
+export type SyncedPreGameCreateTeamAction = SyncedStateClientGenericSyncAction<
+  SyncedPreGameClientActionTypes.CREATE_TEAM,
+  { name: string }
+>;
+
+export type SyncedPreGameRenameTeamAction = SyncedStateClientGenericSyncAction<
+  SyncedPreGameClientActionTypes.RENAME_TEAM,
+  { teamId: TeamId; name: string }
+>;
+
+export type SyncedPreGameDeleteTeamAction = SyncedStateClientGenericSyncAction<
+  SyncedPreGameClientActionTypes.DELETE_TEAM,
+  { teamId: TeamId }
+>;
+
+
 export type SyncedPreGameClientActions =
   | SyncedPreGameClientReadyAction
   | SyncedPreGameClientUnreadyAction
@@ -83,7 +102,10 @@ export type SyncedPreGameClientActions =
   | SyncedPreGameClientLeaveRoomAction
   | SyncedPreGameClientStartGameAction
   | SyncedPreGameClientTransferHostAction
-  | SyncedPreGameClientDisbandRoomAction;
+  | SyncedPreGameClientDisbandRoomAction
+  | SyncedPreGameCreateTeamAction
+  | SyncedPreGameRenameTeamAction
+  | SyncedPreGameDeleteTeamAction;
 
 export enum SyncedPreGameServerEventPayloadType {
   KICKED = "kicked",

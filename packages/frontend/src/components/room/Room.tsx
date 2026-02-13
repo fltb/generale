@@ -10,6 +10,7 @@ import {
   type GameId,
   type PlayerId,
   GamePhase,
+  type TeamId,
 } from "@generale/types";
 import { PreGameRoomStateFrom } from "./StateForm";
 import { PlayerList } from "./PlayerList";
@@ -63,9 +64,10 @@ const makeEmptyRoom = (gameId = ""): PreGameRoomState => ({
 
 /**
  * 本地乐观 applyEvent（给 useVersionedOptimisticState 用）
- * 只做常见修改：ready/unready/change-setting/change-map/change-team 等
+ * 支持：ready/unready/change-setting/change-map/change-team 
+ *      /create-team / rename-team / delete-team 的本地显示
  */
-function applyPregameEventLocal(state: SyncedPreGameState | null, action: SyncedPreGameClientActions): SyncedPreGameState {
+function applyPregameEventLocal(state: SyncedPreGameState | null, action: SyncedPreGameClientActions | any): SyncedPreGameState {
   const base: SyncedPreGameState = structuredClone(state ?? { room: makeEmptyRoom(""), selfId: "" });
   const type = action.type;
 
@@ -97,14 +99,43 @@ function applyPregameEventLocal(state: SyncedPreGameState | null, action: Synced
         base.room.mapSetting = action.payload;
         return base;
       }
+      // ---------------- 新增本地乐观：创建 / 重命名 / 删除 队伍 ----------------
       case SyncedPreGameClientActionTypes.CHANGE_TEAM: {
-        if (action.payload?.teamId && base?.room?.players) {
-          const p = base.room.players.find((x: any) => x.id === base.selfId);
-          if (p) p.teamId = action.payload.teamId;
+        // payload: { name?: string }
+        const name = (action.payload && action.payload.name) ? String(action.payload.name).slice(0, 40) : undefined;
+        // 生成临时 id（客户端仅用于展示，服务端会下发真正 id）
+        let idx = 1;
+        const existingIds = new Set((base.room.teams ?? []).map(t => t.id));
+        while (existingIds.has(`team${idx}`)) idx++;
+        const tempId: TeamId = `team${idx}`;
+        base.room.teams = base.room.teams ?? [];
+        base.room.teams.push({ id: tempId, name: name ?? tempId });
+        base.room.teamCount = base.room.teams.length;
+        return base;
+      }
+      case SyncedPreGameClientActionTypes.RENAME_TEAM: {
+        // payload: { teamId, name }
+        const { teamId, name } = action.payload ?? {};
+        if (teamId && base.room.teams) {
+          const t = base.room.teams.find(tt => tt.id === teamId);
+          if (t && typeof name === 'string') t.name = name.slice(0, 60);
         }
         return base;
       }
-      // 其他类型不在本地乐观更改
+      case SyncedPreGameClientActionTypes.DELETE_TEAM: {
+        // payload: { teamId }
+        const { teamId } = action.payload ?? {};
+        if (teamId && base.room.teams) {
+          // Only remove if no members here (local check). Server will authoritative decide.
+          const memberCount = base.room.players.filter(p => p.teamId === teamId).length;
+          if (memberCount === 0) {
+            base.room.teams = base.room.teams.filter(t => t.id !== teamId);
+            base.room.teamCount = base.room.teams.length;
+          }
+        }
+        return base;
+      }
+      // --------------------------------------------------------------------
       default:
         return base;
     }
@@ -190,6 +221,12 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     }
   });
 
+  const getSelfPlayer = () => {
+    const players = room()?.players ?? [];
+    return players.find(p => p.id === selfId());
+  };
+  const selfReady = () => (getSelfPlayer()?.ready === 1);
+
   const onSettingChange = (nextSetting: Partial<PreGameRoomState["gameSetting"]>) => {
     const action = { type: SyncedPreGameClientActionTypes.CHANGE_SETTING, payload: nextSetting };
     synced.dispatch(action);
@@ -235,16 +272,38 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     synced.dispatch({ type: SyncedPreGameClientActionTypes.CHANGE_MAP, payload: nextMapSetting } as any);
   };
 
-  const onChangeTeam = (playerId: string, teamId: string) => {
+  // ---------------- team related handlers ----------------
+
+  // join/move to team (playerId optional - if undefined, server should interpret as self)
+  const onChangeTeam = (playerId: string | undefined, teamId: string) => {
+    const payload: any = { teamId };
+    if (playerId) payload.playerId = playerId;
     const action = {
       type: SyncedPreGameClientActionTypes.CHANGE_TEAM,
-      payload: {
-        teamId,
-        playerId
-      }
+      payload,
     };
-    // 注意：服务端在 handleClientAction 会检查发起者 pid，只允许玩家修改自己的 teamId
-    synced.dispatch({ ...action });
+    synced.dispatch(action);
+  };
+
+  // create team (only host UI will call) -> server will create real id. optimistic displayed locally.
+  const onCreateTeam = (name?: string) => {
+    const action = {
+      type: SyncedPreGameClientActionTypes.CREATE_TEAM,
+      payload: { name: name ?? undefined }
+    };
+    synced.dispatch(action);
+  };
+
+  // rename team
+  const onRenameTeam = (teamId: string, name: string) => {
+    const action = { type: SyncedPreGameClientActionTypes.RENAME_TEAM, payload: { teamId, name } };
+    synced.dispatch(action);
+  };
+
+  // delete team (local check done in UI; server is authoritative)
+  const onDeleteTeam = (teamId: string) => {
+    const action = { type: SyncedPreGameClientActionTypes.DELETE_TEAM, payload: { teamId } };
+    synced.dispatch(action);
   };
 
   const syncedState = () => {
@@ -282,10 +341,24 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           selfId={selfId()}
           hostId={room()?.hostId ?? ""}
           teamCount={room()?.teamCount ?? 2}
+          teams={room()?.teams ?? []}
           onToggleReady={(playerId, ready) => onToggleReadyForPlayer(playerId, ready)}
           onKick={isHost() ? onKick : undefined}
           onTransferHost={isHost() ? onTransferHost : undefined}
-          onChangeTeam={onChangeTeam}
+          onChangeTeam={(playerId, teamId) => {
+            // playerId here is target player id (for joining, pass undefined to mean self)
+            // We map PlayerList's join-click behaviour:
+            if (!playerId || playerId === selfId()) {
+              // normal "join team" by clicking header -> move self
+              onChangeTeam(undefined, teamId);
+            } else {
+              // host moving other player
+              onChangeTeam(playerId, teamId);
+            }
+          }}
+          onCreateTeam={isHost() ? onCreateTeam : undefined}
+          onRenameTeam={isHost() ? onRenameTeam : undefined}
+          onDeleteTeam={isHost() ? onDeleteTeam : undefined}
         />
       </div>
 
@@ -312,6 +385,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         <PreGameControls
           isHost={isHost()}
           started={room()?.started ?? false}
+          ready={selfReady()}
           onReadyToggle={(ready: boolean) => onToggleReadyForSelf(ready)}
           onStartGame={isHost() ? onStartGame : undefined}
           onLeave={onLeave}

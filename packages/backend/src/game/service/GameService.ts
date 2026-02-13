@@ -85,7 +85,6 @@ export class GameService {
 
   private roomUpdateEmitter?: (gameId: GameId) => void;
   private pregameUpdateFilters: Array<(prev?: PreGameRoomState, curr?: PreGameRoomState) => boolean> = [];
-  private lastPregameSnapshot?: PreGameRoomState;
   // 保存从 pregame 启动游戏前的快照（用于游戏结束后恢复房间）
   private lastPreGameSnapshot?: PreGameRoomState;
 
@@ -330,7 +329,7 @@ export class GameService {
 
     this.preGameInstance.onStartGame(this.startGame.bind(this));
 
-    this.lastPregameSnapshot = structuredClone(this.preGameInstance.getState());
+    this.lastPreGameSnapshot = structuredClone(this.preGameInstance.getState());
 
     // 过滤器：玩家数量变更
     const playerCountChanged = (prev?: PreGameRoomState, curr?: PreGameRoomState) =>
@@ -351,8 +350,8 @@ export class GameService {
     this.addPreGameUpdateFilter(significantChange);
 
     this.preGameInstance.onStateChange((newState) => {
-      const prev = this.lastPregameSnapshot;
-      this.lastPregameSnapshot = structuredClone(newState);
+      const prev = this.lastPreGameSnapshot;
+      this.lastPreGameSnapshot = structuredClone(newState);
 
       let shouldEmit = false;
 

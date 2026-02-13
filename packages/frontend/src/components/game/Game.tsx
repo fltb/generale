@@ -17,6 +17,7 @@ import {
 import { MapRender } from "../MapRender";
 import { Application } from "solid-pixi";
 import PlayerList from "./PlayerList";
+import { useNavigate } from "@solidjs/router";
 
 /**
  * Props:
@@ -36,6 +37,7 @@ export interface GameWithSyncProps {
 export const GameWithSync: Component<GameWithSyncProps> = (props) => {
     const [notice, setNotice] = createSignal<string | null>(null);
     const [gameEndedInfo, setGameEndedInfo] = createSignal<SyncedPreGameServerEventPayload | null>(null);
+    const navigate = useNavigate();
 
     // minimal initial game state fallback (masked shape)
     const emptyState: SyncedGameState = {
@@ -74,12 +76,21 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
         }
     }
 
-    function handleLeaveToRoom() : void {
+    function handleBackToRoom(): void {
         const evt = gameEndedInfo();
         if (!evt) {
             return;
         }
-        props.onStateUpdate?.({event: evt});
+        props.onStateUpdate?.({ event: evt });
+    }
+
+    function handleReturnToLobby(): void {
+        const evt = gameEndedInfo();
+        if (!evt) {
+            return;
+        }
+        props.onStateUpdate?.({ event: evt });
+        navigate('/');
     }
 
     // useSyncedState for game domain
@@ -119,15 +130,18 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
         console.log("Game ended -> show result UI");
 
         setTimeout(() => {
-            handleLeaveToRoom();
+            handleBackToRoom();
         }, 5000);
     });
 
     // auto connect when domain + playerId available
-    createEffect(() => {
+    createEffect(async () => {
         if (props.domain && props.playerId) {
             try {
-                synced.connect();
+                await synced.connect();
+                // TODO:: HACK:: 临时发送一个 CLEAN_ALL 来同步，因为不发送一个 action 会导致状态不和后端同步，原因还在排查，先 hack
+                const action = { type: SyncedGameClientActionTypes.CLEAN_ALL };
+                synced.dispatch(action);
             } catch (e) {
                 console.warn("GameWithSync connect error", e);
             }
@@ -226,17 +240,19 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
                         5 秒后返回房间
                     </p>
 
-                    <button
-                        class="btn btn-primary"
-                        onClick={handleLeaveToRoom}
-                    >
-                        立即返回房间
-                    </button>
+                    <div class="flex gap-4">
+                        <button class="btn btn-primary" onClick={handleBackToRoom}>
+                            回到房间
+                        </button>
 
+                        <button class="btn btn-secondary" onClick={handleReturnToLobby}>
+                            返回大厅
+                        </button>
+                    </div>
                 </div>
 
             </Show>
-            
+
             <div class="card bg-base-200 p-3">
                 <div class="font-semibold mb-2">
                     SyncedGameState（实时）

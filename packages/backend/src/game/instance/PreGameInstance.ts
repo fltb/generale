@@ -94,7 +94,13 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     return id;
   }
 
-  /** Remove any teams that have zero members, but keep at least MIN_TEAMS teams. */
+  /**
+   * Remove any teams that have zero members, but keep at least MIN_TEAMS teams.
+   *
+   * NOTE: This was previously called automatically on many operations.
+   *       Per new requirement, we only call this when the game is about to start
+   *       (or any other explicit time you want to clean empty teams).
+   */
   private removeEmptyTeams() {
     // compute counts
     const counts = new Map<string, number>();
@@ -152,6 +158,12 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
         this.transferHost(pid, evt.payload.newHostId); break;
       case SyncedPreGameClientActionTypes.DISBAND_ROOM:
         this.disbandRoom(pid); break;
+      case SyncedPreGameClientActionTypes.CREATE_TEAM:
+        this.createTeam(pid, evt.payload.name); break;
+      case SyncedPreGameClientActionTypes.RENAME_TEAM:
+        this.renameTeam(pid, evt.payload.teamId, evt.payload.name); break;
+      case SyncedPreGameClientActionTypes.DELETE_TEAM:
+        this.deleteTeam(pid, evt.payload.teamId); break;
       default:
         // ignore
         break;
@@ -183,7 +195,11 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     this.state.mapSetting = mapSetting;
   }
 
-  /** 换队 */
+  /** 换队
+   *
+   * NOTE: 不再自动删除空队（allow empty teams to remain).
+   * 空队会在 tryStartGame 前统一清理。
+   */
   private changeTeam(pid: PlayerId, teamId: TeamId | undefined, targetPlayerId?: PlayerId) {
     // 默认 target 为 requester（即玩家修改自己）
     const targetId = targetPlayerId ?? pid;
@@ -207,9 +223,50 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       target.teamId = realTeamId;
     }
 
-    // after changing, remove any empty teams and sync teamCount
-    this.removeEmptyTeams();
+    // NOTE: 不在此处自动删除空队，保留空队以便后续加入或房主管理。
   }
+
+  private createTeam(pid: PlayerId, name: string) {
+    if (pid !== this.state.hostId) return;
+    
+    const id = this.createTeamId();
+    this.state.teams.push({ id, name });
+
+    this.state.teamCount = this.state.teams.length;
+  }
+
+  private renameTeam(pid: PlayerId, teamId: TeamId, name: string) {
+    if (pid !== this.state.hostId) return;
+
+    const team = this.state.teams.find(t => t.id === teamId);
+    if (!team) return;
+
+    team.name = name;
+  }
+
+  private deleteTeam(pid: PlayerId, teamId: TeamId) {
+    if (pid !== this.state.hostId) return;
+
+    if (this.state.teams.length <= this.MIN_TEAMS) return;
+
+    // 找到目标队伍
+    const team = this.state.teams.find(t => t.id === teamId);
+    if (!team) return;
+
+    // 把该队伍玩家移动到第一个队伍
+    const fallback = this.state.teams.find(t => t.id !== teamId);
+    if (!fallback) return;
+
+    for (const p of this.state.players) {
+      if (p.teamId === teamId) {
+        p.teamId = fallback.id;
+      }
+    }
+
+    this.state.teams = this.state.teams.filter(t => t.id !== teamId);
+    this.state.teamCount = this.state.teams.length;
+  }
+
 
   /** 踢人（仅房主） */
   private kickPlayer(target: PlayerId) {
@@ -255,8 +312,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       this.autoTransferHost();
     }
 
-    // clean up empty teams (auto remove)
-    this.removeEmptyTeams();
+    // NOTE: 不在此处自动清理空队，空队应当保留直到游戏开始时统一清理
 
     if (this.state.players.length === 0) {
       console.debug("[PreGameInstance] all players left, auto destory")
@@ -319,6 +375,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   /** 检查是否可开始游戏并广播 */
   private tryStartGame(pid: PlayerId) {
     if (pid !== this.state.hostId) return;
+
+    // 在真正开始游戏之前，清理空队伍，保证开始时 teams 数量和非空队伍一致
+    this.removeEmptyTeams();
+
     const res = this.canStart();
     if (!res.ok) {
       const conn = this.connectors.get(pid);
@@ -563,17 +623,21 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       this.state.hostId = playerId;
     }
 
-    // ensure at least MIN_TEAMS exist
-    if (!this.state.teams || this.state.teams.length < this.MIN_TEAMS) {
-      while (!this.state.teams || this.state.teams.length < this.MIN_TEAMS) {
-        const id = this.createTeamId();
-        if (!this.state.teams) this.state.teams = [];
-        this.state.teams.push({ id, name: id });
-      }
-      this.state.teamCount = this.state.teams.length;
-    }
+    // 如果当前 teams 数量 < MIN_TEAMS，则为本次加入的玩家创建一个新的队伍并把玩家放入该队。
+    if (!this.state.teams) this.state.teams = [];
+    let defaultTeamId: TeamId | undefined = undefined;
 
-    const defaultTeamId = (this.state.teams && this.state.teams[0]) ? this.state.teams[0].id : this.ensureTeamExists();
+    if (this.state.teams.length < this.MIN_TEAMS) {
+      // 为当前加入的玩家创建一个专属队伍（id 由 createTeamId 生成）
+      const newTeamId = this.createTeamId();
+      // 队伍名使用 id 作为默认名（可以改为 `${playerName}'s Team`）
+      this.state.teams.push({ id: newTeamId, name: newTeamId });
+      this.state.teamCount = this.state.teams.length;
+      defaultTeamId = newTeamId;
+    } else {
+      // 正常逻辑：把玩家放到第一个队，或保持既有队列行为
+      defaultTeamId = (this.state.teams && this.state.teams[0]) ? this.state.teams[0].id : this.ensureTeamExists();
+    }
 
     // 添加玩家到状态
     this.state.players.push({
@@ -581,7 +645,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       name: playerName,
       isHost,
       ready: isHost ? 1 : 0, // 房主默认准备
-      teamId: defaultTeamId,
+      teamId: defaultTeamId!,
       tileColor: this.getAvailableTileColor(), // 默认队伍
     });
 
@@ -599,10 +663,9 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     this.version++;
     this.broadcastState();
 
-    console.log(`[PreGameInstance] Player ${playerId} (${playerName}) added to room, isHost: ${isHost}`);
+    console.log(`[PreGameInstance] Player ${playerId} (${playerName}) added to room, isHost: ${isHost}, assignedTeam: ${defaultTeamId}`);
     return { success: true };
   }
-
   /** 移除玩家（用于 GameService） */
   public removePlayerById(playerId: PlayerId): void {
     this.removePlayer(playerId);
