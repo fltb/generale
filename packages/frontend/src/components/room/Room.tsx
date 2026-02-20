@@ -1,4 +1,4 @@
-import { type Component, createSignal, createEffect, Show } from "solid-js";
+import { type Component, createSignal, createEffect, Show, onCleanup } from "solid-js";
 import {
   type SyncedPreGameState,
   type SyncedPreGameServerEventPayload,
@@ -24,6 +24,11 @@ export interface RoomWithSyncProps {
   gameId: GameId;
   playerName: string;
   autoOpen?: boolean;
+  /**
+   * visible: 控制 UI 显示（true 显示；false 隐藏但保持挂载）
+   * 这样可以避免组件被销毁，从而避免 websocket 重连 / pregame instance 被误销毁的问题。
+   */
+  visible?: boolean;
   /**
    * 父级回调：RoomWithSync 会在本地 state 更新 / server custom event 等场景调用此回调
    * 参数示例:
@@ -221,6 +226,10 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     }
   });
 
+  // Note: we DO NOT disconnect on unmount here so the component can be hidden
+  // while keeping the websocket connection alive. onLeave still calls synced.disconnect()
+  // when the user explicitly leaves the room.
+
   const getSelfPlayer = () => {
     const players = room()?.players ?? [];
     return players.find(p => p.id === selfId());
@@ -318,8 +327,20 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   const selfId = () => syncedState().selfId;
   const isHost = () => (room()?.hostId ?? "") === selfId();
 
+  // Render: control visibility via root wrapper style so component never unmounts
+  const wrapperStyle: Record<string, string> = {
+    display: props.visible === false ? "none" : "block",
+  };
+
+  onCleanup(() => {
+    try {
+      console.debug("[pregame room]: on cleanup disconnected")
+      synced.disconnect();
+    } catch { }
+  });
+
   return (
-    <div class="p-6">
+    <div style={wrapperStyle} class="p-6" aria-hidden={props.visible === false}>
       <div class="card bg-base-200 p-4">
         <div class="flex items-center justify-between">
           <div>

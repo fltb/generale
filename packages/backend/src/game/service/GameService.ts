@@ -51,7 +51,7 @@ export type GameServiceConfig = {
 })
 export type ConnectionInfo = {
   phase: GamePhase;
-  domains: { primary: string; chat: string };
+  domains: { primary: string; pregame?: string; chat: string };
 };
 
 export type ConnectionResult =
@@ -144,8 +144,14 @@ export class GameService {
 
 
       // 检查阶段是否允许 pregame 连接
-      if (this.phase !== GamePhase.PREGAME) {
-        connector.close(4002, 'Invalid phase for pregame');
+      // if (this.phase !== GamePhase.PREGAME) {
+      //   connector.close(4002, 'Invalid phase for pregame');
+      //   return;
+      // }
+
+      // pregame domain 在 PREGAME 与 INGAME 期间都允许连接，为了方便恢复房间
+      if (this.phase === GamePhase.DISBANDED) {
+        connector.close(4004, 'Game disbanded');
         return;
       }
 
@@ -467,9 +473,14 @@ export class GameService {
     this.scheduleGameTicks(state.gameSetting?.speed ?? 1.0);
 
     // 清理 PreGameInstance
-    this.preGameInstance.destroy();
-    this.preGameInstance = null;
+    // this.preGameInstance.destroy();
+    // this.preGameInstance = null;
 
+    try {
+      this.preGameInstance.suspend();
+    } catch (err) {
+      // ignore if not implemented
+    }
     // 触发游戏开始回调
     this.onGameStartCallback?.();
     this.emitRoomUpdatedToManager();
@@ -505,40 +516,37 @@ export class GameService {
     }
 
     // 恢复为 PREGAME：使用 lastPreGameSnapshot（优先），如果没有则从旧的 gameState 尝试构建一个基本的 pregame 状态
-    let restoredPreGameState: PreGameRoomState | null = null;
 
-    if (this.lastPreGameSnapshot) {
-      restoredPreGameState = structuredClone(this.lastPreGameSnapshot);
+    if (this.preGameInstance) {
+      this.preGameInstance.resume();
     } else {
-      // 尝试从 gameInstance 的残留数据构造（降级方案）
+      // 解散房间（降级方案）
       console.error(`[GameService ${this.gameId}] Failed to build fallback pregame state, disbanding game`);
       this.disbandGame();
       return;
     }
 
-    // 将房间恢复到 pregame：创建新的 PreGameInstance（connectors 传空 map，客户端连接时会重新打开 pregame 域并加入）
-    this.preGameInstance = new PreGameInstance(restoredPreGameState, new Map());
     this.phase = GamePhase.PREGAME;
     this.chatInstance.activeStageInstance = this.preGameInstance;
 
-    // 重新注册 startGame 回调和 pregame -> manager 转发
-    this.preGameInstance.onStartGame(this.startGame.bind(this));
-    this.preGameInstance.onStateChange(() => {
-      this.emitRoomUpdatedToManager();
-    });
-    this.preGameInstance.onDisband(() => {
-      this.disbandGame();
-    })
+    // 因为是 resume，所以无需处理
+    // this.preGameInstance.onStartGame(this.startGame.bind(this));
+    // this.preGameInstance.onStateChange(() => {
+    //   this.emitRoomUpdatedToManager();
+    // });
+    // this.preGameInstance.onDisband(() => {
+    //   this.disbandGame();
+    // })
     // 通知 manager 房间已变更（从 INGAME -> PREGAME）
     this.emitRoomUpdatedToManager();
 
     console.log(`[GameService ${this.gameId}] Game ended and room restored to pregame with ${this.preGameInstance.getState().players.length} players`);
   }
 
-  public forceDispose():void {
+  public forceDispose(): void {
     if (this.phase === GamePhase.DISBANDED) return;
 
-        // Clear tick timer on disband
+    // Clear tick timer on disband
     this.clearTickTimer();
 
     console.log(`[GameService ${this.gameId}] disposing game...`);
@@ -760,6 +768,7 @@ export class GameService {
         }
 
         primary = `game-${this.gameId}`;
+        // also expose pregame domain so client may keep it open during ingame
         break;
 
       case GamePhase.ENDED:
@@ -787,6 +796,7 @@ export class GameService {
         phase,
         domains: {
           primary,
+          pregame: `pregame-${this.gameId}`,
           chat: `chat-${this.gameId}`
         },
       }

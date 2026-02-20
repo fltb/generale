@@ -45,6 +45,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   private nextTeamSeq = 1; // 用于自动生成 team id
   private readonly MIN_TEAMS = 2;
 
+  private suspended = false;
 
   constructor(initialState: PreGameRoomState, initialConnectors: Map<PlayerId, PreGameServerConnector>) {
     this.state = structuredClone(initialState);
@@ -228,7 +229,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
   private createTeam(pid: PlayerId, name: string) {
     if (pid !== this.state.hostId) return;
-    
+
     const id = this.createTeamId();
     this.state.teams.push({ id, name });
 
@@ -679,5 +680,22 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   /** 检查是否可以开始游戏 */
   public canStartGame(): boolean {
     return this.canStart().ok;
+  }
+
+  public suspend() {
+    this.suspended = true;
+    // optional: avoid emitting onStateChangeCallbacks
+    try {
+      this.prevSentState.clear();
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  public resume() {
+    this.suspended = false;
+    // broadcast snapshot to all connectors so clients in pregame get consistent view
+    this.version++;
+    this.broadcastState(true);
   }
 }

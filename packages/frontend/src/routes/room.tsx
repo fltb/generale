@@ -26,8 +26,11 @@ const RoomRoute: Component = () => {
 
   const [playerId, setPlayerId] = createSignal<string | null>(null);
   const [playerName, setPlayerName] = createSignal<string | null>(null);
-  const [domainPrimary, setDomainPrimary] = createSignal<string | null>(null);
-  const [domainChat, setDomainChat] = createSignal<string | null>(null);
+
+  // 分离的 domain signals，避免互相覆盖导致重复 mount
+  const [pregameDomain, setPregameDomain] = createSignal<string | null>(null);
+  const [gameDomain, setGameDomain] = createSignal<string | null>(null);
+  const [chatDomain, setChatDomain] = createSignal<string | null>(null);
 
   const [phase, setPhase] = createSignal<GamePhase>(GamePhase.PREGAME);
 
@@ -39,7 +42,7 @@ const RoomRoute: Component = () => {
 
   /**
    * 初始 / 刷新连接信息（authoritative）
-   * ⚠️ pregame → ingame 必须重新调用
+   * 只更新对应 domain，避免覆盖另一个 domain 导致组件重建。
    */
   async function refreshConnectionInfo() {
     if (!params.id) return;
@@ -55,13 +58,37 @@ const RoomRoute: Component = () => {
       }
 
       const data = resp.data;
-      setPlayerId(data.playerId);
-      setPlayerName("Guest"); // TODO:: get player name by api
-      setPhase(data.phase);
-      setDomainPrimary(data.domains.primary);
 
-      setDomainChat(data.domains.chat);
-      setChatVisible(true);
+      // player info
+      setPlayerId(prev => (prev !== data.playerId ? data.playerId : prev));
+      setPlayerName(prev => (prev ?? "Guest") || "Guest");
+
+      // authoritative phase
+      setPhase(prev => (prev !== data.phase ? data.phase : prev));
+
+      // domains: prefer explicit fields if provided
+      const dPregame = data.domains?.pregame ?? null;
+      const dPrimary = data.domains?.primary ?? null;
+      const dChat = data.domains?.chat ?? null;
+
+      // Update pregame domain if provided; if not provided but we're in PREGAME,
+      // fall back to primary.
+      if (dPregame) {
+        if (pregameDomain() !== dPregame) setPregameDomain(dPregame);
+      } else if (data.phase === GamePhase.PREGAME && dPrimary) {
+        if (pregameDomain() !== dPrimary) setPregameDomain(dPrimary);
+      }
+
+      // Update game domain when server says INGAME (primary should be game-*)
+      if (data.phase === GamePhase.INGAME && dPrimary) {
+        if (gameDomain() !== dPrimary) setGameDomain(dPrimary);
+      }
+
+      // chat domain update
+      if (dChat && chatDomain() !== dChat) setChatDomain(dChat);
+
+      // IMPORTANT: do not clear pregameDomain when entering INGAME.
+      // We intentionally keep it so RoomWithSync can remain connected.
     } catch (err: any) {
       setError(err?.message ?? String(err));
     } finally {
@@ -101,12 +128,17 @@ const RoomRoute: Component = () => {
 
       case SyncedPreGameServerEventPayloadType.GAME_STARTED: {
         /**
-         * ⚠️ 核心修复点
-         *
-         * GAME_STARTED 只是 notification
-         * 不能直接切 UI
-         * 必须重新向 server 要 game-* domain
+         * GAME_STARTED 只是 notification（服务器权威）
+         * 我们需要再次请求连接信息以拿到 game-* domain。
          */
+        await refreshConnectionInfo();
+        break;
+      }
+
+      case SyncedPreGameServerEventPayloadType.GAME_ENDED: {
+        // immediate UI feedback
+        setPhase(GamePhase.PREGAME);
+        // authoritative refresh (may update pregame/chat/game domains)
         await refreshConnectionInfo();
         break;
       }
@@ -119,7 +151,7 @@ const RoomRoute: Component = () => {
   return (
     <main class="container mx-auto p-6">
       <Switch>
-        <Match when={error()}>
+        <Match when={!!error()}>
           <div class="alert alert-error mb-4">
             <span>{error()}</span>
             <button
@@ -135,34 +167,10 @@ const RoomRoute: Component = () => {
           <div class="card p-4 mb-4">Preparing connection…</div>
         </Match>
 
-        {/* ---------- PREGAME ---------- */}
-        <Match
-          when={
-            phase() === GamePhase.PREGAME &&
-            domainPrimary() &&
-            playerId()
-          }
-        >
-          <RoomWithSync
-            domain={domainPrimary()!}
-            gameId={params.id!}
-            playerId={playerId()!}
-            playerName={playerName() ?? "Guest"}
-            autoOpen
-            onStateUpdate={handleStateUpdate}
-          />
-        </Match>
-
-        {/* ---------- INGAME ---------- */}
-        <Match
-          when={
-            phase() === GamePhase.INGAME &&
-            domainPrimary() &&
-            playerId()
-          }
-        >
+        {/* ---------- INGAME (显示 game UI) ---------- */}
+        <Match when={phase() === GamePhase.INGAME && gameDomain() && playerId()}>
           <GameWithSync
-            domain={domainPrimary()!} // ⚠️ 必须是 game-*
+            domain={gameDomain()!} // MUST be game-*
             gameId={params.id!}
             playerId={playerId()!}
             onStateUpdate={handleStateUpdate}
@@ -183,8 +191,24 @@ const RoomRoute: Component = () => {
         </Match>
       </Switch>
 
+      {/* ---------------------------------------------------------
+          RoomWithSync：**只挂载一次**，通过 visible 控制显示（避免反复 mount/unmount）
+          保持连接在 INGAME 期间也不关闭（hidden but still mounted）
+         --------------------------------------------------------- */}
+      <Show when={pregameDomain() && playerId()}>
+        <RoomWithSync
+          domain={pregameDomain()!}
+          gameId={params.id!}
+          playerId={playerId()!}
+          playerName={playerName() ?? "Guest"}
+          autoOpen
+          visible={phase() === GamePhase.PREGAME}
+          onStateUpdate={handleStateUpdate}
+        />
+      </Show>
+
       {/* ---------- Chat floating window (bottom-right) ---------- */}
-      <Show when={domainChat() && playerId()}>
+      <Show when={chatDomain() && playerId()}>
         <div class="fixed bottom-4 right-4 z-50">
           {/* Minimized button */}
           <Show when={!chatVisible()}>
@@ -230,7 +254,7 @@ const RoomRoute: Component = () => {
 
               <div class="p-2">
                 <ChatPanel
-                  domain={domainChat()!}
+                  domain={chatDomain()!}
                   userId={playerId()!}
                   userName={playerName() ?? "Guest"}
                   autoOpen

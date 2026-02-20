@@ -125,6 +125,7 @@ export const connectWsSuccessRespSchema = t.Object({
         phase: t.Enum(GamePhase),
         domains: t.Object({
             primary: t.String(),
+            pregame: t.Optional(t.String()),
             chat: t.String(),
         }),
         message: t.String()

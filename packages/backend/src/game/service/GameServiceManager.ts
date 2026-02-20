@@ -96,7 +96,6 @@ export class GameServiceManager {
     this.gameServices.set(config.gameId, gameService);
 
     // existing cleanup callbacks...
-    gameService.onGameEnd(() => this.removeGame(config.gameId));
     gameService.onDisband(() => this.removeGame(config.gameId));
 
     // --- new: emit created event ---
