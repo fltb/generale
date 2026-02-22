@@ -1,4 +1,4 @@
-import { type Component, createSignal, createEffect, Show, onCleanup, createMemo } from "solid-js";
+import { type Component, createSignal, createEffect, Show, onCleanup, createMemo, onMount } from "solid-js";
 import { useSyncedState } from "~/hooks/useSyncedState";
 import {
     type SyncedGameState,
@@ -135,16 +135,14 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
     });
 
     // auto connect when domain + playerId available
-    createEffect(async () => {
-        if (props.domain && props.playerId) {
-            try {
-                await synced.connect();
-                // TODO:: HACK:: 临时发送一个 CLEAN_ALL 来同步，因为不发送一个 action 会导致状态不和后端同步，原因还在排查，先 hack
-                const action = { type: SyncedGameClientActionTypes.CLEAN_ALL };
-                synced.dispatch(action);
-            } catch (e) {
-                console.warn("GameWithSync connect error", e);
-            }
+    onMount(async () => {
+        try {
+            await synced.connect();
+            // TODO:: HACK:: 临时发送一个 CLEAN_ALL 来同步，因为不发送一个 action 会导致状态不和后端同步，原因还在排查，先 hack
+            const action = { type: SyncedGameClientActionTypes.CLEAN_ALL };
+            synced.dispatch(action);
+        } catch (e) {
+            console.warn("GameWithSync connect error", e);
         }
     });
 

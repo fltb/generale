@@ -1,4 +1,4 @@
-import { type Component, createSignal, createEffect, Show, onCleanup } from "solid-js";
+import { type Component, createSignal, createEffect, Show, onCleanup, onMount } from "solid-js";
 import {
   type SyncedPreGameState,
   type SyncedPreGameServerEventPayload,
@@ -107,15 +107,6 @@ function applyPregameEventLocal(state: SyncedPreGameState | null, action: Synced
       // ---------------- 新增本地乐观：创建 / 重命名 / 删除 队伍 ----------------
       case SyncedPreGameClientActionTypes.CHANGE_TEAM: {
         // payload: { name?: string }
-        const name = (action.payload && action.payload.name) ? String(action.payload.name).slice(0, 40) : undefined;
-        // 生成临时 id（客户端仅用于展示，服务端会下发真正 id）
-        let idx = 1;
-        const existingIds = new Set((base.room.teams ?? []).map(t => t.id));
-        while (existingIds.has(`team${idx}`)) idx++;
-        const tempId: TeamId = `team${idx}`;
-        base.room.teams = base.room.teams ?? [];
-        base.room.teams.push({ id: tempId, name: name ?? tempId });
-        base.room.teamCount = base.room.teams.length;
         return base;
       }
       case SyncedPreGameClientActionTypes.RENAME_TEAM: {
@@ -216,19 +207,21 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   });
 
   // auto connect when domain + playerId available
-  createEffect(() => {
-    if (props.domain && props.playerId) {
-      try {
-        synced.connect();
-      } catch (e) {
-        console.warn("RoomWithSync connect error", e);
-      }
+  onMount(() => {
+    try {
+      synced.connect();
+    } catch (e) {
+      console.warn("RoomWithSync connect error", e);
     }
+    console.debug("[Preagame room]: mounted and connected")
   });
 
-  // Note: we DO NOT disconnect on unmount here so the component can be hidden
-  // while keeping the websocket connection alive. onLeave still calls synced.disconnect()
-  // when the user explicitly leaves the room.
+  onCleanup(() => {
+    try {
+      synced.disconnect();
+    } catch { }
+    console.debug("[Preagame room]: cleanup and disconnected")
+  });
 
   const getSelfPlayer = () => {
     const players = room()?.players ?? [];

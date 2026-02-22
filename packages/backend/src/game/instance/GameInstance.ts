@@ -58,7 +58,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     /** 触发所有结束回调 */
     private triggerEndGame(result: GameEndResult) {
         for (const callback of this.onEndGameCallbacks) {
-            callback(result);
+            try { callback(result); } catch (e) { console.error("[GameInstance] onEndGame callback error", e); }
         }
     }
 
@@ -87,13 +87,15 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     public destroy() {
         this.destroyed = true;
         for (const [_pid, connector] of this.connectors) {
-            connector.close();
+            try { connector.close(); } catch { }
         }
         this.connectors.clear();
         this.syncData.clear();
         this.prevSentState.clear();
         this.disconnected.clear();
-        this.state = null as any;
+        // release state reference
+        // @ts-ignore
+        this.state = null;
         this.version = 0;
     }
 
@@ -114,52 +116,129 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     }
 
     /**
+     * 确保 syncData 存在（late-join / reconnect 场景）
+     */
+    private ensureSyncEntry(pid: PlayerId) {
+        if (this.syncData.has(pid)) return this.syncData.get(pid)!;
+        const masked = mask(this.state, pid);
+        const entry: SyncEntry = {
+            lastConfirmedOp: 0,
+            syncedState: {
+                ...masked,
+                playerDisplay: this.settings.playerDisplay,
+                playerOperationQueue: [],
+            }
+        };
+        this.syncData.set(pid, entry);
+        return entry;
+    }
+
+    /**
      * 动态绑定/替换某个玩家的 connector
      */
-    /** 动态添加玩家（用于 GameService） */
     public addPlayer(user: { id: PlayerId, name: string }, connector: GameServerConnector): { success: true } | { success: false, message: string } {
         const playerId = user.id;
         const res = this.canJoin(playerId);
         if (!res.success) {
             return res;
         }
+
+        // set connector
         this.connectors.set(playerId, connector);
-        connector.onOpen(() => this.sendState(playerId, true));
-        connector.onDisconnect(() => this.disconnected.add(playerId));
-        connector.onReconnect(() => {
-            this.disconnected.delete(playerId);
-            this.sendState(playerId, true);
+
+        // ensure we have a sync entry for this player (in case they were not in initial playerIds)
+        this.ensureSyncEntry(playerId);
+
+        // register connector callbacks
+        connector.onOpen(() => {
+            try {
+                // mark as connected
+                this.disconnected.delete(playerId);
+                // Always send a forced snapshot on open to ensure the client gets authoritative state
+                this.sendState(playerId, true);
+            } catch (e) {
+                console.warn(`[GameInstance] onOpen sendState error for ${playerId}`, e);
+            }
         });
-        connector.onClientMessage(evt => this.handleClientEvent(playerId, evt));
-        connector.onClose(() => this.removeConnector(playerId));
+
+        connector.onDisconnect(() => {
+            // mark as disconnected; do not remove sync data
+            this.disconnected.add(playerId);
+        });
+
+        connector.onReconnect(() => {
+            try {
+                this.disconnected.delete(playerId);
+                // send forced snapshot on reconnect
+                this.sendState(playerId, true);
+            } catch (e) {
+                console.warn(`[GameInstance] onReconnect sendState error for ${playerId}`, e);
+            }
+        });
+
+        connector.onClientMessage(evt => {
+            try {
+                this.handleClientEvent(playerId, evt);
+            } catch (e) {
+                console.warn(`[GameInstance] handleClientEvent error for ${playerId}`, e);
+            }
+        });
+
+        connector.onClose(() => {
+            // remove connector but keep syncData for resume
+            this.removeConnector(playerId);
+        });
+
+        // Immediately attempt to send a snapshot (in case connection is already open)
+        // Use microtask so that if connector is still initializing we avoid racing issues.
+        Promise.resolve().then(() => {
+            try {
+                this.sendState(playerId, true);
+            } catch (e) {
+                // ignore — onOpen will try again
+            }
+        });
+
         return { success: true };
     }
 
     /**
-     * 移除某个玩家的 connector
+     * 移除某个玩家的 connector（不删除 syncData）
      */
     public removeConnector(playerId: PlayerId) {
         this.connectors.delete(playerId);
     }
 
     private handleClientEvent(pid: PlayerId, evt: SyncedGameClientActions) {
-        const synced = this.syncData.get(pid)!;
-        console.debug(`[game instance (pid: ${pid})] recv event`, evt);
-        if (synced.lastConfirmedOp >= evt.optimisticId) {
-            console.debug(`[game instance (pid: ${pid})] lastConfirmedOp(${synced.lastConfirmedOp}) >= evt.optimisticId(${evt.optimisticId}), giveup`);
+        const synced = this.ensureSyncEntry(pid);
+        console.debug(`[GameInstance] recv event from ${pid}`, evt);
+
+        // robust optimisticId check
+        const optimisticId = (evt && typeof (evt as any).optimisticId === 'number') ? (evt as any).optimisticId : undefined;
+        if (typeof optimisticId === 'number' && synced.lastConfirmedOp >= optimisticId) {
+            console.debug(`[GameInstance] drop stale evt from ${pid} optimisticId=${optimisticId} lastConfirmedOp=${synced.lastConfirmedOp}`);
             return;
         }
+
         switch (evt.type) {
             case SyncedGameClientActionTypes.PUSH: {
-                synced.syncedState.playerOperationQueue = [...synced.syncedState.playerOperationQueue, ...evt.payload];
-                console.debug(`[game instance (pid: ${pid})] set playerOperationQueue to`, synced.syncedState.playerOperationQueue);
+                const ops = evt.payload ?? [];
+                synced.syncedState.playerOperationQueue = [...(synced.syncedState.playerOperationQueue ?? []), ...ops];
+                console.debug(`[GameInstance] ${pid} queued ops ->`, synced.syncedState.playerOperationQueue);
             } break;
             case SyncedGameClientActionTypes.CLEAN_ALL: {
                 synced.syncedState.playerOperationQueue = [];
-                console.debug(`[game instance (pid: ${pid})] clear playerOperationQueue to`, synced.syncedState.playerOperationQueue);
+                console.debug(`[GameInstance] ${pid} cleared ops`);
             } break;
+            default:
+                console.debug(`[GameInstance] unknown client action type from ${pid}`, evt);
+                break;
         }
-        synced.lastConfirmedOp = evt.optimisticId;
+
+        // update lastConfirmedOp if optimisticId provided
+        if (typeof optimisticId === 'number') {
+            synced.lastConfirmedOp = optimisticId;
+        }
     }
 
     /**
@@ -168,11 +247,18 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
      * forceSnapshot: 是否强制发送全量
      */
     private sendState(pid: PlayerId, forceSnapshot = false) {
-        if (this.disconnected.has(pid)) return;
+        if (this.disconnected.has(pid)) {
+            // client currently disconnected — skip send
+            return;
+        }
         const conn = this.connectors.get(pid);
-        if (!conn) return;
+        if (!conn) {
+            // no connector available
+            return;
+        }
 
-        const entry = this.syncData.get(pid)!;
+        // ensure we have an entry
+        const entry = this.ensureSyncEntry(pid);
         const current = entry.syncedState;
 
         const payloadBase = {
@@ -180,60 +266,73 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
             confirmedOp: entry.lastConfirmedOp
         };
 
-        // 如果没有 prevSentState 或者强制 snapshot，就直接发全量
+        // if no prevSent or forced snapshot -> send snapshot
         if (!this.prevSentState.has(pid) || forceSnapshot) {
-            conn.send({
-                type: SyncedGameServerEventType.STATE_UPDATE,
-                payload: {
-                    type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
-                    ...payloadBase,
-                    payload: current
-                }
-            });
-            // 记录下来，供下次 diff
-            this.prevSentState.set(pid, structuredClone(current));
+            try {
+                conn.send({
+                    type: SyncedGameServerEventType.STATE_UPDATE,
+                    payload: {
+                        type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
+                        ...payloadBase,
+                        payload: current
+                    }
+                });
+                this.prevSentState.set(pid, structuredClone(current));
+            } catch (e) {
+                console.warn(`[GameInstance] failed to send snapshot to ${pid}`, e);
+            }
             return;
         }
 
         const prev = this.prevSentState.get(pid)!;
-        // 否则走 diff 流程
         const patches = compare(prev, current);
 
-        // 临时的判断，以后会根据经验参数之类的方式判断是否发 snapshot
+        // heuristics: if many patches, send snapshot
         if (patches.length > 1000) {
-            conn.send({
-                type: SyncedGameServerEventType.STATE_UPDATE,
-                payload: {
-                    type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
-                    ...payloadBase,
-                    payload: current
-                }
-            });
+            try {
+                conn.send({
+                    type: SyncedGameServerEventType.STATE_UPDATE,
+                    payload: {
+                        type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
+                        ...payloadBase,
+                        payload: current
+                    }
+                });
+            } catch (e) {
+                console.warn(`[GameInstance] failed to send large snapshot to ${pid}`, e);
+            }
         } else {
-            console.debug(`[game instance (pid: ${pid})] send update patch: `, patches)
-            conn.send({
-                type: SyncedGameServerEventType.STATE_UPDATE,
-                payload: {
-                    type: SyncedGameServerStateUpdatePayloadType.PATCH,
-                    ...payloadBase,
-                    payload: patches
-                }
-            });
+            try {
+                conn.send({
+                    type: SyncedGameServerEventType.STATE_UPDATE,
+                    payload: {
+                        type: SyncedGameServerStateUpdatePayloadType.PATCH,
+                        ...payloadBase,
+                        payload: patches
+                    }
+                });
+            } catch (e) {
+                console.warn(`[GameInstance] failed to send patch to ${pid}`, e);
+            }
         }
 
-        // 更新 prevSentState
+        // update prevSentState copy
         this.prevSentState.set(pid, structuredClone(current));
     }
 
     private broadcastGameEnded(): void {
         for (const conn of this.connectors.values()) {
-            conn.send({
-                type: SyncedGameServerEventType.CUSTOM,
-                payload: {
-                    type: SyncedPreGameServerEventPayloadType.GAME_ENDED,
-                    endedAt: Date.now()
-                }
-            })
+            try {
+                conn.send({
+                    type: SyncedGameServerEventType.CUSTOM,
+                    payload: {
+                        type: SyncedPreGameServerEventPayloadType.GAME_ENDED,
+                        endedAt: Date.now()
+                    }
+                });
+            } catch (e) {
+                console.warn("[GameInstance] broadcastGameEnded send error", e);
+            }
         }
     }
 
@@ -242,41 +341,47 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         if (this.state.status === GameStatus.Ended) {
             return;
         }
+
+        // build queues from syncData
         const queues: PlayerActionQueues = {};
         for (const [pid, synced] of this.syncData) {
             queues[pid] = synced.syncedState.playerOperationQueue;
         }
+
         const { state: newState, queue } = tick(this.state, queues);
         this.state = newState;
         this.version++;
 
-        // 对所有玩家发送状态
+        // for each connected player update their per-player syncedState (masked) and queued ops
         for (const pid of this.connectors.keys()) {
-            const synced = this.syncData.get(pid)!;
+            const synced = this.ensureSyncEntry(pid);
             synced.syncedState.playerOperationQueue = queue[pid] ?? [];
             const masked = mask(this.state, pid);
+            // merge masked fields into synced.syncedState but preserve client-specific fields
             synced.syncedState = {
                 ...synced.syncedState,
                 ...masked,
             };
         }
 
+        // send state to all connectors
         for (const pid of this.connectors.keys()) {
-            this.sendState(pid);
+            try {
+                this.sendState(pid);
+            } catch (e) {
+                console.warn(`[GameInstance] sendState error for ${pid}`, e);
+            }
         }
 
         if (this.state.status === GameStatus.Ended) {
-            // 构造 GameEndResult 对象，winnerId/原因等可根据 state 计算
-            // 只查找 status === PlayerStatus.Won 的队伍
             const winnerTeam = Object.values(this.state.teams).find(team => team.status === PlayerStatus.Won);
             let winnerId: string = '';
             if (winnerTeam && Array.isArray(winnerTeam.memberIds) && winnerTeam.memberIds.length > 0) {
                 winnerId = winnerTeam.memberIds[0] ?? '';
             }
-            const result = {
+            const result: GameEndResult = {
                 winnerId,
                 reason: 'Game ended',
-                // 可扩展更多字段
             };
             this.broadcastGameEnded();
             this.triggerEndGame(result);

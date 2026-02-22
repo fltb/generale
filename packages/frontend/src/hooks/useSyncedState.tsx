@@ -18,8 +18,8 @@ export function useSyncedState<
   initialVersion = 0,
   applyEvent,
   context = {},
-  onCustomEvent = () => {},
-  onConnectionClosed = () => {},
+  onCustomEvent = () => { },
+  onConnectionClosed = () => { },
   autoOpen = true,
 }: {
   domain: string;
@@ -43,6 +43,7 @@ export function useSyncedState<
   // NOTE: we no longer use useSubConnector hook here.
   // We'll create/attach the sub via wsMgr.getOrCreateSub when connecting.
   let sub: SubConnectorClient | null = null;
+  let connectRequested = false;
 
   // buffer outgoing messages while sub isn't ready
   const pendingOut: any[] = [];
@@ -219,10 +220,13 @@ export function useSyncedState<
       `[useSyncedState:${domain}] sub disconnected`,
       err?.message ?? ""
     );
+    // allow a future connect() call to re-request
+    connectRequested = false;
   }
 
   function _onClose(code?: number, reason?: string) {
     console.debug(`[useSyncedState:${domain}] sub closed`, code, reason);
+    connectRequested = false;
     onConnectionClosed({ code, reason });
   }
 
@@ -230,9 +234,12 @@ export function useSyncedState<
   onMount(() => {
     try {
       // If wsMgr already created a sub earlier (rare), attach handlers
-      if (wsMgr) {
-        // try to find an existing sub without creating open
-        ensureSubAndAttach();
+      // if (wsMgr) {
+      //   // try to find an existing sub without creating open
+      //   ensureSubAndAttach();
+      // }
+      if (autoOpen) {
+        connect();
       }
     } catch (e) {
       console.error(
@@ -313,40 +320,51 @@ export function useSyncedState<
   // make connect async
   async function connect() {
     try {
-      // ensure websocket connection (may kick off async connect)
+      // 如果已经准备好了，直接返回（幂等）
+      if (sub && sub.ready) {
+        console.debug(`[useSyncedState:${domain}] connect() ignored - sub.ready`);
+        return;
+      }
+      // 如果 connect 已经被请求但尚未 ready，也忽略重复请求
+      if (connectRequested) {
+        console.debug(`[useSyncedState:${domain}] connect() ignored - already requested`);
+        return;
+      }
+      connectRequested = true;
+
+      // ensure websocket connected
       if (!wsMgr || !wsMgr.isConnected) {
         wsMgr.connect(true);
       }
 
-      // wait until underlying socket is connected (short polling)
+      // wait for socket
       await waitForManagerConnected(5000);
 
-      // create local sub and attach handlers BEFORE requesting open (this is critical)
+      // create/attach sub and request domain open
       ensureSubAndAttach();
 
-      // now request server to open domain (this will add pendingOpens and send or retry)
       if (autoOpen) {
         try {
           wsMgr.openDomain(domain, context);
-          console.debug(
-            `[useSyncedState:${domain}] openDomain requested`,
-            domain,
-            context
-          );
+          console.debug(`[useSyncedState:${domain}] openDomain requested`);
         } catch (e) {
-          console.warn(`[useSyncedState:${domain}] openDomain threw`, e);
+          console.warn(`[useSyncedState:${domain}] openDomain throw`, e);
         }
       }
     } catch (e) {
+      // on failure allow retry later
+      connectRequested = false;
       console.warn(`[useSyncedState:${domain}] connect() error`, e);
+      throw e;
     }
   }
+
   function disconnect() {
     try {
       if (sub) {
         try {
           sub.close();
-        } catch {}
+        } catch { }
         // keep sub reference (manager may reattach), or optionally null it:
         sub = null;
       }

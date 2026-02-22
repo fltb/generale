@@ -265,11 +265,13 @@ bug：
 - [X] GameInstance 的 playerDisplay[] 中加入 playername, 并且把前端不存在的 playerSummery 去掉
 - [ ] 后端只有在收到玩家操作之后才后续的 tick 更新，应该尝试在前端或者后端进行不需要用户操作的协商同步
 - [X] gameover 的时候房间自己解散了，应该尝试重建。这个恢复逻辑是有问题的，因为 pregame instance 在切换到 room 之后会被销毁，但是 pregame 在 game end 之后重建的时候，又会进行 instance 的重建，但是重建的是时候不会带上 player 的信息，所以导致 instance 重建之后没有玩家，所以立刻被销毁，然后又触发了完整的房间解散流程。正确的做法是，重建的时候加上玩家信息。或者干脆在玩家进入 game 阶段时，保留 pregame 的连接，这样只有在玩家真正断线之后才会断开 pregame 的连接，重联的时候连接 chat， pregame 和 game。这样的修改.
-- [ ] 找到问题是 endgame 的时候 gameservice manager 自动删除 game 了。现在的问题是，恢复后的 pregame instance 表现异常，host 发生变化了，需要检查玩家重进 room 的逻辑。
+- [X] 找到问题是 endgame 的时候 gameservice manager 自动删除 game 了。现在的问题是，恢复后的 pregame instance 表现异常，host 发生变化了，需要检查玩家重进 room 的逻辑。
 - [X] gameover 的时候前端 UI 需要改进为：返回大厅 | 回到房间
 - [X] 前端应该增加新建队伍的方式，而且把玩家加入队伍从 option menu 变为点击队伍标题这一个更加符合操作逻辑的方式。
 - [X] 后端在玩家加入房间的时候，如果当前是队伍数量小于最小队伍数量，应该给这个玩家创建新队伍并加入。
 - [X] pregame 阶段 room 的准备按钮是坏的，只有 playerlist 里面的是好的，检查这里的问题，然后修正
+- [X] join team 的逻辑有问题，点击 team 名称试图加入 team 的时候会新建 team 而不是加入。
+- [ ] 需要在 pregame instance suspend 的时候锁定状态
 
 #### 其他计划
 

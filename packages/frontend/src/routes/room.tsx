@@ -131,6 +131,7 @@ const RoomRoute: Component = () => {
          * GAME_STARTED 只是 notification（服务器权威）
          * 我们需要再次请求连接信息以拿到 game-* domain。
          */
+        await new Promise(res => setTimeout(res, 500));
         await refreshConnectionInfo();
         break;
       }

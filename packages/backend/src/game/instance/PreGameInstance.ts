@@ -47,6 +47,9 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
   private suspended = false;
 
+  // 防重入/防重复移除标记
+  private removing: Set<PlayerId> = new Set();
+
   constructor(initialState: PreGameRoomState, initialConnectors: Map<PlayerId, PreGameServerConnector>) {
     this.state = structuredClone(initialState);
     this.nextTeamSeq = 1;
@@ -64,6 +67,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       conn.onDisconnect(() => this.removePlayer(pid));
       conn.onReconnect(() => this.sendState(pid, true));
       conn.onClientMessage(evt => this.handleClientAction(pid, evt));
+      // 统一使用 removePlayer 作为 onClose 回调（removePlayer 内部已做防重入处理）
       conn.onClose(() => this.removePlayer(pid));
     }
   }
@@ -78,8 +82,15 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     }
   }
 
-  /** ensure team exists; create if not */
-  private ensureTeamExists(teamId?: TeamId, name?: string): TeamId {
+  /**
+   * ensure team exists
+   *
+   * 改动点（更保守的策略）：
+   * - 如果没有传 teamId（undefined/null），则在 server 端创建一个新队（原有行为）
+   * - 如果传入 teamId 且服务端存在：返回该 teamId
+   * - 如果传入 teamId 且服务端**不存在**：**不再隐式创建**，返回 null（调用方需处理失败）
+   */
+  private ensureTeamExists(teamId?: TeamId, name?: string): TeamId | null {
     if (!teamId) {
       const id = this.createTeamId();
       this.state.teams.push({ id, name: name ?? id });
@@ -88,11 +99,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     }
     const found = this.state.teams.find(t => t.id === teamId);
     if (found) return found.id;
-    // not found -> create new with that id (accept provided id)
-    const id = this.createTeamId(teamId);
-    this.state.teams.push({ id, name: name ?? id });
-    this.state.teamCount = this.state.teams.length;
-    return id;
+
+    // PROTECTION: do NOT silently create when client asked for an unknown team.
+    console.warn(`[PreGameInstance] ensureTeamExists: proposed teamId "${teamId}" not found. refusing to create implicitly.`);
+    return null;
   }
 
   /**
@@ -200,6 +210,9 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
    *
    * NOTE: 不再自动删除空队（allow empty teams to remain).
    * 空队会在 tryStartGame 前统一清理。
+   *
+   * 改动点：
+   * - 当 client 请求加入一个服务端不存在的 teamId 时，拒绝并通知该玩家（不会隐式创建）
    */
   private changeTeam(pid: PlayerId, teamId: TeamId | undefined, targetPlayerId?: PlayerId) {
     // 默认 target 为 requester（即玩家修改自己）
@@ -215,12 +228,25 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       return;
     }
 
-    // If teamId is falsy (empty string), treat as "join team1" => a player must have a team
+    // If teamId is falsy (empty string / undefined), interpret as "join default team"
     if (!teamId) {
-      target.teamId = "team1";
+      // prefer existing first team; if none, create one
+      const firstTeam = (this.state.teams && this.state.teams[0]) ? this.state.teams[0].id : this.ensureTeamExists();
+      if (!firstTeam) {
+        // Shouldn't happen because ensureTeamExists() without param will create,
+        // but guard anyway.
+        console.warn("[PreGameInstance] changeTeam: cannot determine fallback team");
+        return;
+      }
+      target.teamId = firstTeam;
+      return;
     } else {
-      // ensure team exists (create if needed)
+      // ensure team exists (DO NOT create if not found)
       const realTeamId = this.ensureTeamExists(teamId);
+      if (!realTeamId) {
+        console.warn(`[PreGameInstance] changeTeam: requested unknown team "${teamId}", rejected.`);
+        return;
+      }
       target.teamId = realTeamId;
     }
 
@@ -284,7 +310,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       const conn = this.connectors.get(target);
       if (conn) {
         try { conn.close(4000, "kicked"); } catch { }
-        // connector close will call handleDisconnect/removePlayer via handlers (idempotent)
+        // connector close will call removePlayer via handlers (idempotent)
       }
       // defensively remove player now
       this.removePlayer(target);
@@ -303,23 +329,53 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     });
   }
 
-  /** 离开房间/断开 */
+  /** 离开房间/断开
+   *
+   * 这一方法现在是幂等且防重入的：
+   * - 开始时检查是否正在移除中，若是则直接返回
+   * - 如果 player 不存在且 connector 也不存在，直接返回
+   * - 会安全地关闭 connector（若存在），并删除 connector 与 player
+   */
   private removePlayer(pid: PlayerId) {
-    this.connectors.get(pid)?.close();
-    this.connectors.delete(pid);
-    this.state.players = this.state.players.filter(p => p.id !== pid);
-    // 如果房主离开，自动转让
-    if (this.state.hostId === pid) {
-      this.autoTransferHost();
-    }
+    // 防重入：如果已经在移除流程中，直接返回
+    if (this.removing.has(pid)) return;
+    this.removing.add(pid);
 
-    // NOTE: 不在此处自动清理空队，空队应当保留直到游戏开始时统一清理
+    try {
+      const conn = this.connectors.get(pid);
+      const playerExists = this.state.players.some(p => p.id === pid);
 
-    if (this.state.players.length === 0) {
-      console.debug("[PreGameInstance] all players left, auto destory")
-      this.destroy();
-    } else {
-      this.broadcastState();
+      // If nothing to do (no connector and no player) => already removed
+      if (!conn && !playerExists) {
+        return;
+      }
+
+      // Close connector if present (closing may trigger onClose, but removePlayer is guarded by `removing`)
+      if (conn) {
+        try { conn.close(); } catch (e) { /* ignore */ }
+        this.connectors.delete(pid);
+      }
+
+      // Remove player from state if present
+      if (playerExists) {
+        this.state.players = this.state.players.filter(p => p.id !== pid);
+        // 如果房主离开，自动转让
+        if (this.state.hostId === pid) {
+          this.autoTransferHost();
+        }
+
+        // NOTE: 不在此处自动清理空队，空队应当保留直到游戏开始时统一清理
+
+        if (this.state.players.length === 0) {
+          console.debug("[PreGameInstance] all players left, auto destory")
+          this.destroy();
+          return;
+        } else {
+          this.broadcastState();
+        }
+      }
+    } finally {
+      this.removing.delete(pid);
     }
   }
 
@@ -356,7 +412,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
           reason: 'Room has been disbanded.'
         }
       });
-      conn.close();
+      try { conn.close(); } catch (e) { /* ignore */ }
     }
     // notify listeners
     for (const cb of this.onDisbandCallbacks) {
@@ -550,7 +606,9 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       this.onDisbandCallbacks = [];
       console.debug('[PreGameInstance] destroy without disband (normal lifecycle transition)');
     }
-    for (const [_pid, conn] of this.connectors) conn.close();
+    for (const [_pid, conn] of this.connectors) {
+      try { conn.close(); } catch (e) { /* ignore */ }
+    }
     this.connectors.clear();
     this.state.players = [];
     this.onStateChangeCallbacks = [];
@@ -637,7 +695,8 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       defaultTeamId = newTeamId;
     } else {
       // 正常逻辑：把玩家放到第一个队，或保持既有队列行为
-      defaultTeamId = (this.state.teams && this.state.teams[0]) ? this.state.teams[0].id : this.ensureTeamExists();
+      defaultTeamId = (this.state.teams && this.state.teams[0]) ? this.state.teams[0].id : (this.ensureTeamExists() ?? undefined);
+      // ensureTeamExists() without param will create one if needed; guard with ??
     }
 
     // 添加玩家到状态
@@ -658,7 +717,8 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     connector.onDisconnect(() => this.removePlayer(playerId));
     connector.onReconnect(() => this.sendState(playerId, true));
     connector.onClientMessage(evt => this.handleClientAction(playerId, evt));
-    connector.onClose(() => this.connectors.delete(playerId));
+    // 统一使用 removePlayer 作为 onClose 回调
+    connector.onClose(() => this.removePlayer(playerId));
 
     // 更新版本并广播状态
     this.version++;

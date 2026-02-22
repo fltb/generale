@@ -199,7 +199,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       this._scheduleReconnect();
     }
   }
-  
+
   private _scheduleReconnect() {
     const backoff = Math.min(30_000, 1000 * Math.pow(1.5, this.reconnectAttempts));
     this.reconnectAttempts++;
@@ -276,6 +276,18 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
   // ask server to open a sub-domain
   openDomain(domain: string, ctx: Partial<Ctx> = {}) {
     const sub = this.getOrCreateSub(domain, ctx);
+
+    // If already pending, don't re-send
+    if (this.pendingOpens.has(domain)) {
+      console.debug('[WS] openDomain: already pending', domain);
+      return sub;
+    }
+
+    // If sub exists and is already ready, nothing to do
+    if (this.subConnectors.has(domain) && sub.ready) {
+      console.debug('[WS] openDomain: sub already ready', domain);
+      return sub;
+    }
 
     // mark as pending and send open request
     this.pendingOpens.add(domain);
