@@ -203,7 +203,7 @@ const RoomRoute: Component = () => {
           playerId={playerId()!}
           playerName={playerName() ?? "Guest"}
           autoOpen
-          visible={phase() === GamePhase.PREGAME}
+          suspended={phase() === GamePhase.PREGAME}
           onStateUpdate={handleStateUpdate}
         />
       </Show>

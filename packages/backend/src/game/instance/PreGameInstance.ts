@@ -50,6 +50,9 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   // 防重入/防重复移除标记
   private removing: Set<PlayerId> = new Set();
 
+  // 记录在 suspend 期间断开的玩家（保留其 player entry，但 connector 被移除）
+  private disconnectedDuringSuspend: Set<PlayerId> = new Set();
+
   constructor(initialState: PreGameRoomState, initialConnectors: Map<PlayerId, PreGameServerConnector>) {
     this.state = structuredClone(initialState);
     this.nextTeamSeq = 1;
@@ -67,8 +70,8 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       conn.onDisconnect(() => this.removePlayer(pid));
       conn.onReconnect(() => this.sendState(pid, true));
       conn.onClientMessage(evt => this.handleClientAction(pid, evt));
-      // 统一使用 removePlayer 作为 onClose 回调（removePlayer 内部已做防重入处理）
-      conn.onClose(() => this.removePlayer(pid));
+      // 使用 handleDisconnect 作为 onClose 也更合理（onClose 本质是连接断开）
+      conn.onClose(() => this.handleDisconnect(pid));
     }
   }
 
@@ -130,6 +133,27 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     this.state.teamCount = newTeams.length;
   }
 
+  // 专门的 disconnect 处理函数，供 connector.onDisconnect / onClose 使用
+  private handleDisconnect(pid: PlayerId) {
+    // 如果 suspended -> 延迟删除（保留 player 记录），否则按正常流程删除
+    if (this.suspended) {
+      // remove connector but keep player entry
+      const conn = this.connectors.get(pid);
+      if (conn) {
+        try { conn.close(); } catch { }
+        this.connectors.delete(pid);
+      }
+      // mark as disconnectedDuringSuspend (removePlayer would have done same)
+      if (this.state.players.some(p => p.id === pid)) {
+        this.disconnectedDuringSuspend.add(pid);
+        console.debug(`[PreGameInstance] player ${pid} disconnected during suspend (kept in state).`);
+      }
+      // don't call autoTransferHost or broadcast now
+    } else {
+      // normal immediate removal
+      this.removePlayer(pid, /*forceRemove=*/ true);
+    }
+  }
 
   private handleClientAction(pid: PlayerId, evt: SyncedPreGameClientActions) {
     if (this.destroyed) return;
@@ -146,7 +170,18 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       return;
     }
 
-    console.log("pregame recv evt", evt);
+    // If suspended: ignore client modification events (but keep lastConfirmedOp to avoid client-side stuck)
+    if (this.suspended) {
+      console.debug(`[PreGameInstance] Ignoring client action during suspend from ${pid}:`, evt.type);
+      // update lastConfirmedOp so client's optimistic queue can advance (optional but usually helpful)
+      if (typeof evt.optimisticId === 'number') {
+        synced.lastConfirmedOp = evt.optimisticId;
+      }
+      // do not change version / broadcast / apply any state mutation while suspended
+      return;
+    }
+
+    console.debug("pregame recv evt", evt);
 
     switch (evt.type) {
       case SyncedPreGameClientActionTypes.READY:
@@ -335,8 +370,9 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
    * - 开始时检查是否正在移除中，若是则直接返回
    * - 如果 player 不存在且 connector 也不存在，直接返回
    * - 会安全地关闭 connector（若存在），并删除 connector 与 player
+   * - 当 suspended 且 forceRemove === false 时，**不**从 state.players 中删除玩家，仅移除 connector 并将其标记为 disconnectedDuringSuspend
    */
-  private removePlayer(pid: PlayerId) {
+  private removePlayer(pid: PlayerId, forceRemove: boolean = false) {
     // 防重入：如果已经在移除流程中，直接返回
     if (this.removing.has(pid)) return;
     this.removing.add(pid);
@@ -356,7 +392,21 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
         this.connectors.delete(pid);
       }
 
-      // Remove player from state if present
+      // If we're suspended and not forcing removal -> keep player in state but mark as disconnected
+      if (this.suspended && !forceRemove) {
+        if (playerExists) {
+          // mark as disconnected during suspend (we don't remove the player object)
+          this.disconnectedDuringSuspend.add(pid);
+          console.debug(`[PreGameInstance] removePlayer deferred due to suspend: ${pid}`);
+          // do NOT auto transfer host or broadcast state now
+          return;
+        } else {
+          // no player entry, nothing more to do
+          return;
+        }
+      }
+
+      // 正常移除流程（非 suspended 或 forceRemove 为 true）
       if (playerExists) {
         this.state.players = this.state.players.filter(p => p.id !== pid);
         // 如果房主离开，自动转让
@@ -743,6 +793,7 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   }
 
   public suspend() {
+    if (this.suspended) return;
     this.suspended = true;
     // optional: avoid emitting onStateChangeCallbacks
     try {
@@ -750,12 +801,38 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     } catch (e) {
       // ignore
     }
+    // keep current host fixed — no extra action needed, state.hostId 保持不变
+    console.debug('[PreGameInstance] suspended: state locked, client modifications will be ignored.');
   }
 
   public resume() {
+    if (!this.suspended) return;
     this.suspended = false;
+
+    // 主机恢复时检查 host 是否仍然在线（有 connector）
+    const hostId = this.state.hostId;
+    if (hostId) {
+      const hostConnected = this.connectors.has(hostId);
+      if (!hostConnected) {
+        console.debug(`[PreGameInstance] resume: host ${hostId} not connected -> transferring host`);
+        this.autoTransferHost();
+      } else {
+        // 如果 host 重新连接并存在 connector，则保持 host
+        console.debug(`[PreGameInstance] resume: host ${hostId} still connected, keep host`);
+      }
+    } else {
+      // safety: 如果没有 hostId，自动选人
+      this.autoTransferHost();
+    }
+
+    // 清理 disconnectedDuringSuspend（这里选择不强制删除玩家，仅清空标记）
+    this.disconnectedDuringSuspend.clear();
+
+    // 因为 resume 是需要恢复到开始之前的状态
+    this.state.started = false;
     // broadcast snapshot to all connectors so clients in pregame get consistent view
     this.version++;
     this.broadcastState(true);
+    console.debug('[PreGameInstance] resumed: state unlocked and snapshot broadcasted.');
   }
 }
