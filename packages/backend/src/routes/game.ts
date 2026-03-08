@@ -79,10 +79,9 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
     detail: { tags: ["Game"], summary: "Get game information" }
   })
   .get("/list", async ({ query, gameServiceManager }) => {
-    // Get active game IDs from the manager
+    // Acquire active games and normalize to unified summary objects
     const activeGameIds = gameServiceManager.getActiveGames();
 
-    // Normalize each game's info into the public summary shape required by listGamesSuccessRespSchema
     let games = activeGameIds
       .map(id => {
         const svc = gameServiceManager.getGame(id);
@@ -90,63 +89,52 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
 
         const info: any = typeof svc.getGameInfo === "function" ? svc.getGameInfo() : {};
 
-        // Attempt to read sensible fallbacks from different possible shapes
-        const settings = info.settings ?? info.gameSettings ?? {};
-        const playersArray = Array.isArray(info.players) ? info.players : (Array.isArray(info.playerList) ? info.playerList : []);
+        // normalize fields with safe fallbacks
+        const settings = info.settings ?? {};
+        const roomName = info.roomName ?? settings.roomName ?? info.id ?? id;
+        const hostId = info.hostId ?? null;
+        const hostName = info.hostName ?? null;
 
-        // Ensure status is one of the allowed values
-        const rawStatus = info.status ?? settings.status ?? "lobby";
-        const status = (rawStatus === "lobby" || rawStatus === "in-progress" || rawStatus === "finished")
-          ? rawStatus
-          : "lobby";
+        // status: ensure it's one of allowed values
+        const rawStatus = info.status ?? "lobby";
+        const status = (rawStatus === "lobby" || rawStatus === "in-progress" || rawStatus === "finished") ? rawStatus : "lobby";
 
-        const playerCount =
-          typeof info.playerCount === "number"
-            ? info.playerCount
-            : (playersArray.length || 0);
+        const playerCount = typeof info.playerCount === "number" ? info.playerCount : (Array.isArray(info.players) ? info.players.length : 0);
+        const maxPlayers = typeof info.maxPlayers === "number" ? info.maxPlayers : (settings.maxPlayers ?? 8);
+        const hasPassword = Boolean(info.hasPassword ?? false);
 
-        const maxPlayers =
-          typeof info.maxPlayers === "number"
-            ? info.maxPlayers
-            : (typeof settings.maxPlayers === "number" ? settings.maxPlayers : 8);
+        // mode/map: prefer structured settings fields
+        const mode = settings.type ?? info.mode ?? null;
+        const map = settings.mapSize ?? info.map ?? null;
 
         return {
-          id: info.id ?? id,
+          id: String(info.id ?? id),
+          roomName,
+          hostId,
+          hostName,
           playerCount,
           maxPlayers,
           status,
-          hasPassword: Boolean(info.hasPassword ?? settings.hasPassword ?? false),
-
-          // keep these for server-side filtering even though schema doesn't require them in list response
-          // they will be filtered on below; they are not returned to client unless you choose to include them
+          hasPassword,
+          mode,
+          map,
+          // keep raw for legacy filters if needed
           _raw: info,
           _settings: settings,
-          _players: playersArray,
         };
       })
-      .filter(Boolean) as Array<{
-        id: string;
-        playerCount: number;
-        maxPlayers: number;
-        status: "lobby" | "in-progress" | "finished";
-        hasPassword: boolean;
-        _raw?: any;
-        _settings?: any;
-        _players?: any[];
-      }>;
+      .filter(Boolean) as Array<any>;
 
-    // --- 过滤条件 ---
-    // note: allow query.roomName to match settings.roomName or info.name
+    // --- Filtering: use unified fields first (info.roomName / info.settings) ---
     if (query.roomName) {
       const q = String(query.roomName).toLowerCase();
-      // filter by either top-level name or settings.roomName (common places to store the room name)
       games = games.filter(g => {
-        const nameCandidates = [
-          (g._raw?.name ?? ""),
-          (g._settings?.roomName ?? ""),
-          (g._raw?.roomName ?? "")
+        const candidates = [
+          String(g.roomName ?? ""),
+          String(g._settings?.roomName ?? ""),
+          String(g._raw?.name ?? "")
         ];
-        return nameCandidates.some(n => typeof n === "string" && n.toLowerCase().includes(q));
+        return candidates.some(n => typeof n === "string" && n.toLowerCase().includes(q));
       });
     }
 
@@ -154,11 +142,12 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
       const q = String(query.mode);
       games = games.filter(g => {
         const modeCandidates = [
-          g._raw?.mode,
+          g.mode,
           g._settings?.gameMode,
-          g._raw?.gameMode
+          g._raw?.gameMode,
+          g._raw?.mode
         ];
-        return modeCandidates.some(m => m === q);
+        return modeCandidates.some((m: any) => m === q);
       });
     }
 
@@ -166,11 +155,16 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
       const q = String(query.map);
       games = games.filter(g => {
         const mapCandidates = [
-          g._raw?.map,
+          // if map is object (custom), support widthxheight string match or exact compare
+          typeof g.map === "string" ? g.map : (g.map ? `${g.map.width}x${g.map.height}` : null),
           g._settings?.mapSize,
+          g._raw?.map,
           g._raw?.mapSize
         ];
-        return mapCandidates.some(m => m === q);
+        return mapCandidates.some((m: any) => {
+          if (m == null) return false;
+          return String(m) === q || String(m).toLowerCase().includes(q);
+        });
       });
     }
 
@@ -184,20 +178,25 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
       });
     }
 
-    // --- offset & limit ---
+    // pagination
     const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
     const limit = query.limit ? parseInt(String(query.limit), 10) : 20;
 
     const total = games.length;
     const sliced = games.slice(offset, offset + limit);
 
-    // Return only the fields required by the list schema
+    // map to response shape defined by gameSummaryRouteSchema
     const responseData = sliced.map(g => ({
       id: String(g.id),
-      playerCount: Number(g.playerCount),
-      maxPlayers: Number(g.maxPlayers),
-      status: g.status,
-      hasPassword: Boolean(g.hasPassword)
+      roomName: String(g.roomName ?? ""),
+      hostId: g.hostId ?? undefined,
+      hostName: g.hostName ?? undefined,
+      playerCount: Number(g.playerCount ?? 0),
+      maxPlayers: Number(g.maxPlayers ?? 8),
+      status: g.status ?? "lobby",
+      hasPassword: Boolean(g.hasPassword),
+      mode: g.mode ?? undefined,
+      map: g.map ?? undefined,
     }));
 
     return {
@@ -215,7 +214,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
     response: { 200: listGamesSuccessRespSchema, 500: errorRespSchema },
     detail: { tags: ["Game"], summary: "List active games with filters & pagination" }
   })
-  .get("/connect/:gameId", async ({ params,  gameServiceManager, set, cookie: { sid } }) => {
+  .get("/connect/:gameId", async ({ params, gameServiceManager, set, cookie: { sid } }) => {
     const { gameId } = params as { gameId: string };
     // require session
     const session = sid?.value ? sessionService.get(sid.value) : undefined

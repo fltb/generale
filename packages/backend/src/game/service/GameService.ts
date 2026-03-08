@@ -812,79 +812,71 @@ export class GameService {
   public getGameInfo(): GameInfoSuccessResp["data"] {
     const phase = this.phase;
 
-    // --- 1. status (schema requires: lobby | in-progress | finished) ---
+    // --- status (统一成 schema 要求的三种值) ---
     let status: "lobby" | "in-progress" | "finished";
     switch (phase) {
-      case GamePhase.PREGAME:
-        status = "lobby";
-        break;
-      case GamePhase.INGAME:
-        status = "in-progress";
-        break;
+      case GamePhase.PREGAME: status = "lobby"; break;
+      case GamePhase.INGAME: status = "in-progress"; break;
       case GamePhase.ENDED:
-      case GamePhase.DISBANDED:
-        status = "finished";
-        break;
-      default:
-        status = "lobby";
+      case GamePhase.DISBANDED: status = "finished"; break;
+      default: status = "lobby";
     }
 
-    // --- 2. players (convert your internal structure into schema format) ---
-    let players: Array<{
-      id: string;
-      name: string;
-      isHost: boolean;
-    }> = [];
-
+    // --- collect players & host info ---
+    let players: Array<{ id: string; name: string; isHost: boolean }> = [];
     let maxPlayers = this.config.maxPlayers ?? 8;
+    let hostId = "";
+    let hostName: string = "null";
 
     if (phase === GamePhase.PREGAME && this.preGameInstance) {
       const state = this.preGameInstance.getState();
-
-      players = state.players.map((p) => ({
+      // PreGame players usually contain name & isHost etc.
+      players = state.players.map(p => ({
         id: String(p.id),
-        name: "",
+        name: String(p.name ?? ""),
         isHost: Boolean(p.isHost),
       }));
-
       maxPlayers = state.playerLimit ?? maxPlayers;
-    }
-
-    else if (phase === GamePhase.INGAME && this.gameInstance) {
+      hostId = String(state.hostId ?? "");
+      hostName = players.find(p => p.id === hostId)?.name!;
+    } else if (phase === GamePhase.INGAME && this.gameInstance) {
       const state = this.gameInstance.getState();
-
-      players = Object.values(state.players).map((p) => ({
-        id: String(p.id),
-        name: "",   // TODO:: get name in userService
+      // Try to obtain display names from gameInstance settings if present
+      const display: Record<string, any> = (this.gameInstance as any).getSettings?.()?.playerDisplay ?? {};
+      players = Object.entries(state.players).map(([id, _p]: any) => ({
+        id: String(id),
+        name: String(display[id]?.name ?? ""),
         isHost: false,
       }));
-
-      maxPlayers = Object.keys(state.players).length;
+      // ingame: host concept not meaningful; keep hostId empty
+      maxPlayers = Math.max(maxPlayers, Object.keys(state.players).length);
     }
 
     const playerCount = players.length;
 
-    // --- 3. settings (schema requires object, all fields optional except maxPlayers) ---
+    // --- settings (normalize output to match schema) ---
+    const settings = {
+      maxPlayers,
+      mapSize: this.config.mapSize,
+      type: this.config.type,
+      // keep roomName in settings as convenience (but we also expose roomName top-level)
+      roomName: this.config.roomName,
+    };
 
-    // --- 4. hasPassword ---
-    const hasPassword = false; // TODO:: add password
+    // --- hasPassword (placeholder for now) ---
+    const hasPassword = false;
 
-    // --- 5. hostId ---
-    // Pregame 阶段有 host
-    let hostId = "";
-    if (phase === GamePhase.PREGAME && this.preGameInstance) {
-      hostId = this.preGameInstance.getState().hostId;
-    }
+    // Expose roomName & hostName top-level for easy listing
+    const roomName = this.config.roomName ?? "";
 
+    // Build and return: cast to any if your shared types don't yet include roomName/hostName top-level
     return {
       id: this.gameId,
+      roomName,
       hostId,
+      hostName,
       players,
-      settings: {
-        maxPlayers,
-        mapSize: this.config.mapSize,
-        type: this.config.type,
-      },
+      settings,
       status,
       playerCount,
       maxPlayers,
