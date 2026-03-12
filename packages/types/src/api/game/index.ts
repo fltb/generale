@@ -9,6 +9,22 @@ export const gameStatusSchema = t.Union([
 ]);
 export type GameStatus = Static<typeof gameStatusSchema>;
 
+export const standardMapSizeSchema = t.Union([
+  t.Literal("small"),
+  t.Literal("medium"),
+  t.Literal("large")
+])
+
+export const customMapSizeSchema = t.Object({
+  width: t.Number({ minimum: 10, maximum: 500 }),
+  height: t.Number({ minimum: 10, maximum: 500 })
+})
+
+export const mapSizeSchema = t.Union([
+  standardMapSizeSchema,
+  customMapSizeSchema
+])
+
 /**
  * Schema for game settings, used when creating a game.
  */
@@ -17,24 +33,17 @@ export const gameCreationSettingsRouteSchema = t.Union([
     t.Object({
         maxPlayers: t.Optional(t.Number({ minimum: 2, maximum: 8 })),
         // small/medium/large allowed for standard
-        mapSize: t.Optional(t.Union([
-            t.Literal("small"),
-            t.Literal("medium"),
-            t.Literal("large"),
-        ])),
+        mapSize: t.Optional(standardMapSizeSchema),
         // discriminant for variant
-        type: t.Const("standard")
+        type: t.Literal("standard")
     }),
 
     // custom variant
     t.Object({
         maxPlayers: t.Optional(t.Number({ minimum: 2, maximum: 8 })),
         // numeric width/height required for custom
-        mapSize: t.Object({
-            width: t.Number({ minimum: 10, maximum: 500 }),
-            height: t.Number({ minimum: 10, maximum: 500 }),
-        }),
-        type: t.Const("custom")
+        mapSize: customMapSizeSchema,
+        type: t.Literal("custom")
     })
 ]);
 export type GameCreationSettingsRoute = Static<typeof gameCreationSettingsRouteSchema>;
@@ -65,8 +74,8 @@ export const gameSummaryRouteSchema = t.Object({
     maxPlayers: t.Number(),
     status: gameStatusSchema,
     hasPassword: t.Boolean(),
-    mode: t.Optional(t.String()),    // 游戏模式 / 类型
-    map: t.Optional(t.Any()),        // 可改为更精确的 map schema / 字符串 / 对象
+    type: t.Union([t.Literal("standard"), t.Literal("custom")]),    // 游戏模式 / 类型
+    map: t.Optional(mapSizeSchema),        // 可改为更精确的 map schema / 字符串 / 对象
 });
 export type GameSummaryRoute = Static<typeof gameSummaryRouteSchema>;
 
@@ -90,14 +99,36 @@ export type GameInfoRoute = Static<typeof gameInfoRouteSchema>;
 
 // ========== query / request / response schemas ==========
 
-export const listGamesQuerySchema = t.Object({
-    roomName: t.Optional(t.String()),    // 按房间名模糊匹配
-    mode: t.Optional(t.String()),        // 按模式筛选
-    map: t.Optional(t.String()),         // 按地图筛选
-    full: t.Optional(t.String()),        // "true"/"false"
-    offset: t.Optional(t.String()),      // 偏移量
-    limit: t.Optional(t.String())        // 截断数量
-});
+const gameListFilterSchema = t.Object({
+    roomName: t.Optional(t.String()), // 按房间名模糊匹配
+    type: t.Optional(t.Union([t.Literal("standard"), t.Literal("custom")])),
+    // 接收字符串形式的 map filter： "small" | "medium" | "large" | "200x150"
+    map: t.Optional(t.String()),
+    status: t.Optional(gameStatusSchema),
+    hostName: t.Optional(t.String()),
+    minPlayers: t.Optional(t.String()),
+    maxPlayers: t.Optional(t.String()),
+    hasPassword: t.Optional(t.String()),
+})
+export type GameListFilterType = Static<typeof gameListFilterSchema>;
+
+const gameListSortSchema = t.Object({
+    sortBy: t.Optional(t.KeyOf(gameInfoRouteSchema)),
+    sortOrder: t.Optional(t.String()),
+})
+export type GameListSortType = Static<typeof gameListSortSchema>;
+
+const gameListPaginationSchema = t.Object({
+    offset: t.Optional(t.String()),  // 偏移量
+    limit: t.Optional(t.String()),   // 截断数量
+})
+export type GameListPaginationType = Static<typeof gameListPaginationSchema>;
+
+export const listGamesQuerySchema = t.Intersect([
+    gameListFilterSchema,
+    gameListSortSchema,
+    gameListPaginationSchema
+]);
 export type ListGamesQuery = Static<typeof listGamesQuerySchema>;
 
 // --- Request Schemas ---

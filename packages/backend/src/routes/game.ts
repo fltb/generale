@@ -12,12 +12,14 @@ import {
   listGamesSuccessRespSchema,
   connectWsSuccessRespSchema,
   errorRespSchema,
-  listGamesQuerySchema
+  listGamesQuerySchema,
+  GameInfoSuccessResp
 } from "@generale/types/dist/api";
 
 import { GameServiceConfig } from "../game/service/GameService";
 import { sessionService } from "../services/sessionService";
 import { cookieScheme } from "./user";
+import { applyGameFilters, applyGameSort, paginateGames } from "./utils/gameListFilter";
 
 export const gameRoutes = new Elysia({ prefix: "/game" })
   // Decorate with the actual singleton manager instance
@@ -80,135 +82,27 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
   })
   .get("/list", async ({ query, gameServiceManager }) => {
     // Acquire active games and normalize to unified summary objects
-    const activeGameIds = gameServiceManager.getActiveGames();
+    const games: GameInfoSuccessResp["data"][] = gameServiceManager
+      .getActiveGames()
+      .map(id => gameServiceManager.getGame(id)?.getGameInfo())
+      .filter(game => !!game);
 
-    let games = activeGameIds
-      .map(id => {
-        const svc = gameServiceManager.getGame(id);
-        if (!svc) return null;
+    let result = applyGameFilters(games, query)
 
-        const info: any = typeof svc.getGameInfo === "function" ? svc.getGameInfo() : {};
+    result = applyGameSort(result, query)
 
-        // normalize fields with safe fallbacks
-        const settings = info.settings ?? {};
-        const roomName = info.roomName ?? settings.roomName ?? info.id ?? id;
-        const hostId = info.hostId ?? null;
-        const hostName = info.hostName ?? null;
-
-        // status: ensure it's one of allowed values
-        const rawStatus = info.status ?? "lobby";
-        const status = (rawStatus === "lobby" || rawStatus === "in-progress" || rawStatus === "finished") ? rawStatus : "lobby";
-
-        const playerCount = typeof info.playerCount === "number" ? info.playerCount : (Array.isArray(info.players) ? info.players.length : 0);
-        const maxPlayers = typeof info.maxPlayers === "number" ? info.maxPlayers : (settings.maxPlayers ?? 8);
-        const hasPassword = Boolean(info.hasPassword ?? false);
-
-        // mode/map: prefer structured settings fields
-        const mode = settings.type ?? info.mode ?? null;
-        const map = settings.mapSize ?? info.map ?? null;
-
-        return {
-          id: String(info.id ?? id),
-          roomName,
-          hostId,
-          hostName,
-          playerCount,
-          maxPlayers,
-          status,
-          hasPassword,
-          mode,
-          map,
-          // keep raw for legacy filters if needed
-          _raw: info,
-          _settings: settings,
-        };
-      })
-      .filter(Boolean) as Array<any>;
-
-    // --- Filtering: use unified fields first (info.roomName / info.settings) ---
-    if (query.roomName) {
-      const q = String(query.roomName).toLowerCase();
-      games = games.filter(g => {
-        const candidates = [
-          String(g.roomName ?? ""),
-          String(g._settings?.roomName ?? ""),
-          String(g._raw?.name ?? "")
-        ];
-        return candidates.some(n => typeof n === "string" && n.toLowerCase().includes(q));
-      });
-    }
-
-    if (query.mode) {
-      const q = String(query.mode);
-      games = games.filter(g => {
-        const modeCandidates = [
-          g.mode,
-          g._settings?.gameMode,
-          g._raw?.gameMode,
-          g._raw?.mode
-        ];
-        return modeCandidates.some((m: any) => m === q);
-      });
-    }
-
-    if (query.map) {
-      const q = String(query.map);
-      games = games.filter(g => {
-        const mapCandidates = [
-          // if map is object (custom), support widthxheight string match or exact compare
-          typeof g.map === "string" ? g.map : (g.map ? `${g.map.width}x${g.map.height}` : null),
-          g._settings?.mapSize,
-          g._raw?.map,
-          g._raw?.mapSize
-        ];
-        return mapCandidates.some((m: any) => {
-          if (m == null) return false;
-          return String(m) === q || String(m).toLowerCase().includes(q);
-        });
-      });
-    }
-
-    if (query.full !== undefined) {
-      const wantFull = String(query.full) === "true";
-      games = games.filter(g => {
-        const isFull = typeof g.playerCount === "number" && typeof g.maxPlayers === "number"
-          ? g.playerCount >= g.maxPlayers
-          : false;
-        return wantFull ? isFull : !isFull;
-      });
-    }
-
-    // pagination
-    const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
-    const limit = query.limit ? parseInt(String(query.limit), 10) : 20;
-
-    const total = games.length;
-    const sliced = games.slice(offset, offset + limit);
-
-    // map to response shape defined by gameSummaryRouteSchema
-    const responseData = sliced.map(g => ({
-      id: String(g.id),
-      roomName: String(g.roomName ?? ""),
-      hostId: g.hostId ?? undefined,
-      hostName: g.hostName ?? undefined,
-      playerCount: Number(g.playerCount ?? 0),
-      maxPlayers: Number(g.maxPlayers ?? 8),
-      status: g.status ?? "lobby",
-      hasPassword: Boolean(g.hasPassword),
-      mode: g.mode ?? undefined,
-      map: g.map ?? undefined,
-    }));
+    const page = paginateGames(result, query)
 
     return {
       success: true,
-      data: responseData,
+      data: page.items,
       meta: {
-        total,
-        offset,
-        limit,
-        hasMore: offset + limit < total
+        total: page.total,
+        offset: page.offset,
+        limit: page.limit,
+        hasMore: page.hasMore
       }
-    };
+    }
   }, {
     query: listGamesQuerySchema,
     response: { 200: listGamesSuccessRespSchema, 500: errorRespSchema },

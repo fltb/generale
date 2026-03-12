@@ -826,11 +826,10 @@ export class GameService {
     let players: Array<{ id: string; name: string; isHost: boolean }> = [];
     let maxPlayers = this.config.maxPlayers ?? 8;
     let hostId = "";
-    let hostName: string = "null";
+    let hostName: string = "";
 
     if (phase === GamePhase.PREGAME && this.preGameInstance) {
       const state = this.preGameInstance.getState();
-      // PreGame players usually contain name & isHost etc.
       players = state.players.map(p => ({
         id: String(p.id),
         name: String(p.name ?? ""),
@@ -838,30 +837,41 @@ export class GameService {
       }));
       maxPlayers = state.playerLimit ?? maxPlayers;
       hostId = String(state.hostId ?? "");
-      hostName = players.find(p => p.id === hostId)?.name!;
+      hostName = players.find(p => p.id === hostId)?.name ?? "";
     } else if (phase === GamePhase.INGAME && this.gameInstance) {
       const state = this.gameInstance.getState();
-      // Try to obtain display names from gameInstance settings if present
       const display: Record<string, any> = (this.gameInstance as any).getSettings?.()?.playerDisplay ?? {};
       players = Object.entries(state.players).map(([id, _p]: any) => ({
         id: String(id),
         name: String(display[id]?.name ?? ""),
         isHost: false,
       }));
-      // ingame: host concept not meaningful; keep hostId empty
       maxPlayers = Math.max(maxPlayers, Object.keys(state.players).length);
     }
 
     const playerCount = players.length;
 
-    // --- settings (normalize output to match schema) ---
-    const settings = {
-      maxPlayers,
-      mapSize: this.config.mapSize,
-      type: this.config.type,
-      // keep roomName in settings as convenience (but we also expose roomName top-level)
-      roomName: this.config.roomName,
-    };
+    // --- normalize settings ensuring discriminant matches mapSize ---
+    // Use explicit branch narrowing so TS knows the correct shape.
+    let settings: any; // ideally typed as GameSettings; use `any` only if GameSettings is mismatched.
+    if (this.config.type === "custom") {
+      // here TS knows config is custom variant (mapSize must be object)
+      settings = {
+        maxPlayers,
+        mapSize: this.config.mapSize as { width: number; height: number },
+        type: "custom" as const,
+        roomName: this.config.roomName,
+      };
+    } else {
+      
+      // treat as standard (default if undefined)
+      settings = {
+        maxPlayers,
+        mapSize: this.config.mapSize as "small" | "medium" | "large" | undefined,
+        type: "standard" as const,
+        roomName: this.config.roomName,
+      };
+    }
 
     // --- hasPassword (placeholder for now) ---
     const hasPassword = false;
@@ -869,9 +879,10 @@ export class GameService {
     // Expose roomName & hostName top-level for easy listing
     const roomName = this.config.roomName ?? "";
 
-    // Build and return: cast to any if your shared types don't yet include roomName/hostName top-level
     return {
       id: this.gameId,
+      type: this.config.type,
+      map: this.config.mapSize,
       roomName,
       hostId,
       hostName,
@@ -881,6 +892,6 @@ export class GameService {
       playerCount,
       maxPlayers,
       hasPassword,
-    };
+    } as GameInfoSuccessResp["data"];
   }
 }
