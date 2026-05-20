@@ -58,7 +58,7 @@ function extractSessionIdFromWsData(wsData: any): string | undefined {
 // 1. INTERFACES AND TYPE DEFINITIONS
 // =================================================================================
 
-interface WSContextBase {
+export interface WSContextBase {
   userid: string;   // always filled by backend
   username: string;
 };

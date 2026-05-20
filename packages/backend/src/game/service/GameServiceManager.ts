@@ -1,6 +1,50 @@
-import { GameId } from '@generale/types';
+import { type GameId, LobbyClientEvent, LobbyMessage, LobbyServerMessageType } from '@generale/types';
 import { GameService, GameServiceConfig } from './GameService';
-import { registerDomainHandler } from '../../plugins/websocket';
+import { registerDomainHandler, WSContextBase } from '../../plugins/websocket';
+import { GameInfoRoute, GameInfoSuccessResp, ListGamesQuery } from '@generale/types/dist/api';
+import { applyGameFilters, applyGameSort, paginateGames } from '../../routes/utils/gameListFilter';
+
+let GLOBAL_LOBBY_SEQ = 0;
+function nextSeq(): number {
+  GLOBAL_LOBBY_SEQ += 1;
+  return GLOBAL_LOBBY_SEQ;
+}
+
+/**
+ * helper: whether a single game matches a ListGamesQuery.
+ * We can reuse applyGameFilters by feeding single-item array.
+ */
+function matchesFilters(game: GameInfoSuccessResp["data"], query?: Partial<ListGamesQuery> | null) {
+  if (!query || Object.keys(query).length === 0) return true;
+  // applyGameFilters expects ListGamesQuery (strings), but calling with partial is OK for matching behavior:
+  try {
+    const res = applyGameFilters([game], query as ListGamesQuery);
+    return res.length > 0;
+  } catch (e) {
+    // if filters invalid, default to false
+    return false;
+  }
+}
+
+
+/**
+ * helper: build paged snapshot for a given client filters/pagination context
+ * ctxFilters: may be Partial<ListGamesQuery> or full ListGamesQuery (strings). If no offset/limit provided, return full filtered array.
+ */
+function buildSnapshotForClient(allGames: GameInfoSuccessResp["data"][], ctxFilters?: Partial<ListGamesQuery> | null) {
+  const q: Partial<ListGamesQuery> = ctxFilters ?? {};
+  // apply filters
+  const filtered = applyGameFilters(allGames, q as ListGamesQuery);
+  // apply sort if present
+  const sorted = applyGameSort(filtered, q as ListGamesQuery);
+  // if offset/limit provided, paginate
+  if (q.offset !== undefined || q.limit !== undefined) {
+    const page = paginateGames(sorted, q as ListGamesQuery);
+    return { items: page.items, meta: { total: page.total, offset: page.offset, limit: page.limit, hasMore: page.hasMore } };
+  }
+  return { items: sorted, meta: { total: sorted.length, offset: 0, limit: sorted.length, hasMore: false } };
+}
+
 
 /**
  * GameService 管理器
@@ -15,33 +59,165 @@ export class GameServiceManager {
 
   private constructor() {
     // register lobby domain handler so clients can subscribe to room events
-    registerDomainHandler('lobby-games', (connector) => {
-      // on open: send current list
+    // --- register domain handler inside GameServiceManager constructor ---
+    registerDomainHandler<LobbyClientEvent, LobbyMessage, {filters?: ListGamesQuery} & WSContextBase>('lobby-games', (connector) => {
+      // read initial context from connector
+      // connector.getContext() returns server-filled context merged with client open payload
+      const ctx = (() => {
+        try { return connector.getContext(); } catch { return connector.context ?? {}; }
+      })();
+
+      // store per-connector filters state so we can update it on set-filters events
+      let clientFilters: ListGamesQuery | null = ctx.filters ?? null;
+
+      // convenience to get all current GameInfoRoute[] (summary/detailed as stored by GameService)
+      const getAllGames = (): GameInfoSuccessResp["data"][] => {
+        // this refers to GameServiceManager instance scope; if inside class ensure closure captures 'this'
+        const games: GameInfoSuccessResp["data"][] = (Array.from(this.gameServices.values()))
+          .map((g) => g.getGameInfo())
+          .filter(Boolean);
+        return games;
+      };
+
+      // on open: send initial snapshot according to client's filters/pagination
       connector.onOpen(() => {
-        const games = Array.from(this.gameServices.keys()).map(id => this.getGame(id)?.getGameInfo()).filter(Boolean);
-        connector.send({ type: 'room-list', payload: games });
+        try {
+          const all = getAllGames();
+          const snapshot = buildSnapshotForClient(all, clientFilters);
+          const msg: LobbyMessage = {
+            type: LobbyServerMessageType.LIST,
+            payload: snapshot.items as GameInfoRoute[],
+            meta: { ts: Date.now(), seq: nextSeq() }
+          };
+          connector.send(msg);
+        } catch (err) {
+          console.error("[lobby-games] onOpen error", err);
+        }
       });
 
-      // subscribe to manager events and forward to this connector
-      const unsubCreated = this.onRoomCreated((id) => {
-        const info = this.getGame(id)?.getGameInfo() ?? { gameId: id };
-        connector.send({ type: 'room-created', payload: info });
-      });
-      const unsubDeleted = this.onRoomDeleted((id) => {
-        connector.send({ type: 'room-deleted', payload: { gameId: id } });
-      });
-      const unsubUpdated = this.onRoomUpdated((id) => {
-        const info = this.getGame(id)?.getGameInfo();
-        connector.send({ type: 'room-updated', payload: info ?? { gameId: id } });
+      // handle messages from client (set-filters, request-list, sync-from-seq, ping, close)
+      connector.onClientMessage((evt: LobbyClientEvent) => {
+        try {
+          switch (evt.type) {
+            case "request-list": {
+              // allow client to request arbitrary filtered/paged snapshot (ad-hoc)
+              const reqFilters = evt.payload.filters ?? null;
+              const offset = evt.payload?.offset;
+              const limit = evt.payload?.limit;
+              const ctxForReq = { ...(reqFilters ?? {}) };
+              if (offset !== undefined) ctxForReq.offset = String(offset);
+              if (limit !== undefined) ctxForReq.limit = String(limit);
+
+              const all = getAllGames();
+              const snapshot = buildSnapshotForClient(all, ctxForReq);
+              const msg: LobbyMessage = {
+                type: LobbyServerMessageType.LIST,
+                payload: snapshot.items,
+                meta: { ts: Date.now(), seq: nextSeq() }
+              };
+              connector.send(msg);
+              break;
+            }
+
+            case "set-filters": {
+              clientFilters = evt.payload.filters ?? null;
+              // immediately send new snapshot for new filters:
+              const all = getAllGames();
+              const snapshot = buildSnapshotForClient(all, clientFilters);
+              connector.send({
+                type: LobbyServerMessageType.LIST,
+                payload: snapshot.items,
+                meta: { ts: Date.now(), seq: nextSeq() }
+              });
+              break;
+            }
+
+            case "sync-from-seq": {
+              // For now, we just send a fresh snapshot.
+              const all = getAllGames();
+              const snapshot = buildSnapshotForClient(all, clientFilters);
+              connector.send({
+                type: LobbyServerMessageType.LIST,
+                payload: snapshot.items,
+                meta: { ts: Date.now(), seq: nextSeq() }
+              });
+              break;
+            }
+
+            case "ping": {
+              // respond with pong
+              connector.send({ type: LobbyServerMessageType.LIST, payload: [], meta: { ts: Date.now(), seq: nextSeq() } });
+              // note: you might prefer a separate control channel; kept minimal here
+              break;
+            }
+
+            case "close": {
+              // client asked to close the sub-connector
+              connector.close(1000, evt.payload?.reason ?? "client close");
+              break;
+            }
+
+            default:
+              // unknown client event
+              console.warn("[lobby-games] unknown client event", evt);
+          }
+        } catch (err) {
+          console.error("[lobby-games] onClientMessage handler error", err);
+        }
       });
 
-      // clean up on close
+      // when manager emits created/updated/deleted, forward to connector only if match filters
+      const unsubCreated = this.onRoomCreated((id: string) => {
+        try {
+          const info = this.getGame(id)?.getGameInfo();
+          if (!info) return;
+          if (!clientFilters || matchesFilters(info, clientFilters)) {
+            connector.send({
+              type: LobbyServerMessageType.CREATED,
+              payload: info,
+              meta: { ts: Date.now(), seq: nextSeq(), id }
+            });
+          }
+        } catch (err) {
+          console.error("[lobby-games] send created error", err);
+        }
+      });
+
+      const unsubUpdated = this.onRoomUpdated((id: string) => {
+        try {
+          const info = this.getGame(id)?.getGameInfo();
+          if (!info) return;
+          if (!clientFilters || matchesFilters(info, clientFilters)) {
+            connector.send({
+              type: LobbyServerMessageType.UPDATED,
+              payload: info,
+              meta: { ts: Date.now(), seq: nextSeq(), id }
+            });
+          }
+        } catch (err) {
+          console.error("[lobby-games] send updated error", err);
+        }
+      });
+
+      const unsubDeleted = this.onRoomDeleted((id: string) => {
+        try {
+          // For deletions, we forward regardless; clientFilters may be used to ignore if desired
+          connector.send({
+            type: LobbyServerMessageType.DELETED,
+            payload: { gameId: id },
+            meta: { ts: Date.now(), seq: nextSeq(), id }
+          });
+        } catch (err) {
+          console.error("[lobby-games] send deleted error", err);
+        }
+      });
+
+      // clean up subscriptions on close/disconnect
       connector.onClose(() => {
-        unsubCreated(); unsubDeleted(); unsubUpdated();
+        try { unsubCreated(); unsubDeleted(); unsubUpdated(); } catch { }
       });
       connector.onDisconnect(() => {
-        // keep subscriptions? usually best to unsubscribe to prevent memory leak
-        unsubCreated(); unsubDeleted(); unsubUpdated();
+        try { unsubCreated(); unsubDeleted(); unsubUpdated(); } catch { }
       });
     });
   }

@@ -3,3 +3,4 @@ export * from './synced-game-state-type';
 export * from './room/synced-pre-game-state-type';
 export * from './room/pre-game';
 export * from './chat'
+export * from './room-list'
