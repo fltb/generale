@@ -13,7 +13,8 @@ import {
   ChatServerToClient,
   ServerSyncConnector,
   GameSettings,
-  GamePhase
+  GamePhase,
+  PRESET_SIZES,
 } from '@generale/types';
 import { PreGameInstance, PreGameServerConnector } from '../instance/PreGameInstance';
 import { GameInstance, GameInstanceSettings } from '../instance/GameInstance';
@@ -282,21 +283,26 @@ export class GameService {
     // determine default map width/height from config
     let defaultWidth = 20;
     let defaultHeight = 20;
+    let initialSizeLabel: "small" | "medium" | "large" | undefined;
 
     // if config.mapSize provided as numeric object, use it
     if (this.config.mapSize && typeof this.config.mapSize === "object") {
       defaultWidth = Math.max(10, Math.min(500, Math.floor(this.config.mapSize.width)));
       defaultHeight = Math.max(10, Math.min(500, Math.floor(this.config.mapSize.height)));
     } else if (this.config.mapSize && typeof this.config.mapSize === "string") {
-      // mapSize could be small/medium/large -> map to numeric values (adjust as you wish)
+      // standard 模式：把 label 反映为预设尺寸 + sizeLabel
       const m = this.config.mapSize;
-      if (m === "small") { defaultWidth = 10; defaultHeight = 10; }
-      else if (m === "large") { defaultWidth = 40; defaultHeight = 40; }
-      else { defaultWidth = 20; defaultHeight = 20; }
+      const dims = PRESET_SIZES[m as "small" | "medium" | "large"];
+      defaultWidth = dims.width;
+      defaultHeight = dims.height;
+      initialSizeLabel = m as "small" | "medium" | "large";
     }
+
+    const isStandard = this.config.type === "standard";
 
     const initialState: PreGameRoomState = {
       gameId: this.gameId,
+      roomType: isStandard ? "standard" : "custom",
       hostId: '',
       players: [],
       gameSetting: {
@@ -312,11 +318,12 @@ export class GameService {
         afkThreshold: 30,
       },
       mapSetting: {
-        type: (this.config.type === "standard" ? PreGameMapType.Random : PreGameMapType.Custom),
+        type: (isStandard ? PreGameMapType.Random : PreGameMapType.Custom),
         width: defaultWidth,
         height: defaultHeight,
-        tileFrequency: {}
-      },
+        tileFrequency: {},
+        ...(isStandard && initialSizeLabel ? { sizeLabel: initialSizeLabel } : {}),
+      } as PreGameRoomState['mapSetting'],
       teams: [
         { id: "team1", name: "Team 1" },
         { id: "team2", name: "Team 2" }
@@ -337,21 +344,29 @@ export class GameService {
 
     this.lastPreGameSnapshot = structuredClone(this.preGameInstance.getState());
 
-    // 过滤器：玩家数量变更
-    const playerCountChanged = (prev?: PreGameRoomState, curr?: PreGameRoomState) =>
-      (prev?.players.length ?? 0) !== (curr?.players.length ?? 0);
+    // 过滤器：只在影响房间列表展示的字段变化时上报。
+    // 房间列表展示的来源是 getGameInfo()：包含 hostId、players(id/name/isHost)、
+    // started、playerLimit、mapSetting(width/height) 等字段。
+    const playerListFingerprint = (s?: PreGameRoomState) =>
+      JSON.stringify(
+        (s?.players ?? []).map((p) => ({ id: p.id, name: p.name, isHost: p.isHost }))
+      );
 
-    // 过滤器：主持人（host）变化
-    const hostChanged = (prev?: PreGameRoomState, curr?: PreGameRoomState) =>
-      (prev?.hostId ?? '') !== (curr?.hostId ?? '');
+    const mapSettingFingerprint = (s?: PreGameRoomState) => {
+      const ms: any = s?.mapSetting;
+      if (!ms) return "";
+      return JSON.stringify({ width: ms.width, height: ms.height, sizeLabel: ms.sizeLabel ?? null });
+    };
 
-    // 过滤器：房间开始标志 changed
-    const startedChanged = (prev?: PreGameRoomState, curr?: PreGameRoomState) =>
-      (prev?.started ?? false) !== (curr?.started ?? false);
-
-    // 组合示例：只在上面任一情况发生时上报
-    const significantChange = (prev?: PreGameRoomState, curr?: PreGameRoomState) =>
-      playerCountChanged(prev, curr) || hostChanged(prev, curr) || startedChanged(prev, curr);
+    const significantChange = (prev?: PreGameRoomState, curr?: PreGameRoomState) => {
+      if ((prev?.players.length ?? 0) !== (curr?.players.length ?? 0)) return true;
+      if ((prev?.hostId ?? "") !== (curr?.hostId ?? "")) return true;
+      if ((prev?.started ?? false) !== (curr?.started ?? false)) return true;
+      if ((prev?.playerLimit ?? 0) !== (curr?.playerLimit ?? 0)) return true;
+      if (mapSettingFingerprint(prev) !== mapSettingFingerprint(curr)) return true;
+      if (playerListFingerprint(prev) !== playerListFingerprint(curr)) return true;
+      return false;
+    };
 
     this.addPreGameUpdateFilter(significantChange);
 
@@ -851,23 +866,36 @@ export class GameService {
 
     const playerCount = players.length;
 
+    // --- map field: 以 preGameInstance.mapSetting 为准；
+    //   standard 房间直接读 sizeLabel（first-class 字段，CHANGE_MAP 只能命中预设），
+    //   custom 房间读 {width, height}。无需根据尺寸反推 label。
+    let mapField: { width: number; height: number } | "small" | "medium" | "large" | undefined =
+      this.config.mapSize as any;
+    if (phase === GamePhase.PREGAME && this.preGameInstance) {
+      const state = this.preGameInstance.getState();
+      const ms: any = state.mapSetting;
+      if (state.roomType === "standard" && ms?.sizeLabel) {
+        mapField = ms.sizeLabel as "small" | "medium" | "large";
+      } else if (ms && typeof ms.width === "number" && typeof ms.height === "number") {
+        mapField = { width: ms.width, height: ms.height };
+      }
+    }
+
     // --- normalize settings ensuring discriminant matches mapSize ---
     // Use explicit branch narrowing so TS knows the correct shape.
     let settings: any; // ideally typed as GameSettings; use `any` only if GameSettings is mismatched.
     if (this.config.type === "custom") {
-      // here TS knows config is custom variant (mapSize must be object)
       settings = {
         maxPlayers,
-        mapSize: this.config.mapSize as { width: number; height: number },
+        mapSize: mapField as { width: number; height: number },
         type: "custom" as const,
         roomName: this.config.roomName,
       };
     } else {
-      
       // treat as standard (default if undefined)
       settings = {
         maxPlayers,
-        mapSize: this.config.mapSize as "small" | "medium" | "large" | undefined,
+        mapSize: mapField as "small" | "medium" | "large" | undefined,
         type: "standard" as const,
         roomName: this.config.roomName,
       };
@@ -882,7 +910,7 @@ export class GameService {
     return {
       id: this.gameId,
       type: this.config.type,
-      map: this.config.mapSize,
+      map: mapField,
       roomName,
       hostId,
       hostName,

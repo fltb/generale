@@ -5,11 +5,16 @@ import {
   type PreGameRandomMapSetting,
   type PreGameCustomMapSetting,
   type PreGameImportedMapSetting,
+  type PreGameRoomType,
+  type PreGameStandardSizeLabel,
+  PRESET_SIZES,
   TileType,
 } from "@generale/types";
 
 export interface PreGameMapSettingFormProps {
   setting: PreGameMapSetting;
+  /** 房间类型；standard 仅允许预设尺寸，custom 维持原行为 */
+  roomType?: PreGameRoomType;
   onChange: (next: PreGameMapSetting) => void;
 }
 
@@ -25,12 +30,22 @@ export interface PreGameMapSettingFormProps {
 export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (props) => {
   const tileTypes = Object.values(TileType) as TileType[];
 
-  // 前端写死的预置 size（与 GameService 中的映射一致）
-  const presetSizes = {
-    small: { width: 10, height: 10 },
-    medium: { width: 20, height: 20 },
-    large: { width: 40, height: 40 },
-  } as const;
+  // 与 @generale/types 共享的预设表
+  const presetSizes = PRESET_SIZES;
+
+  // standard 房间专用：点击预设按钮，发送只含合法 sizeLabel 的 payload，
+  // 服务端会按 PRESET_SIZES 回填宽高并固定 type=Random。
+  const applyStandardPreset = (label: PreGameStandardSizeLabel) => {
+    const dims = presetSizes[label];
+    const next: PreGameRandomMapSetting = {
+      type: PreGameMapType.Random,
+      width: dims.width,
+      height: dims.height,
+      tileFrequency: {},
+      sizeLabel: label,
+    };
+    props.onChange(next);
+  };
 
   // 切换地图类型时尽量保留公共字段（width/height/tileFrequency）
   const switchTo = (type: PreGameMapType) => {
@@ -145,6 +160,39 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
   };
 
   const isCompactRandom = true;
+
+  // standard 房间：UI 只展示三个预设按钮，隐藏地图类型/尺寸/地形频率等其它项
+  if (props.roomType === "standard") {
+    // 用函数读取以保持响应性：Solid 组件只渲染一次，常量捕获会导致高亮不更新
+    const currentLabel = () =>
+      props.setting.type === PreGameMapType.Random
+        ? (props.setting as PreGameRandomMapSetting).sizeLabel
+        : undefined;
+    return (
+      <div class="p-4 bg-base-100 rounded-lg shadow-sm space-y-3">
+        <div>
+          <label class="label">
+            <span class="label-text">预置尺寸</span>
+            <span class="label-text-alt">standard 模式仅支持 small / medium / large</span>
+          </label>
+          <div class="btn-group">
+            <button
+              class={`btn btn-sm ${currentLabel() === "small" ? "btn-active" : ""}`}
+              onClick={() => applyStandardPreset("small")}
+            >Small (10×10)</button>
+            <button
+              class={`btn btn-sm ${currentLabel() === "medium" ? "btn-active" : ""}`}
+              onClick={() => applyStandardPreset("medium")}
+            >Medium (20×20)</button>
+            <button
+              class={`btn btn-sm ${currentLabel() === "large" ? "btn-active" : ""}`}
+              onClick={() => applyStandardPreset("large")}
+            >Large (40×40)</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div class="p-4 bg-base-100 rounded-lg shadow-sm space-y-4">

@@ -43,9 +43,10 @@ export interface RoomWithSyncProps {
 /** 提供一个 minimal empty PreGameRoomState，供初始 state 使用 */
 const makeEmptyRoom = (gameId = ""): PreGameRoomState => ({
   gameId,
+  roomType: "standard",
   hostId: "",
   players: [],
-  mapSetting: { type: PreGameMapType.Random, width: 20, height: 20, tileFrequency: {} },
+  mapSetting: { type: PreGameMapType.Random, width: 20, height: 20, tileFrequency: {}, sizeLabel: "medium" },
   gameSetting: {
     speed: 1,
     tileGrow: {
@@ -395,6 +396,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         <div class="text-md font-medium mb-2">地图设置</div>
         <PreGameMapSettingForm
           setting={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
+          roomType={room()?.roomType ?? "standard"}
           onChange={(next) => onMapChange(next)}
         />
       </div>

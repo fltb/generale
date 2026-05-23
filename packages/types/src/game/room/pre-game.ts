@@ -14,12 +14,27 @@ export enum PreGameMapType {
   Imported = 'imported',
 }
 
+// standard 房间的预设尺寸 label，标记当前选中的预设；custom 房间为 null/undefined
+export type PreGameStandardSizeLabel = "small" | "medium" | "large";
+
+// standard 房间预设尺寸表：sizeLabel 与 width/height 一一对应，前后端共享
+export const PRESET_SIZES: Record<PreGameStandardSizeLabel, { width: number; height: number }> = {
+  small: { width: 10, height: 10 },
+  medium: { width: 20, height: 20 },
+  large: { width: 40, height: 40 },
+};
+
 // 随机地图参数（地形频率用 TileType）
 export interface PreGameRandomMapSetting {
   type: PreGameMapType.Random;
   width: number;
   height: number;
   tileFrequency: Partial<Record<TileType, number>>; // 只允许 core-type 里的地形
+  /**
+   * standard 房间的预设尺寸标签（small/medium/large）。standard 模式下作为权威字段，
+   * width/height 由后端按预设表回填；custom 房间不应出现此字段。
+   */
+  sizeLabel?: PreGameStandardSizeLabel;
 }
 
 // 自定义地图参数
@@ -72,9 +87,14 @@ export interface PreGamePlayerInfo {
   tileColor: PlayerColor;
 }
 
+// 房间类型（与 GameServiceConfig.type 一致，固定在创建时，房间内不可变）
+export type PreGameRoomType = "standard" | "custom";
+
 // 房间整体状态
 export interface PreGameRoomState {
   gameId: GameId;
+  /** 房间类型：standard 仅允许预设地图尺寸，custom 允许任意尺寸 */
+  roomType: PreGameRoomType;
   hostId: PlayerId;
   players: PreGamePlayerInfo[];
   mapSetting: PreGameMapSetting;

@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/solid-query";
 import CreateRoomModal from "./CreateRoomModal";
 import { A } from "@solidjs/router";
 import { useGameListQuery } from "~/hooks/useGameListQuery";
+import { useLobbyRealtime } from "~/hooks/useLobbyRealtime";
 
 export function RoomList() {
   const navigate = useNavigate();
@@ -20,6 +21,10 @@ export function RoomList() {
 
   // useGameListQuery expects an accessor
   const gamesQuery = useGameListQuery(() => filters(), { offset, limit });
+
+  // 订阅 lobby-games websocket 事件，按需把后端推送的 created/updated/deleted 事件
+  // 直接 patch 进 useGameListQuery 的缓存里，避免轮询刷新。
+  useLobbyRealtime(() => filters(), { offset, limit });
 
   // --- Create room modal state & mutation ---
   const [createOpen, setCreateOpen] = createSignal(false);

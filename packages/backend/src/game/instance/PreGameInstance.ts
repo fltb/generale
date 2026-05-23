@@ -10,7 +10,10 @@ import {
   SyncedPreGameState,
   PlayerColor,
   SyncedPreGameServerEventPayloadType,
-  TeamId
+  TeamId,
+  PreGameMapType,
+  PRESET_SIZES,
+  PreGameStandardSizeLabel,
 } from '@generale/types';
 import { compare } from 'fast-json-patch';
 
@@ -235,9 +238,34 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     Object.assign(this.state.gameSetting, patch);
   }
 
-  /** 修改地图设置（仅房主） */
+  /** 修改地图设置（仅房主）
+   *
+   * standard 房间只接受合法的 sizeLabel（small/medium/large），并由服务端
+   *   按 PRESET_SIZES 回填 width/height，地图类型固定为 Random，tileFrequency 清空。
+   *   其余字段（不同 map type / 自定义尺寸 / tileFrequency）一律拒绝。
+   * custom 房间：原样写入。
+   */
   private changeMap(pid: PlayerId, mapSetting: PreGameRoomState['mapSetting']) {
     if (pid !== this.state.hostId) return;
+
+    if (this.state.roomType === "standard") {
+      const incoming: any = mapSetting;
+      const label = incoming?.sizeLabel as PreGameStandardSizeLabel | undefined;
+      if (!label || !(label in PRESET_SIZES)) {
+        console.warn(`[PreGameInstance] standard room rejects CHANGE_MAP without valid sizeLabel:`, mapSetting);
+        return;
+      }
+      const dims = PRESET_SIZES[label];
+      this.state.mapSetting = {
+        type: PreGameMapType.Random,
+        width: dims.width,
+        height: dims.height,
+        tileFrequency: {},
+        sizeLabel: label,
+      };
+      return;
+    }
+
     this.state.mapSetting = mapSetting;
   }
 
