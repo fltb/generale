@@ -14,6 +14,7 @@ import {
   PreGameMapType,
   PRESET_SIZES,
   PreGameStandardSizeLabel,
+  PreGameRoomType,
 } from '@generale/types';
 import { compare } from 'fast-json-patch';
 
@@ -195,6 +196,8 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
         this.changeSetting(pid, evt.payload); break;
       case SyncedPreGameClientActionTypes.CHANGE_MAP:
         this.changeMap(pid, evt.payload); break;
+      case SyncedPreGameClientActionTypes.CHANGE_ROOM_TYPE:
+        this.changeRoomType(pid, evt.payload.roomType); break;
       case SyncedPreGameClientActionTypes.CHANGE_TEAM:
         this.changeTeam(pid, evt.payload.teamId, evt.payload.playerId); break;
       case SyncedPreGameClientActionTypes.KICK_PLAYER:
@@ -236,6 +239,43 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   private changeSetting(pid: PlayerId, patch: Partial<PreGameRoomState['gameSetting']>) {
     if (pid !== this.state.hostId) return;
     Object.assign(this.state.gameSetting, patch);
+  }
+
+  /** 切换房间模式（仅房主）
+   *
+   * - custom → standard：把 mapSetting 重置为 PRESET_SIZES.medium 的 Random 地图，清空 tileFrequency。
+   *   用户在 custom 模式下的自定义尺寸/地形频率/customData 将丢失（这是 standard 的语义约束）。
+   * - standard → custom：保留当前宽高，地图类型切换为 Custom，并清掉 sizeLabel。
+   * - 相同 → 相同：no-op。
+   */
+  private changeRoomType(pid: PlayerId, next: PreGameRoomType) {
+    if (pid !== this.state.hostId) return;
+    if (next !== "standard" && next !== "custom") return;
+    if (this.state.roomType === next) return;
+
+    if (next === "standard") {
+      const defaultLabel: PreGameStandardSizeLabel = "medium";
+      const dims = PRESET_SIZES[defaultLabel];
+      this.state.mapSetting = {
+        type: PreGameMapType.Random,
+        width: dims.width,
+        height: dims.height,
+        tileFrequency: {},
+        sizeLabel: defaultLabel,
+      };
+    } else {
+      const ms: any = this.state.mapSetting;
+      const w = typeof ms?.width === "number" ? ms.width : 20;
+      const h = typeof ms?.height === "number" ? ms.height : 20;
+      this.state.mapSetting = {
+        type: PreGameMapType.Custom,
+        width: w,
+        height: h,
+        tileFrequency: {},
+        customData: "",
+      };
+    }
+    this.state.roomType = next;
   }
 
   /** 修改地图设置（仅房主）

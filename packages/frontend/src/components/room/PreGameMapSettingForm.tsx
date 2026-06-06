@@ -78,10 +78,20 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
     props.onChange(next);
   };
 
+  const isCustomRoom = () => props.roomType === "custom";
+  const CUSTOM_MIN = 10;
+  const CUSTOM_MAX = 500;
+
+  const clampSize = (v: number) => {
+    const n = Math.floor(v);
+    if (isCustomRoom()) return Math.max(CUSTOM_MIN, Math.min(CUSTOM_MAX, n));
+    return Math.max(1, n);
+  };
+
   const setWidth = (w: number) => {
     const cur = props.setting;
     if (cur.type === PreGameMapType.Random || cur.type === PreGameMapType.Custom) {
-      const next = { ...cur, width: Math.max(1, Math.floor(w)) } as PreGameRandomMapSetting | PreGameCustomMapSetting;
+      const next = { ...cur, width: clampSize(w) } as PreGameRandomMapSetting | PreGameCustomMapSetting;
       props.onChange(next);
     }
   };
@@ -89,7 +99,7 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
   const setHeight = (h: number) => {
     const cur = props.setting;
     if (cur.type === PreGameMapType.Random || cur.type === PreGameMapType.Custom) {
-      const next = { ...cur, height: Math.max(1, Math.floor(h)) } as PreGameRandomMapSetting | PreGameCustomMapSetting;
+      const next = { ...cur, height: clampSize(h) } as PreGameRandomMapSetting | PreGameCustomMapSetting;
       props.onChange(next);
     }
   };
@@ -161,40 +171,42 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
 
   const isCompactRandom = true;
 
-  // standard 房间：UI 只展示三个预设按钮，隐藏地图类型/尺寸/地形频率等其它项
-  if (props.roomType === "standard") {
-    // 用函数读取以保持响应性：Solid 组件只渲染一次，常量捕获会导致高亮不更新
-    const currentLabel = () =>
-      props.setting.type === PreGameMapType.Random
-        ? (props.setting as PreGameRandomMapSetting).sizeLabel
-        : undefined;
-    return (
-      <div class="p-4 bg-base-100 rounded-lg shadow-sm space-y-3">
-        <div>
-          <label class="label">
-            <span class="label-text">预置尺寸</span>
-            <span class="label-text-alt">standard 模式仅支持 small / medium / large</span>
-          </label>
-          <div class="btn-group">
-            <button
-              class={`btn btn-sm ${currentLabel() === "small" ? "btn-active" : ""}`}
-              onClick={() => applyStandardPreset("small")}
-            >Small (10×10)</button>
-            <button
-              class={`btn btn-sm ${currentLabel() === "medium" ? "btn-active" : ""}`}
-              onClick={() => applyStandardPreset("medium")}
-            >Medium (20×20)</button>
-            <button
-              class={`btn btn-sm ${currentLabel() === "large" ? "btn-active" : ""}`}
-              onClick={() => applyStandardPreset("large")}
-            >Large (40×40)</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // standard 房间：UI 只展示三个预设按钮；custom 房间：完整自定义表单。
+  // 必须用响应式的 <Show> 而不是 if/return —— Solid 组件函数只执行一次，
+  // 早返回会把 props.roomType 锁在首次渲染时的值，后续切房间模式不会更新。
+  const currentLabel = () =>
+    props.setting.type === PreGameMapType.Random
+      ? (props.setting as PreGameRandomMapSetting).sizeLabel
+      : undefined;
 
   return (
+    <Show
+      when={props.roomType !== "standard"}
+      fallback={
+        <div class="p-4 bg-base-100 rounded-lg shadow-sm space-y-3">
+          <div>
+            <label class="label">
+              <span class="label-text">预置尺寸</span>
+              <span class="label-text-alt">standard 模式仅支持 small / medium / large</span>
+            </label>
+            <div class="btn-group">
+              <button
+                class={`btn btn-sm ${currentLabel() === "small" ? "btn-active" : ""}`}
+                onClick={() => applyStandardPreset("small")}
+              >Small (10×10)</button>
+              <button
+                class={`btn btn-sm ${currentLabel() === "medium" ? "btn-active" : ""}`}
+                onClick={() => applyStandardPreset("medium")}
+              >Medium (20×20)</button>
+              <button
+                class={`btn btn-sm ${currentLabel() === "large" ? "btn-active" : ""}`}
+                onClick={() => applyStandardPreset("large")}
+              >Large (40×40)</button>
+            </div>
+          </div>
+        </div>
+      }
+    >
     <div class="p-4 bg-base-100 rounded-lg shadow-sm space-y-4">
       <div class="form-control">
         <label class="label">
@@ -228,36 +240,44 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
           <div>
             <label class="label">
               <span class="label-text">宽度 (width)</span>
+              <Show when={isCustomRoom()}>
+                <span class="label-text-alt">{CUSTOM_MIN} - {CUSTOM_MAX}</span>
+              </Show>
             </label>
             <input
               type="number"
-              min={1}
+              min={isCustomRoom() ? CUSTOM_MIN : 1}
+              max={isCustomRoom() ? CUSTOM_MAX : undefined}
               step={1}
               value={String((props.setting as any).width ?? (isCompactRandom ? presetSizes.medium.width : 32))}
               class="input input-bordered w-40"
               onInput={(e) => setWidth(Number((e.currentTarget as HTMLInputElement).value))}
-              disabled={isCompactRandom && props.setting.type === PreGameMapType.Random} // compact 模式下，尺寸通过 preset 控制，文本框禁用以避免歧义
+              disabled={!isCustomRoom() && isCompactRandom && props.setting.type === PreGameMapType.Random}
             />
           </div>
 
           <div>
             <label class="label">
               <span class="label-text">高度 (height)</span>
+              <Show when={isCustomRoom()}>
+                <span class="label-text-alt">{CUSTOM_MIN} - {CUSTOM_MAX}</span>
+              </Show>
             </label>
             <input
               type="number"
-              min={1}
+              min={isCustomRoom() ? CUSTOM_MIN : 1}
+              max={isCustomRoom() ? CUSTOM_MAX : undefined}
               step={1}
               value={String((props.setting as any).height ?? (isCompactRandom ? presetSizes.medium.height : 24))}
               class="input input-bordered w-40"
               onInput={(e) => setHeight(Number((e.currentTarget as HTMLInputElement).value))}
-              disabled={isCompactRandom && props.setting.type === PreGameMapType.Random}
+              disabled={!isCustomRoom() && isCompactRandom && props.setting.type === PreGameMapType.Random}
             />
           </div>
         </div>
 
-        {/* compactRandom: 显示预置按钮（small/medium/large），并隐藏 tileFrequency 等详细项 */}
-        <Show when={isCompactRandom && props.setting.type === PreGameMapType.Random}>
+        {/* compactRandom: 显示预置按钮（small/medium/large），并隐藏 tileFrequency 等详细项；custom 房间不显示预设 */}
+        <Show when={!isCustomRoom() && isCompactRandom && props.setting.type === PreGameMapType.Random}>
           <div>
             <label class="label">
               <span class="label-text">预置尺寸（房间模式）</span>
@@ -352,6 +372,7 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
         </button>
       </div>
     </div>
+    </Show>
   );
 };
 

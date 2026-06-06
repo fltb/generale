@@ -363,6 +363,7 @@ export class GameService {
       if ((prev?.hostId ?? "") !== (curr?.hostId ?? "")) return true;
       if ((prev?.started ?? false) !== (curr?.started ?? false)) return true;
       if ((prev?.playerLimit ?? 0) !== (curr?.playerLimit ?? 0)) return true;
+      if ((prev?.roomType ?? "") !== (curr?.roomType ?? "")) return true;
       if (mapSettingFingerprint(prev) !== mapSettingFingerprint(curr)) return true;
       if (playerListFingerprint(prev) !== playerListFingerprint(curr)) return true;
       return false;
@@ -866,13 +867,16 @@ export class GameService {
 
     const playerCount = players.length;
 
-    // --- map field: 以 preGameInstance.mapSetting 为准；
+    // --- map field 与 roomType field：都以 preGameInstance 的实时状态为准；
     //   standard 房间直接读 sizeLabel（first-class 字段，CHANGE_MAP 只能命中预设），
     //   custom 房间读 {width, height}。无需根据尺寸反推 label。
+    //   roomType 也可能在房间内被房主切换，必须读 state。
     let mapField: { width: number; height: number } | "small" | "medium" | "large" | undefined =
       this.config.mapSize as any;
+    let roomTypeField: "standard" | "custom" = this.config.type;
     if (phase === GamePhase.PREGAME && this.preGameInstance) {
       const state = this.preGameInstance.getState();
+      roomTypeField = state.roomType;
       const ms: any = state.mapSetting;
       if (state.roomType === "standard" && ms?.sizeLabel) {
         mapField = ms.sizeLabel as "small" | "medium" | "large";
@@ -882,9 +886,9 @@ export class GameService {
     }
 
     // --- normalize settings ensuring discriminant matches mapSize ---
-    // Use explicit branch narrowing so TS knows the correct shape.
-    let settings: any; // ideally typed as GameSettings; use `any` only if GameSettings is mismatched.
-    if (this.config.type === "custom") {
+    // 跟随实时 roomType，标签/尺寸都基于上面派生出来的 mapField。
+    let settings: any;
+    if (roomTypeField === "custom") {
       settings = {
         maxPlayers,
         mapSize: mapField as { width: number; height: number },
@@ -892,7 +896,6 @@ export class GameService {
         roomName: this.config.roomName,
       };
     } else {
-      // treat as standard (default if undefined)
       settings = {
         maxPlayers,
         mapSize: mapField as "small" | "medium" | "large" | undefined,
@@ -909,7 +912,7 @@ export class GameService {
 
     return {
       id: this.gameId,
-      type: this.config.type,
+      type: roomTypeField,
       map: mapField,
       roomName,
       hostId,

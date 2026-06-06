@@ -105,6 +105,34 @@ function applyPregameEventLocal(state: SyncedPreGameState | null, action: Synced
         base.room.mapSetting = action.payload;
         return base;
       }
+      case SyncedPreGameClientActionTypes.CHANGE_ROOM_TYPE: {
+        // 与服务端 changeRoomType 镜像：切换 roomType 并联动重置 mapSetting
+        const next = action.payload?.roomType;
+        if (next !== "standard" && next !== "custom") return base;
+        if (base.room.roomType === next) return base;
+        if (next === "standard") {
+          base.room.mapSetting = {
+            type: PreGameMapType.Random,
+            width: 20,
+            height: 20,
+            tileFrequency: {},
+            sizeLabel: "medium",
+          } as any;
+        } else {
+          const ms: any = base.room.mapSetting;
+          const w = typeof ms?.width === "number" ? ms.width : 20;
+          const h = typeof ms?.height === "number" ? ms.height : 20;
+          base.room.mapSetting = {
+            type: PreGameMapType.Custom,
+            width: w,
+            height: h,
+            tileFrequency: {},
+            customData: "",
+          } as any;
+        }
+        base.room.roomType = next;
+        return base;
+      }
       // ---------------- 新增本地乐观：创建 / 重命名 / 删除 队伍 ----------------
       case SyncedPreGameClientActionTypes.CHANGE_TEAM: {
         // payload: { name?: string }
@@ -281,6 +309,13 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     synced.dispatch({ type: SyncedPreGameClientActionTypes.CHANGE_MAP, payload: nextMapSetting } as any);
   };
 
+  const onRoomTypeChange = (nextRoomType: "standard" | "custom") => {
+    synced.dispatch({
+      type: SyncedPreGameClientActionTypes.CHANGE_ROOM_TYPE,
+      payload: { roomType: nextRoomType },
+    } as any);
+  };
+
   // ---------------- team related handlers ----------------
 
   // join/move to team (playerId optional - if undefined, server should interpret as self)
@@ -390,6 +425,29 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           map={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
           onChange={(s) => onSettingChange(s)}
         />
+      </div>
+
+      <div class="card bg-base-200 p-4">
+        <div class="text-md font-medium mb-2">房间模式</div>
+        <div class="flex items-center gap-3">
+          <div class="btn-group">
+            <button
+              class={`btn btn-sm ${(room()?.roomType ?? "standard") === "standard" ? "btn-active" : ""}`}
+              disabled={!isHost()}
+              onClick={() => onRoomTypeChange("standard")}
+            >Standard</button>
+            <button
+              class={`btn btn-sm ${(room()?.roomType ?? "standard") === "custom" ? "btn-active" : ""}`}
+              disabled={!isHost()}
+              onClick={() => onRoomTypeChange("custom")}
+            >Custom</button>
+          </div>
+          <span class="text-xs opacity-60">
+            {(room()?.roomType ?? "standard") === "standard"
+              ? "仅可选 small / medium / large 预设"
+              : "可自定义地图尺寸、地形频率等"}
+          </span>
+        </div>
       </div>
 
       <div class="card bg-base-200 p-4">
