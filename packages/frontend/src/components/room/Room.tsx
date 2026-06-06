@@ -362,10 +362,12 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   const selfId = () => syncedState().selfId;
   const isHost = () => (room()?.hostId ?? "") === selfId();
 
-  // Render: control visibility via root wrapper style so component never unmounts
-  const wrapperStyle: Record<string, string> = {
+  // Render: control visibility via root wrapper style so component never unmounts.
+  // 用 accessor 包裹保持响应性：const wrapperStyle = {...} 会在组件初始化时
+  // 把 props.suspended 锁死，phase 切到 INGAME 时 display 不会更新，房间无法隐藏。
+  const wrapperStyle = (): Record<string, string> => ({
     display: props.suspended === false ? "none" : "block",
-  };
+  });
 
   onCleanup(() => {
     try {
@@ -375,7 +377,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   });
 
   return (
-    <div style={wrapperStyle} class="p-6" aria-hidden={props.suspended === false}>
+    <div style={wrapperStyle()} class="p-6" aria-hidden={props.suspended === false}>
       <div class="card bg-base-200 p-4">
         <div class="flex items-center justify-between">
           <div>
