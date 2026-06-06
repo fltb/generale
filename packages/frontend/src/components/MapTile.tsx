@@ -90,8 +90,10 @@ export const MapTile: Component<MapTileProps> = (props) => {
     }
   });
 
-  const x = props.coord.x * props.size;
-  const y = props.coord.y * props.size;
+  // 用 accessor 包裹保持响应性：直接 const x = props.coord.x * props.size
+  // 会把 size/coord 锁在首次渲染时的值，size 变化时位置不会更新。
+  const x = () => props.coord.x * props.size;
+  const y = () => props.coord.y * props.size;
 
   // 处理点击（通过 container 的 pointer 事件）
   const handlePointerDown: PIXI.FederatedEventHandler<PIXI.FederatedPointerEvent> = (e) => {
@@ -102,7 +104,7 @@ export const MapTile: Component<MapTileProps> = (props) => {
 
   // --- 关键改动：ref wrapper，必须返回函数或 undefined ---
   return (
-    <P.Container x={x} y={y} interactive buttonMode onpointerdown={handlePointerDown}>
+    <P.Container x={x()} y={y()} interactive buttonMode onpointerdown={handlePointerDown}>
       <P.Graphics ref={(inst) => { setG(inst); return () => setG(undefined); }} />
       <P.Graphics ref={(inst) => { setIconGraphics(inst); return () => setIconGraphics(undefined); }} />
 
