@@ -1,4 +1,4 @@
-import { type PreGamePlayerInfo, type TeamInfo } from "@generale/types";
+import { type PreGamePlayerInfo, type TeamInfo, PreGamePlayerStatus } from "@generale/types";
 import { type Component, For, Show, createMemo, createSignal } from "solid-js";
 
 /**
@@ -61,10 +61,16 @@ const PlayerCard: Component<{
         </div>
 
         <div class="flex flex-col min-w-0">
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <div class="truncate font-medium">{p().name}</div>
             <Show when={p().isHost}>
               <span class="badge text-xs ml-1">Host</span>
+            </Show>
+            <Show when={p().status === PreGamePlayerStatus.Playing}>
+              <span class="badge badge-info text-xs">游戏中</span>
+            </Show>
+            <Show when={p().status === PreGamePlayerStatus.Disconnected}>
+              <span class="badge badge-warning text-xs">离线</span>
             </Show>
           </div>
 
@@ -114,6 +120,8 @@ const PlayerCard: Component<{
               <Show when={props.onKick}>
                 <button
                   class="btn btn-xs btn-error"
+                  disabled={p().status !== PreGamePlayerStatus.Lobby}
+                  title={p().status !== PreGamePlayerStatus.Lobby ? "游戏中无法踢出该玩家" : "踢出该玩家"}
                   onClick={() => props.onKick?.(p().id)}
                 >
                   踢出

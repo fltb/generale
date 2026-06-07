@@ -6,6 +6,7 @@ import {
   SyncedPreGameClientActionTypes,
   type PreGameRoomState,
   PreGameMapType,
+  PreGamePlayerStatus,
   SyncedPreGameServerEventPayloadType,
   type GameId,
   type PlayerId,
@@ -38,6 +39,11 @@ export interface RoomWithSyncProps {
   onStateUpdate?: (payload: {
     event?: SyncedPreGameServerEventPayload;
   }) => void;
+  /**
+   * 当 self.status 变化时上报给父级——父级用这个决定显示房间还是游戏。
+   * 缺省视为 Lobby（与服务端 enum 默认一致）。
+   */
+  onSelfStatusChange?: (status: PreGamePlayerStatus) => void;
 }
 
 /** 提供一个 minimal empty PreGameRoomState，供初始 state 使用 */
@@ -263,6 +269,12 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     return players.find(p => p.id === selfId());
   };
   const selfReady = () => (getSelfPlayer()?.ready === 1);
+  const selfStatus = () => getSelfPlayer()?.status ?? PreGamePlayerStatus.Lobby;
+
+  // 把 self.status 上报给父级路由组件，让它据此决定显示 Room 还是 Game
+  createEffect(() => {
+    props.onSelfStatusChange?.(selfStatus());
+  });
 
   const onSettingChange = (nextSetting: Partial<PreGameRoomState["gameSetting"]>) => {
     const action = { type: SyncedPreGameClientActionTypes.CHANGE_SETTING, payload: nextSetting };
@@ -376,8 +388,32 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     } catch { }
   });
 
+  // 当前是不是「游戏进行中、自己在大厅围观」的状态
+  // 用来决定是否显示"游戏进行中"横幅 + 观战入口
+  const gameInProgress = () =>
+    selfStatus() === PreGamePlayerStatus.Lobby &&
+    (room()?.players ?? []).some(p => p.status === PreGamePlayerStatus.Playing);
+
   return (
     <div style={wrapperStyle()} class="p-6" aria-hidden={props.suspended === false}>
+      <Show when={gameInProgress()}>
+        <div class="alert alert-info shadow-sm mb-3">
+          <div class="flex items-center justify-between w-full gap-3">
+            <div>
+              <div class="font-medium">游戏进行中</div>
+              <div class="text-sm opacity-70">你可以在大厅等待本局结束，或选择观战。</div>
+            </div>
+            <button
+              class="btn btn-sm btn-primary"
+              disabled
+              title="观战功能开发中"
+            >
+              观战（开发中）
+            </button>
+          </div>
+        </div>
+      </Show>
+
       <div class="card bg-base-200 p-4">
         <div class="flex items-center justify-between">
           <div>

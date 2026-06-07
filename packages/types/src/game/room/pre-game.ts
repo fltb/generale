@@ -76,6 +76,19 @@ export enum PreGamePlayerReadyState {
   Ready = 1,
 }
 
+/**
+ * 房间阶段视角下的玩家状态
+ * - Lobby:        默认；在房间里，可以换队伍/准备/被踢
+ * - Playing:      游戏开始时被锁入游戏；不能换队伍/准备/被踢；离开只算断线
+ * - Disconnected: 曾是 Playing 但 connector 断开；座位保留到游戏结束
+ * - 后续可扩展 Spectating 等
+ */
+export enum PreGamePlayerStatus {
+  Lobby = 'lobby',
+  Playing = 'playing',
+  Disconnected = 'disconnected',
+}
+
 // 玩家房间信息（只保留房间阶段必需字段）
 export interface PreGamePlayerInfo {
   id: PlayerId;
@@ -85,6 +98,8 @@ export interface PreGamePlayerInfo {
   ready: PreGamePlayerReadyState;
   /** 玩家自选颜色，16进制数，前端可选填 */
   tileColor: PlayerColor;
+  /** 房间阶段视角下的玩家状态，缺省视为 Lobby */
+  status: PreGamePlayerStatus;
 }
 
 // 房间类型（与 GameServiceConfig.type 一致，固定在创建时，房间内不可变）

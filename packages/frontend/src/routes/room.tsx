@@ -17,6 +17,7 @@ import { prepareConnectApi } from "~/api/gameApi";
 
 import {
   GamePhase,
+  PreGamePlayerStatus,
   SyncedPreGameServerEventPayloadType,
 } from "@generale/types";
 
@@ -33,6 +34,9 @@ const RoomRoute: Component = () => {
   const [chatDomain, setChatDomain] = createSignal<string | null>(null);
 
   const [phase, setPhase] = createSignal<GamePhase>(GamePhase.PREGAME);
+  // 自己在房间内的状态：Lobby = 在大厅；Playing = 已被锁入游戏；Disconnected 本地不会出现
+  // （客户端断线时根本看不到任何 self）
+  const [selfStatus, setSelfStatus] = createSignal<PreGamePlayerStatus>(PreGamePlayerStatus.Lobby);
 
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -71,16 +75,18 @@ const RoomRoute: Component = () => {
       const dPrimary = data.domains?.primary ?? null;
       const dChat = data.domains?.chat ?? null;
 
-      // Update pregame domain if provided; if not provided but we're in PREGAME,
-      // fall back to primary.
+      // Update pregame domain if provided; if not provided but primary is pregame-*,
+      // fall back to primary. INGAME 时若服务端返回 primary=pregame-*（表示当前用户
+      // 没在游戏里，应作为 Lobby 进房间），也使用它。
       if (dPregame) {
         if (pregameDomain() !== dPregame) setPregameDomain(dPregame);
-      } else if (data.phase === GamePhase.PREGAME && dPrimary) {
+      } else if (dPrimary && dPrimary.startsWith('pregame-')) {
         if (pregameDomain() !== dPrimary) setPregameDomain(dPrimary);
       }
 
-      // Update game domain when server says INGAME (primary should be game-*)
-      if (data.phase === GamePhase.INGAME && dPrimary) {
+      // Update game domain only if primary is actually a game-* domain
+      // （INGAME 时若用户不在游戏中，primary 会是 pregame-*，那时不要写 gameDomain）
+      if (data.phase === GamePhase.INGAME && dPrimary && dPrimary.startsWith('game-')) {
         if (gameDomain() !== dPrimary) setGameDomain(dPrimary);
       }
 
@@ -168,8 +174,15 @@ const RoomRoute: Component = () => {
           <div class="card p-4 mb-4">Preparing connection…</div>
         </Match>
 
-        {/* ---------- INGAME (显示 game UI) ---------- */}
-        <Match when={phase() === GamePhase.INGAME && gameDomain() && playerId()}>
+        {/* ---------- INGAME (显示 game UI)：只对 Playing 的玩家显示 ----------
+            Lobby 玩家在 INGAME 期间继续看 RoomWithSync（在下面挂载），
+            Playing 玩家看 GameWithSync。 */}
+        <Match when={
+          phase() === GamePhase.INGAME
+          && selfStatus() === PreGamePlayerStatus.Playing
+          && gameDomain()
+          && playerId()
+        }>
           <GameWithSync
             domain={gameDomain()!} // MUST be game-*
             gameId={params.id!}
@@ -203,8 +216,11 @@ const RoomRoute: Component = () => {
           playerId={playerId()!}
           playerName={playerName() ?? "Guest"}
           autoOpen
-          suspended={phase() === GamePhase.PREGAME}
+          // RoomWithSync 内 suspended=true 表示「显示」（命名反了，保留以免破坏现有代码）。
+          // 房间在 self.status === Playing 时隐藏；Lobby 时（含 INGAME 期间的旁观者）显示。
+          suspended={selfStatus() !== PreGamePlayerStatus.Playing}
           onStateUpdate={handleStateUpdate}
+          onSelfStatusChange={(s) => setSelfStatus(s)}
         />
       </Show>
 

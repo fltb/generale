@@ -14,7 +14,8 @@ export interface SyncedGameState extends MaskedGameState {
 
 export enum SyncedGameClientActionTypes {
     PUSH = "player-operation-push",
-    CLEAN_ALL = "player-operation-clean-all"
+    CLEAN_ALL = "player-operation-clean-all",
+    SURRENDER = "player-surrender",
 }
 
 export type SyncedGameClientPlayerOperationPushAction = SyncedStateClientGenericSyncAction<
@@ -26,9 +27,14 @@ export type SyncedGameClientPlayerOperationClancelAllAction = SyncedStateClientG
     SyncedGameClientActionTypes.CLEAN_ALL
 >;
 
+export type SyncedGameClientSurrenderAction = SyncedStateClientGenericSyncAction<
+    SyncedGameClientActionTypes.SURRENDER
+>;
+
 export type SyncedGameClientActions =
     | SyncedGameClientPlayerOperationPushAction
-    | SyncedGameClientPlayerOperationClancelAllAction;
+    | SyncedGameClientPlayerOperationClancelAllAction
+    | SyncedGameClientSurrenderAction;
 
 export type SyncedGameServerEvent = SyncedStateServerEvent<SyncedGameState, SyncedPreGameServerEventPayload>;
 export { SyncedStateServerEventType as SyncedGameServerEventType } 

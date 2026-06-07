@@ -180,6 +180,17 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
         }
     }
 
+    // 投降：发 SURRENDER action 给服务端，本地不做乐观更新
+    // （服务端会把玩家标 Defeated 并立刻判断游戏是否结束并广播）
+    function handleSurrender() {
+        if (!confirm("确定投降吗？")) return;
+        try {
+            synced.dispatch({ type: SyncedGameClientActionTypes.SURRENDER });
+        } catch (e) {
+            console.warn("GameWithSync surrender dispatch error", e);
+        }
+    }
+
     onCleanup(() => {
         try {
             synced.disconnect();
@@ -208,6 +219,7 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
 
                 <div class="flex items-center gap-2">
                     <button class="btn btn-sm" onClick={handleClearQueue}>清空操作队列</button>
+                    <button class="btn btn-sm btn-warning" onClick={handleSurrender}>投降</button>
                     <button class="btn btn-sm btn-ghost" onClick={handleLeave}>离开游戏</button>
                 </div>
             </div>

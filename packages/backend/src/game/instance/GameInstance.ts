@@ -13,6 +13,7 @@ import {
     SyncedPreGameServerEventPayloadType
 } from '@generale/types';
 import { tick, mask } from '../core';
+import { playerDefeatedBy, autoJudge } from '../core/game-utils';
 import { GameStatus, PlayerStatus } from '@generale/types';
 import { compare } from 'fast-json-patch';
 
@@ -230,6 +231,9 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
                 synced.syncedState.playerOperationQueue = [];
                 console.debug(`[GameInstance] ${pid} cleared ops`);
             } break;
+            case SyncedGameClientActionTypes.SURRENDER: {
+                this.handleSurrender(pid);
+            } break;
             default:
                 console.debug(`[GameInstance] unknown client action type from ${pid}`, evt);
                 break;
@@ -238,6 +242,40 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         // update lastConfirmedOp if optimisticId provided
         if (typeof optimisticId === 'number') {
             synced.lastConfirmedOp = optimisticId;
+        }
+    }
+
+    /**
+     * 投降：把发起者标为 Defeated，立刻判断游戏是否结束并广播。
+     * 不要求 destroyed 状态；幂等：已不在 Playing 的玩家忽略。
+     */
+    private handleSurrender(pid: PlayerId) {
+        if (this.destroyed) return;
+        if (this.state.status === GameStatus.Ended) return;
+        const player = this.state.players[pid];
+        if (!player) return;
+        if (player.status !== PlayerStatus.Playing) return;
+
+        console.log(`[GameInstance] player ${pid} surrendered`);
+        playerDefeatedBy(this.state, pid, null);
+        autoJudge(this.state);
+        this.version++;
+
+        // 广播 masked 状态给所有人，确保对手地图立刻看到他领土被收归中立
+        for (const targetPid of this.connectors.keys()) {
+            const entry = this.ensureSyncEntry(targetPid);
+            const masked = mask(this.state, targetPid);
+            entry.syncedState = { ...entry.syncedState, ...masked };
+            try { this.sendState(targetPid); } catch { /* swallow */ }
+        }
+
+        // 如果 autoJudge 已经把游戏判结束了，立刻走结束流程
+        // (cast because TS narrowed status after the early `=== Ended` check above)
+        if ((this.state.status as GameStatus) === GameStatus.Ended) {
+            const winnerTeam = Object.values(this.state.teams).find(team => team.status === PlayerStatus.Won);
+            const winnerId = (winnerTeam && winnerTeam.memberIds[0]) ? winnerTeam.memberIds[0] : '';
+            this.broadcastGameEnded();
+            this.triggerEndGame({ winnerId, reason: 'Game ended (surrender)' });
         }
     }
 

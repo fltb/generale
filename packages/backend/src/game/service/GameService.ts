@@ -775,16 +775,14 @@ export class GameService {
         break;
 
       case GamePhase.INGAME:
-        if (!this.hasPlayer(playerId)) {
-          return {
-            success: false,
-            reason: 'NOT_AUTHORIZED',
-            message: 'Player not found in this game.'
-          };
+        // 已在游戏中的玩家 -> 走 game 域
+        // 不在游戏中的玩家 -> 走 pregame 域，作为 Lobby 玩家进房间
+        //   （之后可以在房间里换队伍等待下一局，或选择观战）
+        if (this.hasPlayer(playerId)) {
+          primary = `game-${this.gameId}`;
+        } else {
+          primary = `pregame-${this.gameId}`;
         }
-
-        primary = `game-${this.gameId}`;
-        // also expose pregame domain so client may keep it open during ingame
         break;
 
       case GamePhase.ENDED:
