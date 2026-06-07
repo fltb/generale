@@ -35,11 +35,24 @@ export const userRoutes = new Elysia()
     async ({ body, set }) => {
       const { username, password, email } = body
 
-      // 1) username collision check — if username taken by other user (not the same email user), reject
+      // 1) username collision check
+      //    - 已验证用户占用：真冲突，拒绝
+      //    - 未验证用户占用：视为「已放弃的注册会话」，清掉以便重新走完整流程
+      //      （这样用户用同一/不同邮箱重试注册时，不会被自己之前未验证的草稿挡住）
       const usernameOwner = await userService.findByUsername(username)
       if (usernameOwner) {
-        set.status = 409
-        return { error: '用户名已存在' }
+        if (usernameOwner.verified) {
+          set.status = 409
+          return { error: '用户名已存在' }
+        }
+        try {
+          await userService.delete(usernameOwner.id)
+          console.info(`register: cleared abandoned unverified user ${usernameOwner.id} (username=${usernameOwner.username}) to free username`)
+        } catch (err) {
+          console.error('Failed to delete abandoned unverified user during register:', usernameOwner.id, err)
+          set.status = 500
+          return { error: '服务器错误：无法清理过期注册' }
+        }
       }
 
       // 2) check email

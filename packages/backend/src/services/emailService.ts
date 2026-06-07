@@ -77,6 +77,8 @@ export async function sendVerificationEmail(email: string, code: string) {
     throw new Error('Email service not initialized');
   }
 
+  console.debug(`sent code ${code} to ${email}`)
+
   await transporter.sendMail({
     from: process.env['EMAIL_FROM'],
     to: email,
