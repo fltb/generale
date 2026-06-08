@@ -12,6 +12,10 @@ export interface MapRenderProps {
   state: SyncedGameState;
   // 可选回调：若宿主想收到新增指令可以传入（非必须）
   onOperationQueued?: (op: PlayerOperation) => void;
+  /** 当前客户端玩家 id，用于首帧把 cursor 自动放到自己的 throne 上 */
+  selfId?: string;
+  /** 按 'c' 键时调用：清空操作队列 */
+  onClearQueue?: () => void;
 }
 
 const ICON_MAP = {
@@ -104,9 +108,34 @@ export const MapRender: Component<MapRenderProps> = (props) => {
   const map = createMemo(() => props.state?.map ?? { width: 0, height: 0, tiles: [] });
   const iconTextures = createMemo<Record<TileType, FaIconKey | null>>(() => TILE_ICON_MAP);
 
-  // active cursor
+  // active cursor。默认 (1,1) 只是占位，下面的 effect 会在拿到自己的 throne 后覆盖。
   const [active, setActive] = createSignal<Coordinates | null>({ x: 1, y: 1 });
   const [gCursor, setGCursor] = createSignal<PIXI.Graphics | undefined>(undefined);
+
+  // 自动定位 cursor 到自己 throne：第一次扫到属于 selfId 的 throne 就置位，置位后不再覆盖
+  // （用户随后点击 / 方向键移动的位置由 active signal 自己管，不应该被 state 更新拽回）。
+  // spectator 没有 selfId 或地图里没有自己的 throne 时不做事，保持默认。
+  const [cursorInitialized, setCursorInitialized] = createSignal(false);
+  createEffect(() => {
+    if (cursorInitialized()) return;
+    const id = props.selfId;
+    if (!id) return;
+    const m = map();
+    const tiles = m?.tiles;
+    if (!tiles || tiles.length === 0) return;
+    for (let y = 0; y < m.height; y++) {
+      const row = tiles[y];
+      if (!row) continue;
+      for (let x = 0; x < m.width; x++) {
+        const tile = row[x];
+        if (tile && tile.type === TileType.Throne && tile.ownerId === id) {
+          setActive({ x, y });
+          setCursorInitialized(true);
+          return;
+        }
+      }
+    }
+  });
 
   createEffect(() => {
     const graphics = gCursor();
@@ -162,9 +191,16 @@ export const MapRender: Component<MapRenderProps> = (props) => {
     props.onOperationQueued?.(op);
   };
 
-  // 键盘控制：当有 active 时，按方向键/WASD 会上报一条 move 并把 active 移到目标
+  // 键盘控制：方向键/WASD 移动；c 清空操作队列
   onMount(() => {
     const handler = (e: KeyboardEvent) => {
+      // 'c' 不依赖 active，单独处理
+      if (e.key === "c" || e.key === "C") {
+        e.preventDefault();
+        props.onClearQueue?.();
+        return;
+      }
+
       const a = active();
       if (!a) return;
 

@@ -58,8 +58,14 @@ export function tick(
             player.lastActiveTick = newState.tick;
         }
 
-        // 仅在成功时消费该操作
-        newQueues[pid] = ok ? ops.slice(1) : [];
+        // 不管成功失败都丢掉队头那一条：
+        // - 成功：自然消费
+        // - 失败：废 op 单独丢弃，不连坐后面合法的 op
+        //
+        // 之前的实现是失败时把整条队列清空（`ok ? slice(1) : []`），导致
+        // "第一下因为 cursor 默认 (1,1) 或 throne 兵力还=1 失败" 就把用户
+        // 后续排好的几下也一起带走，UX 上表现为"第一下移动概率被丢弃"。
+        newQueues[pid] = ops.slice(1);
     }
 
     updateGameState(newState);

@@ -165,7 +165,21 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         this.connectors.set(playerId, connector);
 
         // ensure we have a sync entry for this player (in case they were not in initial playerIds)
-        this.ensureSyncEntry(playerId);
+        const entry = this.ensureSyncEntry(playerId);
+
+        // 关键：用当前 this.state 重算一次 masked 视图，覆盖 entry.syncedState。
+        // 否则重连后 sendState 会把"该玩家断线那一帧冻结的 syncedState"当成快照发回，
+        // 客户端基于过期视图操作会被服务端 validateMove 拒掉但 lastConfirmedOp 仍推进，
+        // 表现为"乐观队列里有 move op 但格子没动、一帧后 op 消失"。
+        const masked = mask(this.state, playerId);
+        entry.syncedState = {
+            ...entry.syncedState,
+            ...masked,
+            playerDisplay: this.settings.playerDisplay,
+            playerOperationQueue: [], // 重连不继承旧的操作队列
+        };
+        // prevSentState 也需要清掉，让首帧确实走 SNAPSHOT 而不是 PATCH against 旧基线
+        this.prevSentState.delete(playerId);
 
         // register connector callbacks
         connector.onOpen(() => {

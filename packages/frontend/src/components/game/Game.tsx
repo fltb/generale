@@ -302,7 +302,12 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
                     antialias={true}
                 >
 
-                    <MapRender state={mergedState()} onOperationQueued={handleOperationQueued} />
+                    <MapRender
+                        state={mergedState()}
+                        onOperationQueued={handleOperationQueued}
+                        selfId={props.spectate ? undefined : props.playerId}
+                        onClearQueue={props.spectate ? undefined : handleClearQueue}
+                    />
                 </Application>
             </div>
 
