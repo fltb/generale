@@ -213,6 +213,12 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           // 当收到 GAME_STARTED 时，告知父组件 phase 已切为 INGAME（由服务器权威决定）
           props.onStateUpdate?.({ event: evt });
           break;
+        case SyncedPreGameServerEventPayloadType.GAME_ENDED:
+          // 走 pregame 域的 GAME_ENDED：服务端会在 resume 之前发它。
+          // 我们只 bubble 给路由，让它把 GameWithSync 维持 mount，等用户/计时器 dismiss。
+          // 不在这里 setNotice，避免在房间页弹出 raw 通知。
+          props.onStateUpdate?.({ event: evt });
+          break;
         case SyncedPreGameServerEventPayloadType.START_REJECTED:
           // 显示原因（通常只由 host 收到），不需要向上传递
           setNotice(evt.reason ?? "开始被拒绝，队伍或准备条件不满足");

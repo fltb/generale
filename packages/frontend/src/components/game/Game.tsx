@@ -13,6 +13,7 @@ import {
     type PlayerId,
     type GameId,
     SyncedPreGameServerEventPayloadType,
+    PlayerStatus,
 } from "@generale/types";
 import { MapRender } from "../MapRender";
 import { Application } from "solid-pixi";
@@ -226,6 +227,48 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
     const prettyState = createMemo(() =>
         JSON.stringify(mergedState().playerOperationQueue, null, 2)
     );
+
+    /**
+     * 结算面板用：从最终（未 mask）的 state 计算
+     *  - 自己赢/输（spectator 没有自己，返回 null）
+     *  - 获胜队伍名 + 队员名字
+     *  - 失败队伍列表（队员名字，按队伍分组）
+     */
+    const endgameResult = createMemo(() => {
+        if (!gameEndedInfo()) return null;
+        const s = mergedState();
+        const players = s?.players ?? {};
+        const teams = s?.teams ?? {};
+        const display = s?.playerDisplay ?? {};
+
+        const selfPlayer = players[props.playerId];
+        const selfOutcome: "won" | "lost" | null = !selfPlayer
+            ? null
+            : selfPlayer.status === PlayerStatus.Won
+                ? "won"
+                : selfPlayer.status === PlayerStatus.Defeated
+                    ? "lost"
+                    : null;
+
+        const teamLabel = (memberIds: PlayerId[]) =>
+            memberIds
+                .map(id => display[id]?.name ?? id)
+                .filter(Boolean)
+                .join("、");
+
+        const winnerTeam = Object.values(teams).find(
+            t => (t as any).status === PlayerStatus.Won
+        ) as { id: string; memberIds: PlayerId[] } | undefined;
+        const loserTeams = Object.values(teams).filter(
+            t => (t as any).status === PlayerStatus.Defeated
+        ) as Array<{ id: string; memberIds: PlayerId[] }>;
+
+        return {
+            selfOutcome,
+            winnerLabel: winnerTeam ? teamLabel(winnerTeam.memberIds) : null,
+            loserLabels: loserTeams.map(t => teamLabel(t.memberIds)).filter(s => s.length > 0),
+        };
+    });
     return (
         <div class="p-4">
             <div class="card bg-base-200 p-3 mb-3 flex items-center justify-between">
@@ -264,13 +307,36 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
             </div>
 
             <Show when={gameEndedInfo()}>
-                <div class="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white">
+                {/* fixed + z-50：相对视口铺满，覆盖在房间组件、chat 浮窗等之上。
+                    用 absolute 会受外层无 position 的祖先 / pixi Application 容器影响导致覆盖不全。 */}
+                <div class="fixed inset-0 z-50 bg-black/70 flex flex-col items-center justify-center text-white px-6">
+                    <Show
+                        when={endgameResult()?.selfOutcome === "won"}
+                        fallback={
+                            <Show
+                                when={endgameResult()?.selfOutcome === "lost"}
+                                fallback={<h1 class="text-4xl font-bold mb-4">游戏结束</h1>}
+                            >
+                                <h1 class="text-5xl font-bold mb-4 text-rose-300">你输了</h1>
+                            </Show>
+                        }
+                    >
+                        <h1 class="text-5xl font-bold mb-4 text-amber-300">你赢了</h1>
+                    </Show>
 
-                    <h1 class="text-4xl font-bold mb-4">
-                        游戏结束
-                    </h1>
+                    <Show when={endgameResult()?.winnerLabel}>
+                        <p class="mb-2 text-lg">
+                            获胜：<span class="font-semibold">{endgameResult()!.winnerLabel}</span>
+                        </p>
+                    </Show>
 
-                    <p class="mb-4">
+                    <Show when={(endgameResult()?.loserLabels ?? []).length > 0}>
+                        <p class="mb-4 text-sm opacity-80">
+                            失败：{(endgameResult()!.loserLabels).join(" / ")}
+                        </p>
+                    </Show>
+
+                    <p class="mb-4 opacity-70">
                         5 秒后返回房间
                     </p>
 

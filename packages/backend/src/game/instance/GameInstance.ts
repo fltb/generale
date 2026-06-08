@@ -279,6 +279,26 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     }
 
     /**
+     * 游戏结束时，给所有玩家 connector 推一帧未 mask 的完整 SyncedGameState，
+     * 让客户端结算 UI 下面显示全局视野（throne/barracks/对手领土等都可见）。
+     * 观战者一直收 unmasked，无需重复推。
+     */
+    private pushFinalUnmaskedSnapshotToPlayers(): void {
+        for (const pid of this.connectors.keys()) {
+            const synced = this.ensureSyncEntry(pid);
+            synced.syncedState = {
+                ...synced.syncedState,
+                ...structuredClone(this.state),
+            };
+            try {
+                this.sendState(pid, /*forceSnapshot=*/ true);
+            } catch (e) {
+                console.warn(`[GameInstance] pushFinalUnmaskedSnapshotToPlayers error for ${pid}`, e);
+            }
+        }
+    }
+
+    /**
      * 投降：把发起者标为 Defeated，立刻判断游戏是否结束并广播。
      * 不要求 destroyed 状态；幂等：已不在 Playing 的玩家忽略。
      */
@@ -308,6 +328,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         // 如果 autoJudge 已经把游戏判结束了，立刻走结束流程
         // (cast because TS narrowed status after the early `=== Ended` check above)
         if ((this.state.status as GameStatus) === GameStatus.Ended) {
+            this.pushFinalUnmaskedSnapshotToPlayers();
             const winnerTeam = Object.values(this.state.teams).find(team => team.status === PlayerStatus.Won);
             const winnerId = (winnerTeam && winnerTeam.memberIds[0]) ? winnerTeam.memberIds[0] : '';
             this.broadcastGameEnded();
@@ -600,6 +621,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         }
 
         if (this.state.status === GameStatus.Ended) {
+            this.pushFinalUnmaskedSnapshotToPlayers();
             const winnerTeam = Object.values(this.state.teams).find(team => team.status === PlayerStatus.Won);
             let winnerId: string = '';
             if (winnerTeam && Array.isArray(winnerTeam.memberIds) && winnerTeam.memberIds.length > 0) {

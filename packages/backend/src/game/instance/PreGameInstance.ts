@@ -715,6 +715,31 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     }
   }
 
+  /**
+   * 在 pregame 域上广播 GAME_ENDED 事件。
+   *
+   * GameService.endGame 会先调它再 resume()，这样客户端在 pregame state 翻位
+   * （Playing/Spectating -> Lobby）之前就能收到"游戏刚结束"的信号，可以维持游戏
+   * 结算 UI 不被立刻替换为房间页。
+   *
+   * 只发事件，不动状态。
+   */
+  public broadcastGameEnded(endedAt: number): void {
+    for (const conn of this.connectors.values()) {
+      try {
+        conn.send({
+          type: SyncedPreGameServerEventType.CUSTOM,
+          payload: {
+            type: SyncedPreGameServerEventPayloadType.GAME_ENDED,
+            endedAt,
+          },
+        });
+      } catch (e) {
+        console.warn('[PreGameInstance] broadcastGameEnded send error', e);
+      }
+    }
+  }
+
   /** 判断是否所有非房主都准备好且人数足够 */
   private canStart(): { ok: false, reason: string } | { ok: true } {
     const readyPlayers = this.state.players.filter(p => !p.isHost && p.ready === 1);

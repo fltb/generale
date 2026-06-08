@@ -553,9 +553,12 @@ export class GameService {
       this.gameInstance = null;
     }
 
-    // 恢复为 PREGAME：使用 lastPreGameSnapshot（优先），如果没有则从旧的 gameState 尝试构建一个基本的 pregame 状态
-
+    // 先在 pregame 域广播一次 GAME_ENDED，再 resume()。
+    // 顺序很关键：客户端的 RoomWithSync 必须先收到 GAME_ENDED（让路由记下"刚结束"标记，
+    // 维持游戏结算 UI），再收到 resume 后的 pregame state（status: Playing/Spectating -> Lobby）。
+    // 否则 selfStatus 翻位会让 Match 立刻 unmount GameWithSync，玩家来不及看输赢。
     if (this.preGameInstance) {
+      this.preGameInstance.broadcastGameEnded(Date.now());
       this.preGameInstance.resume();
     } else {
       // 解散房间（降级方案）

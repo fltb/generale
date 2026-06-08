@@ -42,6 +42,12 @@ const RoomRoute: Component = () => {
   // 把 LEAVE_SPECTATE 发到 pregame 域。Room 卸载时会传 null 进来。
   const [roomApi, setRoomApi] = createSignal<{ leaveSpectate: () => void } | null>(null);
 
+  // 服务端在 resume 之前会通过 pregame 域发一次 GAME_ENDED；此 signal 为 true 时
+  // 表示"游戏刚结束、结算 UI 正显示中"，Match 在此期间维持 GameWithSync 挂载，
+  // 不被 selfStatus 翻位（Playing -> Lobby）立刻 unmount。
+  // 由 Game.tsx 的"回到房间"按钮或 5s 计时器 bubble 第二次 GAME_ENDED 来清掉。
+  const [gameJustEnded, setGameJustEnded] = createSignal(false);
+
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
@@ -165,10 +171,19 @@ const RoomRoute: Component = () => {
       }
 
       case SyncedPreGameServerEventPayloadType.GAME_ENDED: {
-        // immediate UI feedback
-        setPhase(GamePhase.PREGAME);
-        // authoritative refresh (may update pregame/chat/game domains)
-        await refreshConnectionInfo();
+        // 两段式：
+        // 1) 第一次（来自 RoomWithSync 的 pregame GAME_ENDED）：仅标记结束，
+        //    维持 GameWithSync 挂载让用户看结算 UI。不切 phase 也不 refresh，
+        //    因为 selfStatus 还要靠 RoomWithSync 接下来收到的 pregame state 翻位。
+        // 2) 第二次（来自 GameWithSync 的"回到房间"按钮或 5s 计时器）：用户已 dismiss，
+        //    把 phase/domain 切回 PREGAME。
+        if (!gameJustEnded()) {
+          setGameJustEnded(true);
+        } else {
+          setGameJustEnded(false);
+          setPhase(GamePhase.PREGAME);
+          await refreshConnectionInfo();
+        }
         break;
       }
 
@@ -199,10 +214,15 @@ const RoomRoute: Component = () => {
         {/* ---------- INGAME (显示 game UI) ----------
             - Playing 玩家：作为对局参与者打开 GameWithSync
             - Spectating 玩家：作为观战者打开 GameWithSync（read-only，禁用 surrender/操作）
-            - Lobby 玩家：继续看 RoomWithSync（下面挂载） */}
+            - Lobby 玩家：继续看 RoomWithSync（下面挂载）
+            - gameJustEnded：游戏刚结束，结算 overlay 显示中，维持挂载等用户/计时器 dismiss */}
         <Match when={
           phase() === GamePhase.INGAME
-          && (selfStatus() === PreGamePlayerStatus.Playing || selfStatus() === PreGamePlayerStatus.Spectating)
+          && (
+            selfStatus() === PreGamePlayerStatus.Playing
+            || selfStatus() === PreGamePlayerStatus.Spectating
+            || gameJustEnded()
+          )
           && gameDomain()
           && playerId()
         }>
@@ -242,8 +262,9 @@ const RoomRoute: Component = () => {
           playerName={playerName() ?? "Guest"}
           autoOpen
           // RoomWithSync 内 suspended=true 表示「显示」（命名反了，保留以免破坏现有代码）。
-          // 仅当玩家处于 Lobby 时显示房间页；Playing/Spectating 都让 GameWithSync 占满屏。
-          suspended={selfStatus() === PreGamePlayerStatus.Lobby}
+          // 仅当玩家在 Lobby 且不在游戏结束结算窗口内时显示房间页；
+          // Playing/Spectating/gameJustEnded 全都让 GameWithSync 占满屏。
+          suspended={selfStatus() === PreGamePlayerStatus.Lobby && !gameJustEnded()}
           onStateUpdate={handleStateUpdate}
           onSelfStatusChange={(s) => setSelfStatus(s)}
           onExposeApi={(api) => setRoomApi(api)}
