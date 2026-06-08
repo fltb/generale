@@ -95,7 +95,10 @@ export function createScaledFaIcon(
     sizePx: number = 32,
     colorHex: number = 0x000000
 ): Graphics {
-    const ctx = getGraphicsContextFromFa(key, colorHex);
+    // 注意：getGraphicsContextFromFa 的签名是 (key, px, colorHex)；
+    // 这里以前漏写了 sizePx，颜色被当作像素数传进去（0xff0000 -> px=16711680），
+    // SVG 被渲染到天文数字大小再被外层 scale.set 压回去，导致图标在视觉上消失。
+    const ctx = getGraphicsContextFromFa(key, sizePx, colorHex);
     const graphics = new Graphics(ctx);
 
     // 计算缩放比例

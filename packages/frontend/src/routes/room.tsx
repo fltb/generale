@@ -113,16 +113,20 @@ const RoomRoute: Component = () => {
   });
 
   /**
-   * 当 selfStatus 变成 Spectating 时，重新 prepareConnect 拿 game-* 域。
-   * 当 selfStatus 退回 Lobby 时，清掉 gameDomain，避免 stale 域名让客户端误开 game 连接。
-   * （Playing 玩家走 GAME_STARTED 流程，已经会自动 refresh，不需要在这里特别处理）
+   * 当 selfStatus 变成 Spectating 而 gameDomain 还没拿到时，重新 prepareConnect。
+   *
+   * 不再在 Lobby 时主动清 gameDomain ——
+   * 1) 它在 selfStatus 默认 Lobby（F5 后刚 mount，state 还没回来）的首次执行里会把
+   *    刚 setGameDomain 出来的合法 game-* 域立刻清掉，导致 Playing 玩家始终拿不到
+   *    gameDomain，Match 不命中 → 白屏。
+   * 2) gameDomain 保留也不会让 GameWithSync 错误挂载，因为 Match 还要求
+   *    selfStatus ∈ {Playing, Spectating}；Lobby 不会进游戏 UI。
+   * 3) 同一个 gameId 的 game-${id} 域始终有效，复用即可。
    */
   createEffect(() => {
     const status = selfStatus();
     if (status === PreGamePlayerStatus.Spectating && !gameDomain()) {
       refreshConnectionInfo();
-    } else if (status === PreGamePlayerStatus.Lobby && gameDomain()) {
-      setGameDomain(null);
     }
   });
 
