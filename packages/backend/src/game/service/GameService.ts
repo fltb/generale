@@ -15,6 +15,7 @@ import {
   GameSettings,
   GamePhase,
   PRESET_SIZES,
+  PreGamePlayerStatus,
 } from '@generale/types';
 import { PreGameInstance, PreGameServerConnector } from '../instance/PreGameInstance';
 import { GameInstance, GameInstanceSettings } from '../instance/GameInstance';
@@ -175,6 +176,11 @@ export class GameService {
 
   /**
    * 创建 Game 域名处理器
+   *
+   * 玩家在 PreGame 状态决定连接形式：
+   *   - Playing  -> 正常作为对局参与者接入（addPlayer）
+   *   - Spectating -> 作为观战者接入（addSpectator，只读不发 action）
+   *   - 其它（包括 PreGame 实例不存在或玩家不在状态里）-> 4003 拒绝
    */
   private createGameDomainHandler(): DomainHandler<SyncedGameClientActions, SyncedGameServerEvent> {
     return (connector: SubConnector<SyncedGameClientActions, SyncedGameServerEvent>) => {
@@ -197,13 +203,29 @@ export class GameService {
         return;
       }
 
-      // 新接口：动态绑定 GameInstance connector
-      if (this.gameInstance) {
-        const res = this.gameInstance.addPlayer({ id: userid, name: username }, this.adaptToGameConnector(connector));
+      if (!this.gameInstance) {
+        connector.close(4002, 'No game instance');
+        return;
+      }
+
+      // 区分玩家 / 观战者：以 PreGameInstance 中的 status 为准
+      const pregameState = this.preGameInstance?.getState();
+      const playerEntry = pregameState?.players.find(p => p.id === userid);
+      const isSpectator = playerEntry?.status === PreGamePlayerStatus.Spectating;
+
+      if (isSpectator) {
+        const res = this.gameInstance.addSpectator({ id: userid, name: username }, this.adaptToGameConnector(connector));
         if (!res.success) {
           connector.close(4003, res.message);
           return;
         }
+        return;
+      }
+
+      const res = this.gameInstance.addPlayer({ id: userid, name: username }, this.adaptToGameConnector(connector));
+      if (!res.success) {
+        connector.close(4003, res.message);
+        return;
       }
     };
   }
@@ -774,16 +796,22 @@ export class GameService {
         primary = `pregame-${this.gameId}`;
         break;
 
-      case GamePhase.INGAME:
-        // 已在游戏中的玩家 -> 走 game 域
-        // 不在游戏中的玩家 -> 走 pregame 域，作为 Lobby 玩家进房间
-        //   （之后可以在房间里换队伍等待下一局，或选择观战）
+      case GamePhase.INGAME: {
+        // 1) 已在游戏中的玩家 -> game 域（作为对局参与者）
+        // 2) PreGame state 里标为 Spectating 的玩家 -> game 域（作为观战者，addSpectator）
+        // 3) 其它（Lobby / 未在房间里）-> pregame 域，作为 Lobby 进房间
         if (this.hasPlayer(playerId)) {
+          primary = `game-${this.gameId}`;
+          break;
+        }
+        const pregameSelf = this.preGameInstance?.getState().players.find(p => p.id === playerId);
+        if (pregameSelf?.status === PreGamePlayerStatus.Spectating) {
           primary = `game-${this.gameId}`;
         } else {
           primary = `pregame-${this.gameId}`;
         }
         break;
+      }
 
       case GamePhase.ENDED:
       case GamePhase.DISBANDED:

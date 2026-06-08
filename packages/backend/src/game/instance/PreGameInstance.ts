@@ -72,10 +72,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
     for (const [pid, conn] of this.connectors) {
       conn.onOpen(() => this.sendState(pid, true));
-      conn.onDisconnect(() => this.handleDisconnect(pid));
+      conn.onDisconnect(() => this.handleDisconnect(pid, conn));
       conn.onReconnect(() => this.sendState(pid, true));
       conn.onClientMessage(evt => this.handleClientAction(pid, evt));
-      conn.onClose(() => this.handleDisconnect(pid));
+      conn.onClose(() => this.handleDisconnect(pid, conn));
     }
   }
 
@@ -137,26 +137,48 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     this.state.teamCount = newTeams.length;
   }
 
-  // 专门的 disconnect 处理函数，供 connector.onDisconnect / onClose 使用
-  private handleDisconnect(pid: PlayerId) {
+  /**
+   * 清除某个 pid 的 per-connection 服务端状态：connector / prevSentState / syncData。
+   * 保留 player entry 本身（是否保留由调用方决定）。
+   * 不清这些会导致：
+   *  - prevSentState 残留 → 重连首帧服务端发 PATCH 而不是 SNAPSHOT，客户端 patch 失败
+   *  - syncData.lastConfirmedOp 残留 → 新 connection 从 optimisticId=0 计数时被
+   *    服务端误判为过期 action 丢弃
+   */
+  private clearPerConnectionState(pid: PlayerId) {
+    const conn = this.connectors.get(pid);
+    if (conn) {
+      try { conn.close(); } catch { }
+      this.connectors.delete(pid);
+    }
+    this.prevSentState.delete(pid);
+    this.syncData.delete(pid);
+  }
+
+  /**
+   * 专门的 disconnect 处理函数，供 connector.onDisconnect / onClose 使用。
+   *
+   * `source` 是触发本次回调的 connector。如果当前 this.connectors[pid] 已经
+   * 不是 source（说明同一个 pid 后来有了新连接，旧的 onClose 才迟到地跑），
+   * 直接忽略——否则会把无辜的新 connector 关掉、把刚回来的 Playing 玩家又翻成 Disconnected。
+   *
+   * 没传 source 的旧调用路径（罕见）退化为不检查，保留原行为。
+   */
+  private handleDisconnect(pid: PlayerId, source?: PreGameServerConnector) {
+    if (source && this.connectors.get(pid) !== source) {
+      console.debug(`[PreGameInstance] stale onClose/onDisconnect for ${pid} ignored (connector replaced)`);
+      return;
+    }
+
     const player = this.state.players.find(p => p.id === pid);
     if (!player) {
-      // no player entry — just clean connector if any
-      const conn = this.connectors.get(pid);
-      if (conn) {
-        try { conn.close(); } catch { }
-        this.connectors.delete(pid);
-      }
+      this.clearPerConnectionState(pid);
       return;
     }
 
     // Playing 玩家断开 -> 标记 Disconnected，保留座位等待 game 结束回收
     if (player.status === PreGamePlayerStatus.Playing) {
-      const conn = this.connectors.get(pid);
-      if (conn) {
-        try { conn.close(); } catch { }
-        this.connectors.delete(pid);
-      }
+      this.clearPerConnectionState(pid);
       player.status = PreGamePlayerStatus.Disconnected;
       console.debug(`[PreGameInstance] Playing player ${pid} -> Disconnected (slot held)`);
       this.broadcastState();
@@ -165,15 +187,11 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
     // Disconnected 玩家重复断开 -> 幂等，no-op
     if (player.status === PreGamePlayerStatus.Disconnected) {
-      const conn = this.connectors.get(pid);
-      if (conn) {
-        try { conn.close(); } catch { }
-        this.connectors.delete(pid);
-      }
+      this.clearPerConnectionState(pid);
       return;
     }
 
-    // Lobby 玩家断开：按正常流程移除（即使 suspended=true 也直接走，
+    // Lobby / Spectating 玩家断开：按正常流程移除（即使 suspended=true 也直接走，
     // 因为他不在游戏里，保留座位没意义）
     this.removePlayer(pid, /*forceRemove=*/ true);
   }
@@ -182,23 +200,46 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
    * 判断这个 action 当前是否被允许。
    * 规则：
    * - destroyed 直接拒
-   * - Playing/Disconnected 玩家在 pregame 域只能做"无操作"——所有写操作拒
-   * - 房间 suspended（=游戏进行中）时：
-   *    * Lobby 玩家允许 CHANGE_TEAM / LEAVE_ROOM
-   *    * 其它（READY/CHANGE_SETTING/CHANGE_MAP/KICK_PLAYER/START_GAME...）拒
-   * - KICK_PLAYER 只允许在 PREGAME（!suspended）期间
+   * - Playing/Disconnected 玩家在 pregame 域不能做任何写操作
+   * - Spectating 玩家在 pregame 域只允许 LEAVE_SPECTATE / LEAVE_ROOM / CHANGE_TEAM
+   * - Lobby 玩家：
+   *    * 非 suspended 期间一切放行
+   *    * suspended 期间只允许 CHANGE_TEAM / LEAVE_ROOM / ENTER_SPECTATE
+   * - KICK_PLAYER / START_GAME 等只允许在 PREGAME（!suspended）期间
    */
   private actionAllowed(player: { status: PreGamePlayerStatus }, evtType: SyncedPreGameClientActionTypes): boolean {
-    if (player.status !== PreGamePlayerStatus.Lobby) {
-      // Playing / Disconnected 玩家走 game 域，不允许在 pregame 域改任何东西
+    if (
+      player.status === PreGamePlayerStatus.Playing ||
+      player.status === PreGamePlayerStatus.Disconnected
+    ) {
+      // 这些玩家应通过 game 域操作，不允许在 pregame 域改任何东西
       return false;
     }
-    if (!this.suspended) return true;
 
-    // suspended 期间 Lobby 玩家只允许的有限动作：换队伍、离开房间
+    if (player.status === PreGamePlayerStatus.Spectating) {
+      switch (evtType) {
+        case SyncedPreGameClientActionTypes.LEAVE_SPECTATE:
+        case SyncedPreGameClientActionTypes.LEAVE_ROOM:
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    // 剩下的就是 Lobby
+    if (!this.suspended) {
+      // 非 suspended 时 ENTER_SPECTATE 无意义，拒掉
+      if (evtType === SyncedPreGameClientActionTypes.ENTER_SPECTATE) return false;
+      // LEAVE_SPECTATE 对 Lobby 玩家也无意义
+      if (evtType === SyncedPreGameClientActionTypes.LEAVE_SPECTATE) return false;
+      return true;
+    }
+
+    // suspended 期间 Lobby 玩家只允许的有限动作
     switch (evtType) {
       case SyncedPreGameClientActionTypes.CHANGE_TEAM:
       case SyncedPreGameClientActionTypes.LEAVE_ROOM:
+      case SyncedPreGameClientActionTypes.ENTER_SPECTATE:
         return true;
       default:
         return false;
@@ -260,6 +301,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
         this.renameTeam(pid, evt.payload.teamId, evt.payload.name); break;
       case SyncedPreGameClientActionTypes.DELETE_TEAM:
         this.deleteTeam(pid, evt.payload.teamId); break;
+      case SyncedPreGameClientActionTypes.ENTER_SPECTATE:
+        this.enterSpectate(pid); break;
+      case SyncedPreGameClientActionTypes.LEAVE_SPECTATE:
+        this.leaveSpectate(pid); break;
       default:
         // ignore
         break;
@@ -277,6 +322,35 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     console.log("set ready to", ready)
     const p = this.state.players.find(p => p.id === pid);
     if (p && !p.isHost) p.ready = ready ? 1 : 0;
+  }
+
+  /**
+   * Lobby -> Spectating
+   * 前提：当前必须 suspended（INGAME），玩家必须是 Lobby。actionAllowed 已经守住，
+   * 这里再做一次防御性检查。
+   * 注意：不真正打开 game 域连接 —— 那是客户端拿到状态后自己去开 game-${id} sub
+   * 的事。我们只翻状态位 + 广播。
+   */
+  private enterSpectate(pid: PlayerId) {
+    if (!this.suspended) return;
+    const p = this.state.players.find(p => p.id === pid);
+    if (!p) return;
+    if (p.status !== PreGamePlayerStatus.Lobby) return;
+    p.status = PreGamePlayerStatus.Spectating;
+    p.ready = 0;
+    console.debug(`[PreGameInstance] ${pid} Lobby -> Spectating`);
+  }
+
+  /**
+   * Spectating -> Lobby
+   * 任何时刻都可以退（包括游戏已结束的边界情况）。
+   */
+  private leaveSpectate(pid: PlayerId) {
+    const p = this.state.players.find(p => p.id === pid);
+    if (!p) return;
+    if (p.status !== PreGamePlayerStatus.Spectating) return;
+    p.status = PreGamePlayerStatus.Lobby;
+    console.debug(`[PreGameInstance] ${pid} Spectating -> Lobby`);
   }
 
   /** 修改房间设置（仅房主） */
@@ -511,20 +585,14 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
       // Playing 玩家在非 force 路径下不要直接删 —— 走 handleDisconnect 转 Disconnected
       if (player && player.status === PreGamePlayerStatus.Playing && !forceRemove) {
-        if (conn) {
-          try { conn.close(); } catch { }
-          this.connectors.delete(pid);
-        }
+        this.clearPerConnectionState(pid);
         player.status = PreGamePlayerStatus.Disconnected;
         this.broadcastState();
         return;
       }
 
-      // 关闭 connector
-      if (conn) {
-        try { conn.close(); } catch { }
-        this.connectors.delete(pid);
-      }
+      // 彻底回收：connector + 同步状态 + player entry 全清
+      this.clearPerConnectionState(pid);
 
       if (player) {
         this.state.players = this.state.players.filter(p => p.id !== pid);
@@ -865,12 +933,17 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     const existing = this.state.players.find(p => p.id === playerId);
     if (existing && existing.status === PreGamePlayerStatus.Disconnected) {
       existing.status = PreGamePlayerStatus.Playing;
+      // 如果旧 connector 还残留在 map 里（不应该发生，但兜底），先关掉避免漏 socket
+      const stale = this.connectors.get(playerId);
+      if (stale && stale !== connector) {
+        try { stale.close(); } catch { }
+      }
       this.connectors.set(playerId, connector);
       connector.onOpen(() => this.sendState(playerId, true));
-      connector.onDisconnect(() => this.handleDisconnect(playerId));
+      connector.onDisconnect(() => this.handleDisconnect(playerId, connector));
       connector.onReconnect(() => this.sendState(playerId, true));
       connector.onClientMessage(evt => this.handleClientAction(playerId, evt));
-      connector.onClose(() => this.handleDisconnect(playerId));
+      connector.onClose(() => this.handleDisconnect(playerId, connector));
       this.version++;
       this.broadcastState();
       console.log(`[PreGameInstance] Player ${playerId} reconnected (Disconnected -> Playing)`);
@@ -912,10 +985,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
     // 设置连接器回调
     connector.onOpen(() => this.sendState(playerId, true));
-    connector.onDisconnect(() => this.handleDisconnect(playerId));
+    connector.onDisconnect(() => this.handleDisconnect(playerId, connector));
     connector.onReconnect(() => this.sendState(playerId, true));
     connector.onClientMessage(evt => this.handleClientAction(playerId, evt));
-    connector.onClose(() => this.handleDisconnect(playerId));
+    connector.onClose(() => this.handleDisconnect(playerId, connector));
 
     // 更新版本并广播状态
     this.version++;
@@ -956,10 +1029,14 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     if (!this.suspended) return;
     this.suspended = false;
 
-    // 1. 先把仍 Playing 的玩家恢复成 Lobby（这样 step 2 触发的 autoTransferHost
-    //    会从 Lobby 玩家里选，而不是从还没回收的 Playing 里选）
+    // 1. 把 Playing 和 Spectating 的玩家都归位到 Lobby
+    //    （Spectating 也是房间里的人，游戏结束后回归大厅；
+    //    Playing 先归位是为了让 step 2 触发的 autoTransferHost 候选优先来自 Lobby）
     for (const p of this.state.players) {
-      if (p.status === PreGamePlayerStatus.Playing) {
+      if (
+        p.status === PreGamePlayerStatus.Playing ||
+        p.status === PreGamePlayerStatus.Spectating
+      ) {
         p.status = PreGamePlayerStatus.Lobby;
         p.ready = 0;
       }

@@ -30,6 +30,8 @@ export enum SyncedPreGameClientActionTypes {
   CREATE_TEAM = 'create-team',
   RENAME_TEAM = 'rename-team',
   DELETE_TEAM = 'delete-team',
+  ENTER_SPECTATE = 'enter-spectate', // Lobby -> Spectating（仅 INGAME 期间）
+  LEAVE_SPECTATE = 'leave-spectate', // Spectating -> Lobby
 }
 
 export type SyncedPreGameClientReadyAction = SyncedStateClientGenericSyncAction<
@@ -97,6 +99,14 @@ export type SyncedPreGameDeleteTeamAction = SyncedStateClientGenericSyncAction<
   { teamId: TeamId }
 >;
 
+export type SyncedPreGameEnterSpectateAction = SyncedStateClientGenericSyncAction<
+  SyncedPreGameClientActionTypes.ENTER_SPECTATE
+>;
+
+export type SyncedPreGameLeaveSpectateAction = SyncedStateClientGenericSyncAction<
+  SyncedPreGameClientActionTypes.LEAVE_SPECTATE
+>;
+
 
 export type SyncedPreGameClientActions =
   | SyncedPreGameClientReadyAction
@@ -112,7 +122,9 @@ export type SyncedPreGameClientActions =
   | SyncedPreGameClientDisbandRoomAction
   | SyncedPreGameCreateTeamAction
   | SyncedPreGameRenameTeamAction
-  | SyncedPreGameDeleteTeamAction;
+  | SyncedPreGameDeleteTeamAction
+  | SyncedPreGameEnterSpectateAction
+  | SyncedPreGameLeaveSpectateAction;
 
 export enum SyncedPreGameServerEventPayloadType {
   KICKED = "kicked",

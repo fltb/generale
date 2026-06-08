@@ -44,6 +44,11 @@ export interface RoomWithSyncProps {
    * 缺省视为 Lobby（与服务端 enum 默认一致）。
    */
   onSelfStatusChange?: (status: PreGamePlayerStatus) => void;
+  /**
+   * 暴露房间内部的几个 dispatcher 给父级，便于 GameWithSync（观战）等其它子组件
+   * 触发 pregame 域的 action。只在挂载/卸载时调用一次。
+   */
+  onExposeApi?: (api: { leaveSpectate: () => void } | null) => void;
 }
 
 /** 提供一个 minimal empty PreGameRoomState，供初始 state 使用 */
@@ -328,6 +333,23 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     } as any);
   };
 
+  // 进入观战 / 退出观战。actionAllowed 在服务端做严格判断；前端只在 UI 层做按钮可见性控制。
+  const onEnterSpectate = () => {
+    synced.dispatch({ type: SyncedPreGameClientActionTypes.ENTER_SPECTATE });
+  };
+  const onLeaveSpectate = () => {
+    synced.dispatch({ type: SyncedPreGameClientActionTypes.LEAVE_SPECTATE });
+  };
+
+  // 把 leaveSpectate 暴露给父级（GameWithSync 在观战模式下需要它）。
+  // onMount 注册、onCleanup 注销，避免 stale 引用。
+  onMount(() => {
+    props.onExposeApi?.({ leaveSpectate: onLeaveSpectate });
+  });
+  onCleanup(() => {
+    props.onExposeApi?.(null);
+  });
+
   // ---------------- team related handlers ----------------
 
   // join/move to team (playerId optional - if undefined, server should interpret as self)
@@ -388,11 +410,17 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     } catch { }
   });
 
-  // 当前是不是「游戏进行中、自己在大厅围观」的状态
-  // 用来决定是否显示"游戏进行中"横幅 + 观战入口
+  // 房间是否处于"游戏进行中"状态（房间里有人正在游戏）。
+  // 用于决定是否显示横幅 + 观战入口
   const gameInProgress = () =>
-    selfStatus() === PreGamePlayerStatus.Lobby &&
     (room()?.players ?? []).some(p => p.status === PreGamePlayerStatus.Playing);
+
+  // 仅当自己是 Lobby（在大厅围观）时才显示"进入观战"按钮；
+  // Spectating 状态下显示"退出观战"按钮（注意：Spectating 玩家在路由层
+  // 实际渲染的是 GameWithSync 而不是 Room，但 wrapper 仍挂载着 Room；
+  // 这里保留入口便于将来场景，如父级也允许在房间页同时显示时退出）
+  const isLobby = () => selfStatus() === PreGamePlayerStatus.Lobby;
+  const isSpectating = () => selfStatus() === PreGamePlayerStatus.Spectating;
 
   return (
     <div style={wrapperStyle()} class="p-6" aria-hidden={props.suspended === false}>
@@ -401,15 +429,22 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           <div class="flex items-center justify-between w-full gap-3">
             <div>
               <div class="font-medium">游戏进行中</div>
-              <div class="text-sm opacity-70">你可以在大厅等待本局结束，或选择观战。</div>
+              <div class="text-sm opacity-70">
+                <Show when={isLobby()} fallback={"你正在观战中。"}>
+                  你可以在大厅等待本局结束，或进入观战。
+                </Show>
+              </div>
             </div>
-            <button
-              class="btn btn-sm btn-primary"
-              disabled
-              title="观战功能开发中"
-            >
-              观战（开发中）
-            </button>
+            <Show when={isLobby()}>
+              <button class="btn btn-sm btn-primary" onClick={onEnterSpectate}>
+                进入观战
+              </button>
+            </Show>
+            <Show when={isSpectating()}>
+              <button class="btn btn-sm btn-ghost" onClick={onLeaveSpectate}>
+                退出观战
+              </button>
+            </Show>
           </div>
         </div>
       </Show>

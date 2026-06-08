@@ -31,7 +31,19 @@ export interface GameWithSyncProps {
     gameId: GameId;
     playerId: PlayerId;
     autoOpen?: boolean;
+    /**
+     * 观战模式：connector 走的是同一个 game-* 域，但服务端会把这个连接接到
+     * GameInstance.addSpectator 而非 addPlayer。客户端在这个模式下：
+     * - 不发 PUSH / CLEAN_ALL / SURRENDER
+     * - 隐藏操作按钮，"离开游戏" 替换成 "退出观战"（dispatch 到 pregame 域的 LEAVE_SPECTATE）
+     * - MapRender 收到的 state 是未 mask 的完整地图
+     *
+     * 注意：LEAVE_SPECTATE 必须通过 pregame 域 dispatch。Game.tsx 自己不连 pregame，
+     * 所以这里通过 onLeaveSpectate 回调把意图上报给父级（routes/room.tsx）路由处理。
+     */
+    spectate?: boolean;
     onStateUpdate?: (payload: { event?: SyncedPreGameServerEventPayload }) => void;
+    onLeaveSpectate?: () => void;
 }
 
 export const GameWithSync: Component<GameWithSyncProps> = (props) => {
@@ -138,16 +150,21 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
     onMount(async () => {
         try {
             await synced.connect();
-            // TODO:: HACK:: 临时发送一个 CLEAN_ALL 来同步，因为不发送一个 action 会导致状态不和后端同步，原因还在排查，先 hack
-            const action = { type: SyncedGameClientActionTypes.CLEAN_ALL };
-            synced.dispatch(action);
+            // 仅对真实玩家发送 sync HACK；观战者不应该发任何 action
+            if (!props.spectate) {
+                // TODO:: HACK:: 临时发送一个 CLEAN_ALL 来同步，因为不发送一个 action 会导致状态不和后端同步，原因还在排查，先 hack
+                const action = { type: SyncedGameClientActionTypes.CLEAN_ALL };
+                synced.dispatch(action);
+            }
         } catch (e) {
             console.warn("GameWithSync connect error", e);
         }
     });
 
     // MapRender -> onOperationQueued => dispatch PUSH action
+    // 观战者点格子也不发；服务端会丢弃，但客户端层面提前阻断更省事
     function handleOperationQueued(op: PlayerOperation) {
+        if (props.spectate) return;
         try {
             const action = {
                 type: SyncedGameClientActionTypes.PUSH,
@@ -218,9 +235,16 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button class="btn btn-sm" onClick={handleClearQueue}>清空操作队列</button>
-                    <button class="btn btn-sm btn-warning" onClick={handleSurrender}>投降</button>
-                    <button class="btn btn-sm btn-ghost" onClick={handleLeave}>离开游戏</button>
+                    <Show when={!props.spectate} fallback={
+                        <>
+                            <span class="badge badge-info">观战中</span>
+                            <button class="btn btn-sm btn-ghost" onClick={() => props.onLeaveSpectate?.()}>退出观战</button>
+                        </>
+                    }>
+                        <button class="btn btn-sm" onClick={handleClearQueue}>清空操作队列</button>
+                        <button class="btn btn-sm btn-warning" onClick={handleSurrender}>投降</button>
+                        <button class="btn btn-sm btn-ghost" onClick={handleLeave}>离开游戏</button>
+                    </Show>
                 </div>
             </div>
 

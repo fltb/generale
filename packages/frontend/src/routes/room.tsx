@@ -38,6 +38,10 @@ const RoomRoute: Component = () => {
   // （客户端断线时根本看不到任何 self）
   const [selfStatus, setSelfStatus] = createSignal<PreGamePlayerStatus>(PreGamePlayerStatus.Lobby);
 
+  // RoomWithSync 暴露的 dispatcher，用于观战玩家在 GameWithSync 里点"退出观战"时
+  // 把 LEAVE_SPECTATE 发到 pregame 域。Room 卸载时会传 null 进来。
+  const [roomApi, setRoomApi] = createSignal<{ leaveSpectate: () => void } | null>(null);
+
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
@@ -109,6 +113,20 @@ const RoomRoute: Component = () => {
   });
 
   /**
+   * 当 selfStatus 变成 Spectating 时，重新 prepareConnect 拿 game-* 域。
+   * 当 selfStatus 退回 Lobby 时，清掉 gameDomain，避免 stale 域名让客户端误开 game 连接。
+   * （Playing 玩家走 GAME_STARTED 流程，已经会自动 refresh，不需要在这里特别处理）
+   */
+  createEffect(() => {
+    const status = selfStatus();
+    if (status === PreGamePlayerStatus.Spectating && !gameDomain()) {
+      refreshConnectionInfo();
+    } else if (status === PreGamePlayerStatus.Lobby && gameDomain()) {
+      setGameDomain(null);
+    }
+  });
+
+  /**
    * 子组件（Room / Game）统一上报事件
    * 👉 这里是「真正的状态机入口」
    */
@@ -174,12 +192,13 @@ const RoomRoute: Component = () => {
           <div class="card p-4 mb-4">Preparing connection…</div>
         </Match>
 
-        {/* ---------- INGAME (显示 game UI)：只对 Playing 的玩家显示 ----------
-            Lobby 玩家在 INGAME 期间继续看 RoomWithSync（在下面挂载），
-            Playing 玩家看 GameWithSync。 */}
+        {/* ---------- INGAME (显示 game UI) ----------
+            - Playing 玩家：作为对局参与者打开 GameWithSync
+            - Spectating 玩家：作为观战者打开 GameWithSync（read-only，禁用 surrender/操作）
+            - Lobby 玩家：继续看 RoomWithSync（下面挂载） */}
         <Match when={
           phase() === GamePhase.INGAME
-          && selfStatus() === PreGamePlayerStatus.Playing
+          && (selfStatus() === PreGamePlayerStatus.Playing || selfStatus() === PreGamePlayerStatus.Spectating)
           && gameDomain()
           && playerId()
         }>
@@ -187,7 +206,9 @@ const RoomRoute: Component = () => {
             domain={gameDomain()!} // MUST be game-*
             gameId={params.id!}
             playerId={playerId()!}
+            spectate={selfStatus() === PreGamePlayerStatus.Spectating}
             onStateUpdate={handleStateUpdate}
+            onLeaveSpectate={() => roomApi()?.leaveSpectate()}
           />
         </Match>
 
@@ -217,10 +238,11 @@ const RoomRoute: Component = () => {
           playerName={playerName() ?? "Guest"}
           autoOpen
           // RoomWithSync 内 suspended=true 表示「显示」（命名反了，保留以免破坏现有代码）。
-          // 房间在 self.status === Playing 时隐藏；Lobby 时（含 INGAME 期间的旁观者）显示。
-          suspended={selfStatus() !== PreGamePlayerStatus.Playing}
+          // 仅当玩家处于 Lobby 时显示房间页；Playing/Spectating 都让 GameWithSync 占满屏。
+          suspended={selfStatus() === PreGamePlayerStatus.Lobby}
           onStateUpdate={handleStateUpdate}
           onSelfStatusChange={(s) => setSelfStatus(s)}
+          onExposeApi={(api) => setRoomApi(api)}
         />
       </Show>
 

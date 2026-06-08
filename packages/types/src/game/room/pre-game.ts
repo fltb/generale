@@ -81,12 +81,13 @@ export enum PreGamePlayerReadyState {
  * - Lobby:        默认；在房间里，可以换队伍/准备/被踢
  * - Playing:      游戏开始时被锁入游戏；不能换队伍/准备/被踢；离开只算断线
  * - Disconnected: 曾是 Playing 但 connector 断开；座位保留到游戏结束
- * - 后续可扩展 Spectating 等
+ * - Spectating:   Lobby 的受限变体；在 INGAME 期间打开 game 域观战；游戏结束/退出回 Lobby
  */
 export enum PreGamePlayerStatus {
   Lobby = 'lobby',
   Playing = 'playing',
   Disconnected = 'disconnected',
+  Spectating = 'spectating',
 }
 
 // 玩家房间信息（只保留房间阶段必需字段）
