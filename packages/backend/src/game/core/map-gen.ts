@@ -189,19 +189,7 @@ function assignPlayerStartingPositions(
         ownerId: player.id,
         army: 1
       };
-      const surrounding = [
-        { x: x - 1, y }, { x: x + 1, y },
-        { x, y: y - 1 }, { x, y: y + 1 }
-      ];
-      surrounding.forEach(({ x: sx, y: sy }) => {
-        if (sx >= 0 && sx < width && sy >= 0 && sy < height) {
-          const tile = tiles[sy]![sx]!;
-          if (tile.type === TileType.Plain || tile.type === TileType.Barracks) {
-            tile.ownerId = player.id;
-            tile.army = Math.floor(Math.random() * 3) + 1;
-          }
-        }
-      });
+      // 起始视野只给一个 throne + 1 兵，四邻不预占有，让玩家自己扩张
     }
   });
 }
