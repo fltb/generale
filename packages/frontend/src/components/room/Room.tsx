@@ -55,6 +55,7 @@ export interface RoomWithSyncProps {
 const makeEmptyRoom = (gameId = ""): PreGameRoomState => ({
   gameId,
   roomType: "standard",
+  teamMode: "ffa",
   hostId: "",
   players: [],
   mapSetting: { type: PreGameMapType.Random, width: 20, height: 20, tileFrequency: {}, sizeLabel: "medium" },
@@ -70,11 +71,8 @@ const makeEmptyRoom = (gameId = ""): PreGameRoomState => ({
     },
     afkThreshold: 30,
   },
-  teams: [
-    { id: "team1", name: "Team 1" },
-    { id: "team2", name: "Team 2" }
-  ],
-  teamCount: 2,
+  teams: [],
+  teamCount: 0,
   playerLimit: 8,
   started: false,
 });
@@ -339,6 +337,13 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     } as any);
   };
 
+  const onTeamModeChange = (nextTeamMode: "ffa" | "team") => {
+    synced.dispatch({
+      type: SyncedPreGameClientActionTypes.CHANGE_TEAM_MODE,
+      payload: { teamMode: nextTeamMode },
+    } as any);
+  };
+
   // 进入观战 / 退出观战。actionAllowed 在服务端做严格判断；前端只在 UI 层做按钮可见性控制。
   const onEnterSpectate = () => {
     synced.dispatch({ type: SyncedPreGameClientActionTypes.ENTER_SPECTATE });
@@ -477,6 +482,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           hostId={room()?.hostId ?? ""}
           teamCount={room()?.teamCount ?? 2}
           teams={room()?.teams ?? []}
+          teamMode={room()?.teamMode ?? "ffa"}
           onToggleReady={(playerId, ready) => onToggleReadyForPlayer(playerId, ready)}
           onKick={isHost() ? onKick : undefined}
           onTransferHost={isHost() ? onTransferHost : undefined}
@@ -508,7 +514,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
 
       <div class="card bg-base-200 p-4">
         <div class="text-md font-medium mb-2">房间模式</div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 mb-3">
           <div class="btn-group">
             <button
               class={`btn btn-sm ${(room()?.roomType ?? "standard") === "standard" ? "btn-active" : ""}`}
@@ -525,6 +531,26 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
             {(room()?.roomType ?? "standard") === "standard"
               ? "仅可选 small / medium / large 预设"
               : "可自定义地图尺寸、地形频率等"}
+          </span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="btn-group">
+            <button
+              class={`btn btn-sm ${(room()?.teamMode ?? "ffa") === "ffa" ? "btn-active" : ""}`}
+              disabled={!isHost()}
+              onClick={() => onTeamModeChange("ffa")}
+            >单人</button>
+            <button
+              class={`btn btn-sm ${(room()?.teamMode ?? "ffa") === "team" ? "btn-active" : ""}`}
+              disabled={!isHost()}
+              onClick={() => onTeamModeChange("team")}
+            >组队</button>
+          </div>
+          <span class="text-xs opacity-60">
+            {(room()?.teamMode ?? "ffa") === "ffa"
+              ? "每人一队，前端隐藏队伍信息"
+              : "可自由组队、换队、重命名"}
           </span>
         </div>
       </div>

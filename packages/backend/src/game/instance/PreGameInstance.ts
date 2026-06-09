@@ -15,6 +15,7 @@ import {
   PRESET_SIZES,
   PreGameStandardSizeLabel,
   PreGameRoomType,
+  PreGameTeamMode,
   PreGamePlayerStatus,
 } from '@generale/types';
 import { compare } from 'fast-json-patch';
@@ -226,6 +227,20 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       }
     }
 
+    // ffa 模式：阻止任何队伍管理类 action（包括 host 的）。
+    // 每个玩家由服务端自动分配独占 team，前端也不暴露这些入口。
+    if (this.state.teamMode === "ffa") {
+      switch (evtType) {
+        case SyncedPreGameClientActionTypes.CHANGE_TEAM:
+        case SyncedPreGameClientActionTypes.CREATE_TEAM:
+        case SyncedPreGameClientActionTypes.RENAME_TEAM:
+        case SyncedPreGameClientActionTypes.DELETE_TEAM:
+          return false;
+        default:
+          break;
+      }
+    }
+
     // 剩下的就是 Lobby
     if (!this.suspended) {
       // 非 suspended 时 ENTER_SPECTATE 无意义，拒掉
@@ -282,6 +297,8 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
         this.changeMap(pid, evt.payload); break;
       case SyncedPreGameClientActionTypes.CHANGE_ROOM_TYPE:
         this.changeRoomType(pid, evt.payload.roomType); break;
+      case SyncedPreGameClientActionTypes.CHANGE_TEAM_MODE:
+        this.changeTeamMode(pid, evt.payload.teamMode); break;
       case SyncedPreGameClientActionTypes.CHANGE_TEAM:
         this.changeTeam(pid, evt.payload.teamId, evt.payload.playerId); break;
       case SyncedPreGameClientActionTypes.KICK_PLAYER:
@@ -394,6 +411,39 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       };
     }
     this.state.roomType = next;
+  }
+
+  /** 切换队伍模式（仅房主）
+   *
+   * - team → ffa：拆队 —— 把每个玩家分到一支独占的新队伍，旧 teams 数组重建
+   * - ffa → team：当前布局保留下来（每人一支队），房主可以再用 RENAME_TEAM / 把别人 CHANGE_TEAM
+   *               过来组队。MIN_TEAMS=2 已经成立（只要至少有 2 玩家），不需要补
+   * - 相同 → 相同：no-op
+   */
+  private changeTeamMode(pid: PlayerId, next: PreGameTeamMode) {
+    if (pid !== this.state.hostId) return;
+    if (next !== "ffa" && next !== "team") return;
+    if (this.state.teamMode === next) return;
+
+    if (next === "ffa") {
+      // 重置 teams：每个玩家一支独占队伍
+      const newTeams: { id: TeamId; name?: string }[] = [];
+      for (const p of this.state.players) {
+        const teamId = this.createTeamId();
+        newTeams.push({ id: teamId, name: p.name });
+        p.teamId = teamId;
+      }
+      // 保底 MIN_TEAMS（如果只有 0/1 玩家）
+      while (newTeams.length < this.MIN_TEAMS) {
+        const teamId = this.createTeamId();
+        newTeams.push({ id: teamId, name: teamId });
+      }
+      this.state.teams = newTeams;
+      this.state.teamCount = newTeams.length;
+    }
+    // ffa→team：当前每人一支独占队的状态保留，让房主自由编辑
+
+    this.state.teamMode = next;
   }
 
   /** 修改地图设置（仅房主）
@@ -595,9 +645,19 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       this.clearPerConnectionState(pid);
 
       if (player) {
+        const leavingTeamId = player.teamId;
         this.state.players = this.state.players.filter(p => p.id !== pid);
         if (this.state.hostId === pid) {
           this.autoTransferHost();
+        }
+
+        // ffa：玩家走了顺手把他独占的队也回收（保留 MIN_TEAMS 兜底）
+        if (this.state.teamMode === "ffa" && leavingTeamId) {
+          const stillUsed = this.state.players.some(p => p.teamId === leavingTeamId);
+          if (!stillUsed && this.state.teams.length > this.MIN_TEAMS) {
+            this.state.teams = this.state.teams.filter(t => t.id !== leavingTeamId);
+            this.state.teamCount = this.state.teams.length;
+          }
         }
 
         if (this.state.players.length === 0) {
@@ -981,11 +1041,17 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       this.state.hostId = playerId;
     }
 
-    // 如果当前 teams 数量 < MIN_TEAMS，则为本次加入的玩家创建一个新的队伍并把玩家放入该队。
     if (!this.state.teams) this.state.teams = [];
     let defaultTeamId: TeamId | undefined = undefined;
 
-    if (this.state.teams.length < this.MIN_TEAMS) {
+    if (this.state.teamMode === "ffa") {
+      // ffa：每个玩家独占一支队伍
+      const newTeamId = this.createTeamId();
+      this.state.teams.push({ id: newTeamId, name: playerName });
+      this.state.teamCount = this.state.teams.length;
+      defaultTeamId = newTeamId;
+    } else if (this.state.teams.length < this.MIN_TEAMS) {
+      // team 模式：保留旧逻辑——当前 teams 不足 MIN_TEAMS 时给新玩家专属新队
       const newTeamId = this.createTeamId();
       this.state.teams.push({ id: newTeamId, name: newTeamId });
       this.state.teamCount = this.state.teams.length;

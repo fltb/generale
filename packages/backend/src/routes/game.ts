@@ -50,7 +50,8 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
       roomName: body.roomName,
       mapSize: finalMapSize,
       type: (body.gameSettings?.type as ("custom" | "standard")) ?? "standard",
-      maxPlayers: body.gameSettings?.maxPlayers ?? 8
+      maxPlayers: body.gameSettings?.maxPlayers ?? 8,
+      teamMode: body.gameSettings?.teamMode ?? "ffa",
     };
 
     // create game

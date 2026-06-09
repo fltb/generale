@@ -106,11 +106,20 @@ export interface PreGamePlayerInfo {
 // 房间类型（与 GameServiceConfig.type 一致，固定在创建时，房间内不可变）
 export type PreGameRoomType = "standard" | "custom";
 
+/**
+ * 队伍模式
+ * - ffa:  Free-for-all。每个玩家独占一支队伍，前端隐藏队伍 UI，后端在玩家加入时自动给他建一支独立队
+ * - team: 经典组队模式，玩家可换队 / 房主管理队伍
+ */
+export type PreGameTeamMode = "ffa" | "team";
+
 // 房间整体状态
 export interface PreGameRoomState {
   gameId: GameId;
   /** 房间类型：standard 仅允许预设地图尺寸，custom 允许任意尺寸 */
   roomType: PreGameRoomType;
+  /** 队伍模式：ffa（单人）或 team（组队）。新房间默认 ffa。 */
+  teamMode: PreGameTeamMode;
   hostId: PlayerId;
   players: PreGamePlayerInfo[];
   mapSetting: PreGameMapSetting;

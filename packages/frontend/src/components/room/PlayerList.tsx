@@ -1,4 +1,4 @@
-import { type PreGamePlayerInfo, type TeamInfo, PreGamePlayerStatus } from "@generale/types";
+import { type PreGamePlayerInfo, type TeamInfo, type PreGameTeamMode, PreGamePlayerStatus } from "@generale/types";
 import { type Component, For, Show, createMemo, createSignal } from "solid-js";
 
 /**
@@ -8,6 +8,7 @@ import { type Component, For, Show, createMemo, createSignal } from "solid-js";
  * - selfId: 当前客户端玩家 id
  * - hostId: 房主 id
  * - teamCount: 房间当前队伍数量（RoomWithSync 传入）
+ * - teamMode: 队伍模式；ffa 时前端只渲染扁平玩家列表，不暴露队伍管理 UI
  * - onToggleReady: 切换准备
  * - onKick: 踢出（房主可见）
  * - onTransferHost: 转让房主（房主可见）
@@ -20,6 +21,7 @@ export interface PlayerListProps {
   selfId: string;
   hostId: string;
   teamCount: number;
+  teamMode?: PreGameTeamMode;
 
   onToggleReady: (playerId: string, ready: boolean) => void;
   onKick?: (playerId: string) => void;
@@ -41,6 +43,7 @@ const PlayerCard: Component<{
   selfId: string;
   hostId: string;
   teams: TeamInfo[];
+  hideTeamPicker?: boolean;
 
   onToggleReady: (playerId: string, ready: boolean) => void;
   onKick?: (playerId: string) => void;
@@ -129,8 +132,8 @@ const PlayerCard: Component<{
               </Show>
             </div>
 
-            {/* host 快速移队：下拉列出所有队伍 */}
-            <Show when={props.onChangeTeam}>
+            {/* host 快速移队：下拉列出所有队伍。ffa 时不渲染 */}
+            <Show when={props.onChangeTeam && !props.hideTeamPicker}>
               <select
                 class="select select-xs select-bordered mt-1"
                 value={p().teamId ?? ""}
@@ -305,9 +308,11 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
     setNewTeamName("");
   };
 
+  const isFfa = () => (props.teamMode ?? "ffa") === "ffa";
+
   return (
     <div class="space-y-5">
-      <Show when={props.selfId === props.hostId}>
+      <Show when={!isFfa() && props.selfId === props.hostId}>
         <div class="flex gap-2 items-center mb-2">
           <input
             class="input input-sm input-bordered"
@@ -319,12 +324,36 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
         </div>
       </Show>
 
-      <For each={grouped()}>
-        {([teamId, members]) => {
-          const team = props.teams?.find(t => t.id === teamId) ?? (teamId === "no team" ? null : { id: teamId, name: teamId });
-          return <TeamGroup team={team} members={members} props={props} />;
-        }}
-      </For>
+      {/* ffa：扁平列表，不渲染 TeamGroup / 队伍管理；组队模式：按 team 分组 */}
+      <Show
+        when={!isFfa()}
+        fallback={
+          <div class="flex flex-wrap gap-3">
+            <For each={props.players}>
+              {(player) => (
+                <PlayerCard
+                  player={player}
+                  selfId={props.selfId}
+                  hostId={props.hostId}
+                  teams={props.teams}
+                  hideTeamPicker
+                  onToggleReady={props.onToggleReady}
+                  onKick={props.onKick}
+                  onTransferHost={props.onTransferHost}
+                  onChangeTeam={undefined}
+                />
+              )}
+            </For>
+          </div>
+        }
+      >
+        <For each={grouped()}>
+          {([teamId, members]) => {
+            const team = props.teams?.find(t => t.id === teamId) ?? (teamId === "no team" ? null : { id: teamId, name: teamId });
+            return <TeamGroup team={team} members={members} props={props} />;
+          }}
+        </For>
+      </Show>
     </div>
   );
 };

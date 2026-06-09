@@ -34,6 +34,8 @@ export const gameCreationSettingsRouteSchema = t.Union([
         maxPlayers: t.Optional(t.Number({ minimum: 2, maximum: 8 })),
         // small/medium/large allowed for standard
         mapSize: t.Optional(standardMapSizeSchema),
+        // 队伍模式：ffa = 单人 free-for-all，team = 经典组队。缺省 ffa
+        teamMode: t.Optional(t.Union([t.Literal("ffa"), t.Literal("team")])),
         // discriminant for variant
         type: t.Literal("standard")
     }),
@@ -43,6 +45,7 @@ export const gameCreationSettingsRouteSchema = t.Union([
         maxPlayers: t.Optional(t.Number({ minimum: 2, maximum: 8 })),
         // numeric width/height required for custom
         mapSize: customMapSizeSchema,
+        teamMode: t.Optional(t.Union([t.Literal("ffa"), t.Literal("team")])),
         type: t.Literal("custom")
     })
 ]);

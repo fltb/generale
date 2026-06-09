@@ -1,5 +1,5 @@
 import type { SyncedStateClientGenericSyncAction, SyncedStateServerEvent } from '../../connection/sync-store-type';
-import type { PreGameRoomState, PreGamePlayerInfo, PreGameRoomType } from './pre-game';
+import type { PreGameRoomState, PreGamePlayerInfo, PreGameRoomType, PreGameTeamMode } from './pre-game';
 import type { PlayerId, TeamId } from '../core-type';
 
 /**
@@ -21,6 +21,7 @@ export enum SyncedPreGameClientActionTypes {
   CHANGE_SETTING = 'change-room-setting',
   CHANGE_MAP = 'change-room-map',
   CHANGE_ROOM_TYPE = 'change-room-type',
+  CHANGE_TEAM_MODE = 'change-team-mode',
   CHANGE_TEAM = 'change-team',
   KICK_PLAYER = 'kick-player',
   LEAVE_ROOM = 'leave-room',
@@ -55,6 +56,11 @@ export type SyncedPreGameClientChangeMapAction = SyncedStateClientGenericSyncAct
 export type SyncedPreGameClientChangeRoomTypeAction = SyncedStateClientGenericSyncAction<
   SyncedPreGameClientActionTypes.CHANGE_ROOM_TYPE,
   { roomType: PreGameRoomType }
+>;
+
+export type SyncedPreGameClientChangeTeamModeAction = SyncedStateClientGenericSyncAction<
+  SyncedPreGameClientActionTypes.CHANGE_TEAM_MODE,
+  { teamMode: PreGameTeamMode }
 >;
 
 export type SyncedPreGameClientChangeTeamAction = SyncedStateClientGenericSyncAction<
@@ -114,6 +120,7 @@ export type SyncedPreGameClientActions =
   | SyncedPreGameClientChangeSettingAction
   | SyncedPreGameClientChangeMapAction
   | SyncedPreGameClientChangeRoomTypeAction
+  | SyncedPreGameClientChangeTeamModeAction
   | SyncedPreGameClientChangeTeamAction
   | SyncedPreGameClientKickPlayerAction
   | SyncedPreGameClientLeaveRoomAction

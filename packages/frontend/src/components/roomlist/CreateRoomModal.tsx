@@ -25,6 +25,7 @@ export default function CreateRoomModal(props: {
   // Form state
   const [roomName, setRoomName] = createSignal("");
   const [type, setType] = createSignal<"standard" | "custom">("standard");
+  const [teamMode, setTeamMode] = createSignal<"ffa" | "team">("ffa");
   const [maxPlayers, setMaxPlayers] = createSignal<number | "">("");
   const [mapSizeStd, setMapSizeStd] = createSignal<
     "" | "small" | "medium" | "large"
@@ -68,6 +69,7 @@ export default function CreateRoomModal(props: {
     setCustomHeight("");
     setGameMode("");
     setType("standard");
+    setTeamMode("ffa");
   }
 
   function validateAndBuildPayload(): CreateGameReqBody | null {
@@ -91,6 +93,9 @@ export default function CreateRoomModal(props: {
 
     // discriminant
     settings.type = type();
+
+    // 队伍模式（缺省 ffa）
+    settings.teamMode = teamMode();
 
     if (type() === "standard") {
       // allow empty (server default) or one of small/medium/large
@@ -199,6 +204,18 @@ export default function CreateRoomModal(props: {
                 />
               </label>
             </div>
+
+            <label class="block">
+              <span class="label-text">队伍模式 (teamMode)</span>
+              <select
+                class="select select-bordered w-full"
+                value={teamMode()}
+                onChange={(e: any) => setTeamMode(e.target.value)}
+              >
+                <option value="ffa">单人 (ffa)</option>
+                <option value="team">组队 (team)</option>
+              </select>
+            </label>
 
             <Show when={type() === "standard"}>
               <div>

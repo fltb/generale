@@ -16,6 +16,7 @@ import {
   GamePhase,
   PRESET_SIZES,
   PreGamePlayerStatus,
+  PreGameTeamMode,
 } from '@generale/types';
 import { PreGameInstance, PreGameServerConnector } from '../instance/PreGameInstance';
 import { GameInstance, GameInstanceSettings } from '../instance/GameInstance';
@@ -36,6 +37,8 @@ export type GameServiceConfig = {
   chatMaxMessages?: number;
   gameTimeout?: number;
   heartbeatInterval?: number;
+  /** 队伍模式：ffa（默认）/ team。在 initializePreGame 时写入 initialState */
+  teamMode?: PreGameTeamMode;
   // optional: raw incoming gameSettings (from create request). Prefer normalized mapSize in gameConfig.mapSizeNormalized below
   gameSettings?: Partial<GameInstanceSettings>;
 } & ({
@@ -322,9 +325,14 @@ export class GameService {
 
     const isStandard = this.config.type === "standard";
 
+    const teamMode: PreGameTeamMode = this.config.teamMode ?? "ffa";
+
     const initialState: PreGameRoomState = {
       gameId: this.gameId,
       roomType: isStandard ? "standard" : "custom",
+      // 队伍模式：默认 ffa；config 传 team 时初始为空，addPlayer 在 team 模式会按
+      // <MIN_TEAMS 时给新玩家专属队
+      teamMode,
       hostId: '',
       players: [],
       gameSetting: {
@@ -346,11 +354,8 @@ export class GameService {
         tileFrequency: {},
         ...(isStandard && initialSizeLabel ? { sizeLabel: initialSizeLabel } : {}),
       } as PreGameRoomState['mapSetting'],
-      teams: [
-        { id: "team1", name: "Team 1" },
-        { id: "team2", name: "Team 2" }
-      ],
-      teamCount: 2,
+      teams: [],
+      teamCount: 0,
       playerLimit: this.config.maxPlayers ?? 8,
       started: false
     };

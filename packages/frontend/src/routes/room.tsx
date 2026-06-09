@@ -262,9 +262,18 @@ const RoomRoute: Component = () => {
           playerName={playerName() ?? "Guest"}
           autoOpen
           // RoomWithSync 内 suspended=true 表示「显示」（命名反了，保留以免破坏现有代码）。
-          // 仅当玩家在 Lobby 且不在游戏结束结算窗口内时显示房间页；
-          // Playing/Spectating/gameJustEnded 全都让 GameWithSync 占满屏。
-          suspended={selfStatus() === PreGamePlayerStatus.Lobby && !gameJustEnded()}
+          // 只在"GameWithSync 确实应该在屏上"的几种情况下隐藏房间：
+          //   phase===INGAME 且 selfStatus 是 Playing/Spectating，或正在游戏结束 overlay 窗口。
+          // 其它任何状态（含 dismiss 完成、phase=PREGAME 但 selfStatus 还没翻 Lobby 的过渡帧）
+          // 都让房间可见，避免出现 GameWithSync 已 unmount、房间还被隐藏的"白屏"窗口。
+          suspended={!(
+            phase() === GamePhase.INGAME
+            && (
+              selfStatus() === PreGamePlayerStatus.Playing
+              || selfStatus() === PreGamePlayerStatus.Spectating
+              || gameJustEnded()
+            )
+          )}
           onStateUpdate={handleStateUpdate}
           onSelfStatusChange={(s) => setSelfStatus(s)}
           onExposeApi={(api) => setRoomApi(api)}
