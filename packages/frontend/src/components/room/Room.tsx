@@ -26,15 +26,13 @@ export interface RoomWithSyncProps {
   playerName: string;
   autoOpen?: boolean;
   /**
-   * visible: 控制 UI 显示（true 显示；false 隐藏但保持挂载）
-   * 这样可以避免组件被销毁，从而避免 websocket 重连 / pregame instance 被误销毁的问题。
+   * visible: 控制 UI 显示（true 或缺省 显示；false 隐藏但保持挂载）。
+   * 隐藏而非 unmount 是为了避免 websocket 重连 / pregame instance 被误销毁。
    */
-  suspended?: boolean;
+  visible?: boolean;
   /**
-   * 父级回调：RoomWithSync 会在本地 state 更新 / server custom event 等场景调用此回调
-   * 参数示例:
-   * { phase: GamePhase.PREGAME, state: SyncedPreGameState }
-   * { phase: GamePhase.INGAME, event: { type: 'GAME_STARTED', payload: {...} } }
+   * 父级回调：RoomWithSync 会在本地 state 更新 / server custom event 等场景调用此回调。
+   * 注意 GAME_ENDED 不再走这里，而是通过专用 onGameEndedReceived。
    */
   onStateUpdate?: (payload: {
     event?: SyncedPreGameServerEventPayload;
@@ -44,6 +42,11 @@ export interface RoomWithSyncProps {
    * 缺省视为 Lobby（与服务端 enum 默认一致）。
    */
   onSelfStatusChange?: (status: PreGamePlayerStatus) => void;
+  /**
+   * 服务端 pregame 域的 GAME_ENDED 到达时调用。父级据此进入"结算窗口"维持
+   * GameWithSync 挂载。和"用户 dismiss 结算 UI"是两条独立信号。
+   */
+  onGameEndedReceived?: () => void;
   /**
    * 暴露房间内部的几个 dispatcher 给父级，便于 GameWithSync（观战）等其它子组件
    * 触发 pregame 域的 action。只在挂载/卸载时调用一次。
@@ -212,10 +215,10 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           props.onStateUpdate?.({ event: evt });
           break;
         case SyncedPreGameServerEventPayloadType.GAME_ENDED:
-          // 走 pregame 域的 GAME_ENDED：服务端会在 resume 之前发它。
-          // 我们只 bubble 给路由，让它把 GameWithSync 维持 mount，等用户/计时器 dismiss。
+          // pregame 域的 GAME_ENDED：服务端 endGame 在 resume 之前发它。
+          // 走专用 onGameEndedReceived，让路由进入"结算窗口"维持 GameWithSync 挂载。
           // 不在这里 setNotice，避免在房间页弹出 raw 通知。
-          props.onStateUpdate?.({ event: evt });
+          props.onGameEndedReceived?.();
           break;
         case SyncedPreGameServerEventPayloadType.START_REJECTED:
           // 显示原因（通常只由 host 收到），不需要向上传递
@@ -268,7 +271,8 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   });
 
   createEffect(() =>{
-    if (props.suspended)  {
+    // 房间可见时清掉过时的 notice（避免切回房间页仍挂着旧提示）
+    if (props.visible) {
       setNotice(null);
     }
   })
@@ -408,10 +412,11 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   const isHost = () => (room()?.hostId ?? "") === selfId();
 
   // Render: control visibility via root wrapper style so component never unmounts.
-  // 用 accessor 包裹保持响应性：const wrapperStyle = {...} 会在组件初始化时
-  // 把 props.suspended 锁死，phase 切到 INGAME 时 display 不会更新，房间无法隐藏。
+  // 用 accessor 包裹保持响应性：直接 const wrapperStyle = {...} 会在组件初始化时
+  // 把 props.visible 锁死，phase 切换时 display 不会更新。
+  // visible 缺省视为 true（向后兼容：不传也算可见）。
   const wrapperStyle = (): Record<string, string> => ({
-    display: props.suspended === false ? "none" : "block",
+    display: props.visible === false ? "none" : "block",
   });
 
   onCleanup(() => {
@@ -434,7 +439,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   const isSpectating = () => selfStatus() === PreGamePlayerStatus.Spectating;
 
   return (
-    <div style={wrapperStyle()} class="p-6" aria-hidden={props.suspended === false}>
+    <div style={wrapperStyle()} class="p-6" aria-hidden={props.visible === false}>
       <Show when={gameInProgress()}>
         <div class="alert alert-info shadow-sm mb-3">
           <div class="flex items-center justify-between w-full gap-3">

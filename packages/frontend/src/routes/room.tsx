@@ -2,6 +2,8 @@ import {
   type Component,
   createSignal,
   createEffect,
+  createMemo,
+  onCleanup,
   Show,
   Switch,
   Match,
@@ -45,8 +47,19 @@ const RoomRoute: Component = () => {
   // 服务端在 resume 之前会通过 pregame 域发一次 GAME_ENDED；此 signal 为 true 时
   // 表示"游戏刚结束、结算 UI 正显示中"，Match 在此期间维持 GameWithSync 挂载，
   // 不被 selfStatus 翻位（Playing -> Lobby）立刻 unmount。
-  // 由 Game.tsx 的"回到房间"按钮或 5s 计时器 bubble 第二次 GAME_ENDED 来清掉。
+  // 由 Game.tsx 的"回到房间"按钮或 5s 计时器调 onDismissGameEnd 清掉。
   const [gameJustEnded, setGameJustEnded] = createSignal(false);
+  // gameJustEnded 的兜底计时器：万一 Game.tsx 没机会调 dismiss（异常 unmount 等），
+  // ~15s 后强制走 dismiss 路径，避免房间永远卡在隐藏。
+  const GAME_END_FALLBACK_MS = 15_000;
+  let gameEndFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  function cancelGameEndFallback() {
+    if (gameEndFallbackTimer) {
+      clearTimeout(gameEndFallbackTimer);
+      gameEndFallbackTimer = null;
+    }
+  }
+  onCleanup(() => cancelGameEndFallback());
 
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -137,8 +150,8 @@ const RoomRoute: Component = () => {
   });
 
   /**
-   * 子组件（Room / Game）统一上报事件
-   * 👉 这里是「真正的状态机入口」
+   * 子组件（Room / Game）上报的非 GAME_ENDED 自定义事件。GAME_ENDED 已经走专用
+   * onGameEndedReceived / onDismissGameEnd 两个 callback，下面 switch 不再处理。
    */
   const handleStateUpdate: RoomWithSyncProps["onStateUpdate"] = async (
     next
@@ -170,27 +183,53 @@ const RoomRoute: Component = () => {
         break;
       }
 
-      case SyncedPreGameServerEventPayloadType.GAME_ENDED: {
-        // 两段式：
-        // 1) 第一次（来自 RoomWithSync 的 pregame GAME_ENDED）：仅标记结束，
-        //    维持 GameWithSync 挂载让用户看结算 UI。不切 phase 也不 refresh，
-        //    因为 selfStatus 还要靠 RoomWithSync 接下来收到的 pregame state 翻位。
-        // 2) 第二次（来自 GameWithSync 的"回到房间"按钮或 5s 计时器）：用户已 dismiss，
-        //    把 phase/domain 切回 PREGAME。
-        if (!gameJustEnded()) {
-          setGameJustEnded(true);
-        } else {
-          setGameJustEnded(false);
-          setPhase(GamePhase.PREGAME);
-          await refreshConnectionInfo();
-        }
-        break;
-      }
-
       default:
         break;
     }
   };
+
+  /**
+   * 服务端的 GAME_ENDED 到达（RoomWithSync 在 pregame 域收到时调）。
+   * 只在 phase===INGAME 期间生效；如果用户已经 dismiss（phase 已切回 PREGAME），
+   * 后到的 GAME_ENDED 视为陈旧事件忽略，避免把刚清掉的 gameJustEnded 又拉回 true。
+   */
+  function handleGameEndedReceived() {
+    if (phase() !== GamePhase.INGAME) return;
+    if (gameJustEnded()) return;
+    setGameJustEnded(true);
+    cancelGameEndFallback();
+    gameEndFallbackTimer = setTimeout(() => {
+      console.warn("[room] gameJustEnded fallback timer fired -> force dismiss");
+      handleDismissGameEnd();
+    }, GAME_END_FALLBACK_MS);
+  }
+
+  /**
+   * 用户按"回到房间" / Game.tsx 的 5s 计时器 / fallback 计时器调用。
+   * 无条件转回 PREGAME 视图：取消挂载游戏、refresh。
+   * 不清 gameDomain —— 同 gameId 下一局复用，且清掉会触发首帧白屏 race（见历史 fix）。
+   */
+  function handleDismissGameEnd() {
+    cancelGameEndFallback();
+    setGameJustEnded(false);
+    setPhase(GamePhase.PREGAME);
+    refreshConnectionInfo();
+  }
+
+  /**
+   * 单一真源：现在该不该把 GameWithSync 放在屏幕上？
+   * Match 和 RoomWithSync.visible 都从这里读，避免两处条件漂移。
+   * 这里不考虑 gameDomain / playerId 等基础设施就绪条件——它们由 Match 单独 guard，
+   * 但房间的可见性不应该被它们的缺失反过来锁死（缺它们时仍应回退到房间页）。
+   */
+  const showingGameUI = createMemo(() =>
+    phase() === GamePhase.INGAME
+    && (
+      selfStatus() === PreGamePlayerStatus.Playing
+      || selfStatus() === PreGamePlayerStatus.Spectating
+      || gameJustEnded()
+    )
+  );
 
   return (
     <main class="container mx-auto p-6">
@@ -216,22 +255,14 @@ const RoomRoute: Component = () => {
             - Spectating 玩家：作为观战者打开 GameWithSync（read-only，禁用 surrender/操作）
             - Lobby 玩家：继续看 RoomWithSync（下面挂载）
             - gameJustEnded：游戏刚结束，结算 overlay 显示中，维持挂载等用户/计时器 dismiss */}
-        <Match when={
-          phase() === GamePhase.INGAME
-          && (
-            selfStatus() === PreGamePlayerStatus.Playing
-            || selfStatus() === PreGamePlayerStatus.Spectating
-            || gameJustEnded()
-          )
-          && gameDomain()
-          && playerId()
-        }>
+        <Match when={showingGameUI() && gameDomain() && playerId()}>
           <GameWithSync
             domain={gameDomain()!} // MUST be game-*
             gameId={params.id!}
             playerId={playerId()!}
             spectate={selfStatus() === PreGamePlayerStatus.Spectating}
             onStateUpdate={handleStateUpdate}
+            onDismissGameEnd={handleDismissGameEnd}
             onLeaveSpectate={() => roomApi()?.leaveSpectate()}
           />
         </Match>
@@ -261,21 +292,11 @@ const RoomRoute: Component = () => {
           playerId={playerId()!}
           playerName={playerName() ?? "Guest"}
           autoOpen
-          // RoomWithSync 内 suspended=true 表示「显示」（命名反了，保留以免破坏现有代码）。
-          // 只在"GameWithSync 确实应该在屏上"的几种情况下隐藏房间：
-          //   phase===INGAME 且 selfStatus 是 Playing/Spectating，或正在游戏结束 overlay 窗口。
-          // 其它任何状态（含 dismiss 完成、phase=PREGAME 但 selfStatus 还没翻 Lobby 的过渡帧）
-          // 都让房间可见，避免出现 GameWithSync 已 unmount、房间还被隐藏的"白屏"窗口。
-          suspended={!(
-            phase() === GamePhase.INGAME
-            && (
-              selfStatus() === PreGamePlayerStatus.Playing
-              || selfStatus() === PreGamePlayerStatus.Spectating
-              || gameJustEnded()
-            )
-          )}
+          // 房间和游戏 UI 二选一：游戏在屏上时房间隐藏，反之可见。
+          visible={!showingGameUI()}
           onStateUpdate={handleStateUpdate}
           onSelfStatusChange={(s) => setSelfStatus(s)}
+          onGameEndedReceived={handleGameEndedReceived}
           onExposeApi={(api) => setRoomApi(api)}
         />
       </Show>

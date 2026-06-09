@@ -44,6 +44,12 @@ export interface GameWithSyncProps {
      */
     spectate?: boolean;
     onStateUpdate?: (payload: { event?: SyncedPreGameServerEventPayload }) => void;
+    /**
+     * 用户在结算 overlay 上点"回到房间" / 5s 计时器 / "返回大厅" 时调用。
+     * 父级路由据此清掉 gameJustEnded、phase 切回 PREGAME。
+     * 不再通过 onStateUpdate({GAME_ENDED}) 二段式 toggle 走，避免歧义。
+     */
+    onDismissGameEnd?: () => void;
     onLeaveSpectate?: () => void;
 }
 
@@ -90,19 +96,13 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
     }
 
     function handleBackToRoom(): void {
-        const evt = gameEndedInfo();
-        if (!evt) {
-            return;
-        }
-        props.onStateUpdate?.({ event: evt });
+        if (!gameEndedInfo()) return;
+        props.onDismissGameEnd?.();
     }
 
     function handleReturnToLobby(): void {
-        const evt = gameEndedInfo();
-        if (!evt) {
-            return;
-        }
-        props.onStateUpdate?.({ event: evt });
+        if (!gameEndedInfo()) return;
+        props.onDismissGameEnd?.();
         navigate('/');
     }
 
