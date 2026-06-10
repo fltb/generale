@@ -2,6 +2,7 @@
 import { createSignal, createEffect, onCleanup, JSX, Show } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { useAuth } from "~/hooks/useAuth";
+import Avatar from "~/components/Avatar";
 
 /**
  * Navigation bar component
@@ -83,10 +84,12 @@ export default function Nav(): JSX.Element {
                   onClick={() => setOpen(!open())}
                   class="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-white/10"
                 >
-                  <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm">
-                    {auth.user?.email?.[0]?.toUpperCase() ?? "U"}
-                  </div>
-                  <span>{auth.user?.email ?? "User"}</span>
+                  <Avatar
+                    src={(auth.user?.avatarThumbUrl ?? auth.user?.avatarUrl)!}
+                    alt={auth.user?.displayName || auth.user?.username || auth.user?.email}
+                    size={32}
+                  />
+                  <span>{auth.user?.displayName || auth.user?.username || auth.user?.email || "User"}</span>
                 </button>
 
                 {/* 下拉菜单保留 */}

@@ -44,3 +44,9 @@ package-lock.json
 /.drizzle/
 /drizzle/
 /.db/
+
+# 运行期生成的静态资源：
+# - 默认头像由 ProfileService.ensureDefaultAvatars 启动期重建
+# - 用户上传的头像也写在这里
+# 不需要进版本库
+/public/

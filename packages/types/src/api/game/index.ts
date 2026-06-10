@@ -86,10 +86,9 @@ export type GameSummaryRoute = Static<typeof gameSummaryRouteSchema>;
 
 /**
  * Detailed game info schema: extend the summary with players & settings.
- * We use t.Intersect to logically merge the summary and the detailed fields.
- * If your `t` implementation doesn't support t.Intersect, you can inline the combined object.
+ * 用 t.Composite 平铺成单一 t.Object，避免 t.Intersect 在校验 / KeyOf 上的坑。
  */
-export const gameInfoRouteSchema = t.Intersect([
+export const gameInfoRouteSchema = t.Composite([
     gameSummaryRouteSchema,
     t.Object({
         // players: full players list (detailed)
@@ -127,7 +126,11 @@ const gameListPaginationSchema = t.Object({
 })
 export type GameListPaginationType = Static<typeof gameListPaginationSchema>;
 
-export const listGamesQuerySchema = t.Intersect([
+// 不要用 t.Intersect —— TypeBox 编译器在 query schema 上不支持
+// `Intersect + additionalProperties:false` 的组合，会直接抛
+// "Preflight validation check failed to guard for the given schema"。
+// t.Composite 会把多个 t.Object 平铺成一个 t.Object，没有 allOf，可以正常编译。
+export const listGamesQuerySchema = t.Composite([
     gameListFilterSchema,
     gameListSortSchema,
     gameListPaginationSchema

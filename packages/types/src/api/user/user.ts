@@ -70,11 +70,18 @@ export type ResetPasswordReqBody = Static<typeof resetPasswordReqSchema>;
 /**
  * Schema representing the public-facing user profile object.
  * This is the core data model for a user, not a direct response itself.
+ * displayName / avatarUrl / avatarThumbUrl / bio 来自 profiles 表（GET /me 时一并返回）。
  */
 export const userProfileSchemaResp = t.Object({
     id: t.String(),
     username: t.String(),
-    email: t.String()
+    email: t.String(),
+    displayName: t.Optional(t.String()),
+    /** 原图 URL，profile 页用 */
+    avatarUrl: t.Optional(t.String()),
+    /** 缩略图 URL，Nav / PlayerList 等小尺寸场景用 */
+    avatarThumbUrl: t.Optional(t.String()),
+    bio: t.Optional(t.String()),
 });
 
 /**

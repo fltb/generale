@@ -1,20 +1,30 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
+import { staticPlugin } from "@elysiajs/static";
 import { gameRoutes } from "./routes/game";
 import { userRoutes } from "./routes/user";
+import { profileRoutes } from "./routes/profile";
 import { authPlugin } from "./middleware/authPlugin";
 import { registerDomainHandler, websocketPlugin } from "./plugins/websocket";
 import { initEmailServiceWithEnv } from "./services/emailService";
+import { ProfileService } from "./services/profileService";
 
 await initEmailServiceWithEnv();
+// 启动期确保默认头像存在，避免新用户首次访问时拿不到图
+await ProfileService.ensureDefaultAvatars();
 
 const app = new Elysia()
   .use(cors())
+  // 静态托管头像：./public/avatars/<userId>.<ext> -> URL /api/avatars/<userId>.<ext>
+  // 走 /api 前缀是为了和已有路由共用同一个 rsbuild 反向代理。
+  // 头像 URL 由 ProfileService.saveAvatarBytes 生成，带 ?v=<ms> 缓存破。
+  .use(staticPlugin({ assets: "public/avatars", prefix: "/api/avatars" }))
   .use(authPlugin)
   .group("/api", (api) =>
     api
       .use(userRoutes)
+      .use(profileRoutes)
       .use(gameRoutes)
       .use(swagger({
         documentation: {

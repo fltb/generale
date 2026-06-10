@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@elysiajs/cors": "latest",
+    "@elysiajs/static": "^1.4.10",
     "@elysiajs/swagger": "latest",
     "@generale/types": "workspace:*",
     "@libsql/client": "^0.15.15",
@@ -18,7 +19,8 @@
     "drizzle-orm": "^0.44.7",
     "elysia": "latest",
     "fast-json-patch": "^3.1.1",
-    "nodemailer": "^6.9.1"
+    "nodemailer": "^6.9.1",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/bun": "^1.2.19",

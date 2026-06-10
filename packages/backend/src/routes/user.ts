@@ -15,6 +15,7 @@ import {
 
 import { verificationTokens, users } from '../db/schema'
 import { userService } from '../services/userService'
+import { profileService, ProfileService } from '../services/profileService'
 import { sendVerificationEmail } from '../services/emailService'
 import { sessionService } from '../services/sessionService'
 import { eq } from 'drizzle-orm'
@@ -27,6 +28,31 @@ function generateCode() {
 export const cookieScheme = t.Cookie({
   sid: t.Optional(t.String())
 })
+
+/**
+ * 拼装 `/me` 和 `/login` 共用的"当前用户视图"。
+ * 一次 getProfile 查询完成所有字段（避免之前 /me 和 /login 各自调 getProfile +
+ * getAvatarUrlsForDisplay 两次的浪费），并保证两个端点的 response shape 完全一致。
+ *
+ * 包含敏感字段 email——只能给"自己"用，不能拿去做"按 userId 查别人"。
+ */
+async function buildSelfUserView(user: {
+  id: string
+  username: string
+  email: string
+}) {
+  const profile = await profileService.getProfile(user.id)
+  const defaults = ProfileService.defaultAvatarUrls()
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    ...(profile?.displayName ? { displayName: profile.displayName } : {}),
+    avatarUrl: profile?.avatarUrl || defaults.avatarUrl,
+    avatarThumbUrl: profile?.avatarThumbUrl || defaults.avatarThumbUrl,
+    ...(profile?.bio ? { bio: profile.bio } : {}),
+  }
+}
 
 export const userRoutes = new Elysia()
   // 替换 register handler 为下面实现（保留其它路由不变）
@@ -257,7 +283,8 @@ export const userRoutes = new Elysia()
         sameSite: 'lax',
         path: '/',
       })
-      return { user: { id: user.id, username: user.username, email: user.email } }
+      // 和 /me 同形：loginMutation.onSuccess 直接把这份写进 ["me"] cache，头像/displayName 立刻就有
+      return { user: await buildSelfUserView(user) }
     },
     {
       body: loginReqSchema,
@@ -300,7 +327,7 @@ export const userRoutes = new Elysia()
         set.status = 404
         return { error: 'user not found' }
       }
-      return { user: { id: user.id, username: user.username, email: user.email } }
+      return { user: await buildSelfUserView(user) }
     },
     {
       response: {

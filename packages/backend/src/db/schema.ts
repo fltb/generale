@@ -54,7 +54,11 @@ export const verificationTokens = sqliteTable('verification_tokens', {
 // User profiles
 export const profiles = sqliteTable('profiles', {
   userId: text('user_id').primaryKey().references(() => users.id),
+  displayName: text('display_name'),
+  /** 原图 URL（profile 页用） */
   avatarUrl: text('avatar_url'),
+  /** 缩略图 URL（Nav、PlayerList 等小尺寸场景用） */
+  avatarThumbUrl: text('avatar_thumb_url'),
   bio: text('bio'),
   updatedAt: integer('updated_at', { mode: 'timestamp' })
     .default(sql`(CURRENT_TIMESTAMP)`),
