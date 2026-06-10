@@ -1,7 +1,6 @@
 import { useAuth } from "~/hooks/useAuth";
-import { useNavigate } from "@solidjs/router";
+import { useNavigate, A } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
-import { useWS } from "~/hooks/useWebsocket";
 
 type Tab = "login" | "register";
 
@@ -12,7 +11,6 @@ type Tab = "login" | "register";
 export default function LoginPage() {
   const auth = useAuth();
   const nav = useNavigate();
-  const wsManager = useWS();
 
   // Tab 控制
   const [tab, setTab] = createSignal<Tab>("login");
@@ -27,9 +25,8 @@ export default function LoginPage() {
   const [regUsername, setRegUsername] = createSignal("");
   const [regPassword, setRegPassword] = createSignal("");
   const [regEmail, setRegEmail] = createSignal("");
-  const [regCode, setRegCode] = createSignal("");
-  const [regStep, setRegStep] = createSignal<"form" | "verify">("form");
   const [regMessage, setRegMessage] = createSignal("");
+  const [regSent, setRegSent] = createSignal(false);
   const [regLoading, setRegLoading] = createSignal(false);
 
   /**
@@ -66,7 +63,8 @@ export default function LoginPage() {
   };
 
   /**
-   * 处理注册提交（发送验证码 / 创建账号）
+   * 注册：服务端落库 unverified 用户并发可点击链接到邮箱。
+   * 不再有验证码回填步骤——用户去邮箱点链接完成。
    */
   const handleRegister = async (e: Event) => {
     e.preventDefault();
@@ -78,57 +76,10 @@ export default function LoginPage() {
         password: regPassword(),
         email: regEmail(),
       });
-      // 假设后端返回 { message: string }
-      setRegMessage(res?.message || "已发送验证码，请查收邮箱");
-      setRegStep("verify");
+      setRegMessage(res?.message || "验证链接已发送，请查收邮箱后点击链接完成验证");
+      setRegSent(true);
     } catch (err: any) {
       setRegMessage(err?.message || "注册失败");
-    } finally {
-      setRegLoading(false);
-    }
-  };
-
-  /**
-   * 提交验证码以完成验证，并在验证成功后自动登录
-   */
-  const handleVerify = async () => {
-    setRegLoading(true);
-    setRegMessage("");
-    try {
-      const res = await auth.verify({ email: regEmail(), code: regCode() });
-      if (res?.success) {
-        setRegMessage("验证成功，正在为你自动登录…");
-
-        // 尝试自动登录（使用刚才填写的用户名/密码）
-        try {
-          await auth.login({
-            username: regUsername(),
-            password: regPassword(),
-          });
-          // 自动登录成功，跳转到 /
-          nav("/");
-          return; // 已跳转，不再执行后续清理
-        } catch (loginErr: any) {
-          // 自动登录失败：提示用户并切回登录 tab（可按需改为留在当前页）
-          setRegMessage(
-            `验证成功，但自动登录失败，请手动登录。原因：${
-              loginErr?.message || "未知错误"
-            }`
-          );
-          setTab("login");
-        }
-
-        // 如果不自动跳转（自动登录失败或选择不自动登录），清理注册表单
-        setRegUsername("");
-        setRegPassword("");
-        setRegEmail("");
-        setRegCode("");
-        setRegStep("form");
-      } else {
-        setRegMessage(res?.message || "验证失败");
-      }
-    } catch (err: any) {
-      setRegMessage(err?.message || "验证失败");
     } finally {
       setRegLoading(false);
     }
@@ -139,6 +90,7 @@ export default function LoginPage() {
     setTab(t);
     setLoginError("");
     setRegMessage("");
+    setRegSent(false);
   };
 
   return (
@@ -167,10 +119,11 @@ export default function LoginPage() {
       <Show when={tab() === "login"}>
         <form onSubmit={handleLogin} class="flex flex-col gap-2">
           <input
-            placeholder="用户名"
+            placeholder="用户名或邮箱"
             value={loginUsername()}
             onInput={(e) => setLoginUsername(e.currentTarget.value)}
             class="input input-bordered"
+            autocomplete="username"
             required
           />
           <input
@@ -179,6 +132,7 @@ export default function LoginPage() {
             value={loginPassword()}
             onInput={(e) => setLoginPassword(e.currentTarget.value)}
             class="input input-bordered"
+            autocomplete="current-password"
             required
           />
           <button
@@ -190,6 +144,9 @@ export default function LoginPage() {
           </button>
         </form>
         <p class="mt-2 text-red-500">{loginError()}</p>
+        <p class="mt-2 text-sm">
+          <A href="/forgot-password" class="link">忘记密码？</A>
+        </p>
         <p class="mt-2">
           还没有账号？{" "}
           <button class="link" onClick={() => switchTo("register")}>
@@ -198,10 +155,28 @@ export default function LoginPage() {
         </p>
       </Show>
 
-      {/* 注册表单 + 验证 */}
+      {/* 注册表单：提交后服务端发可点击链接到邮箱，用户去邮箱点链接完成验证 */}
       <Show when={tab() === "register"}>
         <div class="flex flex-col gap-2">
-          <Show when={regStep() === "form"}>
+          <Show
+            when={!regSent()}
+            fallback={
+              <div class="space-y-3">
+                <div class="alert alert-success">
+                  {regMessage() || "验证链接已发送，请查收邮箱后点击链接完成验证"}
+                </div>
+                <p class="text-sm opacity-70">
+                  查看邮箱（包括垃圾邮件），点击邮件里的链接即可激活账号。链接 10 分钟内有效。
+                </p>
+                <div class="flex gap-2">
+                  <button class="btn btn-ghost btn-sm" onClick={() => switchTo("login")}>返回登录</button>
+                  <button class="btn btn-sm" onClick={() => { setRegSent(false); setRegMessage(""); }}>
+                    重新填写注册信息
+                  </button>
+                </div>
+              </div>
+            }
+          >
             <form onSubmit={handleRegister} class="flex flex-col gap-2">
               <input
                 placeholder="用户名"
@@ -233,43 +208,12 @@ export default function LoginPage() {
               >
                 {regLoading() ? "提交中..." : "注册"}
               </button>
+              <Show when={regMessage()}>
+                <p class="mt-2 text-sm text-error">{regMessage()}</p>
+              </Show>
             </form>
           </Show>
 
-          <Show when={regStep() === "verify"}>
-            <div class="flex flex-col gap-2">
-              <input
-                placeholder="验证码"
-                value={regCode()}
-                onInput={(e) => setRegCode(e.currentTarget.value)}
-                class="input input-bordered"
-              />
-              <div class="flex gap-2">
-                <button
-                  class="btn btn-primary"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleVerify();
-                  }}
-                  disabled={regLoading()}
-                >
-                  {regLoading() ? "验证中..." : "提交验证码"}
-                </button>
-                <button
-                  class="btn"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // 切回表单以便用户修改邮箱等信息并重新提交
-                    setRegStep("form");
-                  }}
-                >
-                  返回修改信息
-                </button>
-              </div>
-            </div>
-          </Show>
-
-          <p class="mt-2 text-sm text-green-600">{regMessage()}</p>
           <p class="mt-2">
             已有账号？{" "}
             <button class="link" onClick={() => switchTo("login")}>

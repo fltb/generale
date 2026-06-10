@@ -29,6 +29,8 @@ export type RegisterReqBody = Static<typeof registerReqSchema>;
 
 /**
  * Schema for the body of the POST /api/login request.
+ * `username` 字段同时接受用户名或邮箱（服务端会按这两种方式各查一次）。
+ * 名字保留为 username 是为了兼容已经发出的客户端代码；语义上等价于 identifier。
  */
 export const loginReqSchema = t.Object({
     username: t.String(),
@@ -64,6 +66,32 @@ export const resetPasswordReqSchema = t.Object({
  * Static TypeScript type for the password reset request body.
  */
 export type ResetPasswordReqBody = Static<typeof resetPasswordReqSchema>;
+
+/**
+ * 登录态下改密码：需要当前密码 + 新密码
+ */
+export const changePasswordReqSchema = t.Object({
+    currentPassword: t.String(),
+    newPassword: t.String({ minLength: 8 }),
+});
+export type ChangePasswordReqBody = Static<typeof changePasswordReqSchema>;
+
+/**
+ * 登录态下发起改邮箱：需要当前密码（防 session 劫持）+ 新邮箱
+ */
+export const changeEmailReqSchema = t.Object({
+    currentPassword: t.String(),
+    newEmail: t.String({ format: 'email' }),
+});
+export type ChangeEmailReqBody = Static<typeof changeEmailReqSchema>;
+
+/**
+ * 改邮箱确认（用户点新邮箱里的链接拉过来的）
+ */
+export const confirmEmailChangeReqSchema = t.Object({
+    token: t.String(),
+});
+export type ConfirmEmailChangeReqBody = Static<typeof confirmEmailChangeReqSchema>;
 
 // --- Responses ---
 

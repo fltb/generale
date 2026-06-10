@@ -155,9 +155,12 @@ export const gamePlayerParamsReqSchema = t.Object({
 });
 export type GamePlayerParamsReq = Static<typeof gamePlayerParamsReqSchema>;
 
+/**
+ * 注册邮箱验证：用户从邮件里点链接打开 /verify-email?token=XXX，
+ * 前端再 POST 这个 token 过来。
+ */
 export const verifyReqSchema = t.Object({
-    email: t.String(),
-    code: t.String()
+    token: t.String()
 });
 export type VerifyReqBody = Static<typeof verifyReqSchema>;
 

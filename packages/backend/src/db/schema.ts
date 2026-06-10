@@ -47,6 +47,19 @@ export const verificationTokens = sqliteTable('verification_tokens', {
     .notNull()
     .references(() => users.id),
 
+  /**
+   * Token 用途。不同用途隔离，防止 register token 被拿去 reset 别人密码这类滥用。
+   * - 'register':       新注册邮箱验证
+   * - 'reset-password': 忘记密码流程
+   * - 'change-email':   登录态改邮箱，配合下面 newEmail 字段
+   */
+  purpose: text('purpose')
+    .notNull()
+    .default('register'),
+
+  /** 仅 change-email 用：存目标新邮箱，确认时把 users.email 改成这个 */
+  newEmail: text('new_email'),
+
   expiresAt: integer('expires_at', { mode: 'timestamp' })
     .notNull()
 })

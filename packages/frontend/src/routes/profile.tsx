@@ -6,10 +6,13 @@ import { useAuth } from "~/hooks/useAuth";
 import { ProtectedRoute } from "~/components/ProtectedRoute";
 import Avatar from "~/components/Avatar";
 import { patchMyProfileApi, uploadMyAvatarApi } from "~/api/profileApi";
+import { changePasswordApi, changeEmailApi } from "~/api/accountApi";
 import { ApiError } from "~/api/base";
 import type {
   ProfileUpdateReqBody,
   AvatarUploadRespBody,
+  ChangePasswordReqBody,
+  ChangeEmailReqBody,
   ErrorResp,
   MessageResp,
 } from "@generale/types/dist/api";
@@ -102,6 +105,42 @@ export default function ProfilePage() {
   const currentAvatarSrc = createMemo(
     () => pendingPreviewUrl() ?? auth.user?.avatarUrl ?? null,
   );
+
+  // ===================== 改密码 =====================
+  const [pwCurrent, setPwCurrent] = createSignal("");
+  const [pwNew, setPwNew] = createSignal("");
+  const [pwConfirm, setPwConfirm] = createSignal("");
+  const [pwLocalErr, setPwLocalErr] = createSignal<string | null>(null);
+
+  const pwMutation = useMutation<MessageResp, ApiError<ErrorResp>, ChangePasswordReqBody>(() => ({
+    mutationFn: (body) => changePasswordApi(body),
+    onSuccess: () => {
+      setPwCurrent(""); setPwNew(""); setPwConfirm("");
+    },
+  }));
+
+  function submitPassword() {
+    setPwLocalErr(null);
+    if (pwNew().length < 8) { setPwLocalErr("新密码至少 8 位"); return; }
+    if (pwNew() !== pwConfirm()) { setPwLocalErr("两次新密码不一致"); return; }
+    pwMutation.mutate({ currentPassword: pwCurrent(), newPassword: pwNew() });
+  }
+
+  // ===================== 改邮箱 =====================
+  const [emCurrent, setEmCurrent] = createSignal("");
+  const [emNew, setEmNew] = createSignal("");
+
+  const emMutation = useMutation<MessageResp, ApiError<ErrorResp>, ChangeEmailReqBody>(() => ({
+    mutationFn: (body) => changeEmailApi(body),
+    onSuccess: () => {
+      setEmCurrent(""); setEmNew("");
+    },
+  }));
+
+  function submitEmail() {
+    if (!emNew().trim() || !emCurrent()) return;
+    emMutation.mutate({ currentPassword: emCurrent(), newEmail: emNew().trim() });
+  }
 
   return (
     <ProtectedRoute>
@@ -216,6 +255,83 @@ export default function ProfilePage() {
                   <span class="text-error text-sm">
                     {patchMutation.error?.message ?? "保存失败"}
                   </span>
+                </Show>
+              </div>
+            </section>
+
+            {/* ---------- 改密码 ---------- */}
+            <section class="card bg-base-200 p-4 space-y-3">
+              <h2 class="text-lg font-semibold">修改密码</h2>
+              <input
+                type="password"
+                class="input input-bordered w-full"
+                placeholder="当前密码"
+                value={pwCurrent()}
+                onInput={(e) => setPwCurrent((e.target as HTMLInputElement).value)}
+                autocomplete="current-password"
+              />
+              <input
+                type="password"
+                class="input input-bordered w-full"
+                placeholder="新密码（至少 8 位）"
+                value={pwNew()}
+                onInput={(e) => setPwNew((e.target as HTMLInputElement).value)}
+                autocomplete="new-password"
+              />
+              <input
+                type="password"
+                class="input input-bordered w-full"
+                placeholder="再次输入新密码"
+                value={pwConfirm()}
+                onInput={(e) => setPwConfirm((e.target as HTMLInputElement).value)}
+                autocomplete="new-password"
+              />
+              <div class="flex gap-2 items-center">
+                <button class="btn btn-primary" disabled={pwMutation.isPending} onClick={submitPassword}>
+                  {pwMutation.isPending ? "提交中..." : "更新密码"}
+                </button>
+                <Show when={pwMutation.isSuccess}>
+                  <span class="text-success text-sm">{pwMutation.data?.message ?? "密码已更新"}</span>
+                </Show>
+                <Show when={pwLocalErr()}>
+                  <span class="text-error text-sm">{pwLocalErr()}</span>
+                </Show>
+                <Show when={pwMutation.isError}>
+                  <span class="text-error text-sm">{pwMutation.error?.message ?? "更新失败"}</span>
+                </Show>
+              </div>
+            </section>
+
+            {/* ---------- 改邮箱 ---------- */}
+            <section class="card bg-base-200 p-4 space-y-3">
+              <h2 class="text-lg font-semibold">修改邮箱</h2>
+              <p class="text-sm opacity-70">
+                提交后会发一封确认链接到<strong>新邮箱</strong>，点击链接才生效。旧邮箱也会收到通知。
+              </p>
+              <input
+                type="email"
+                class="input input-bordered w-full"
+                placeholder="新邮箱"
+                value={emNew()}
+                onInput={(e) => setEmNew((e.target as HTMLInputElement).value)}
+              />
+              <input
+                type="password"
+                class="input input-bordered w-full"
+                placeholder="当前密码（验证身份）"
+                value={emCurrent()}
+                onInput={(e) => setEmCurrent((e.target as HTMLInputElement).value)}
+                autocomplete="current-password"
+              />
+              <div class="flex gap-2 items-center">
+                <button class="btn btn-primary" disabled={emMutation.isPending} onClick={submitEmail}>
+                  {emMutation.isPending ? "发送中..." : "发送确认邮件"}
+                </button>
+                <Show when={emMutation.isSuccess}>
+                  <span class="text-success text-sm">{emMutation.data?.message ?? "已发送确认邮件"}</span>
+                </Show>
+                <Show when={emMutation.isError}>
+                  <span class="text-error text-sm">{emMutation.error?.message ?? "发送失败"}</span>
                 </Show>
               </div>
             </section>

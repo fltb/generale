@@ -10,18 +10,25 @@ import {
   verifyReqSchema,
   resetPasswordReqSchema,
   passwordResetTokenRespSchema,
-  logoutRespSchema
+  logoutRespSchema,
+  requestPasswordResetReqSchema,
+  changePasswordReqSchema,
+  changeEmailReqSchema,
+  confirmEmailChangeReqSchema,
 } from '@generale/types/dist/api'
 
 import { verificationTokens, users } from '../db/schema'
 import { userService } from '../services/userService'
 import { profileService, ProfileService } from '../services/profileService'
-import { sendVerificationEmail } from '../services/emailService'
+import { sendVerificationEmail, sendPasswordResetEmail, sendEmailChangeConfirmation, sendEmailChangeNotification } from '../services/emailService'
 import { sessionService } from '../services/sessionService'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
-function generateCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+/** 32 字节 URL-safe 随机串，用于 register / reset / change-email 这类放在链接里的不可记忆 token */
+function generateOpaqueToken() {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Buffer.from(bytes).toString('base64url')
 }
 
 // 将 sid 设为可选，避免在没有 cookie 时触发 422 校验错误
@@ -101,7 +108,7 @@ export const userRoutes = new Elysia()
         //  - issue new token and send verification email
 
         try {
-          db.delete(verificationTokens).where(eq(verificationTokens.userId, existing.id)).run()
+          db.delete(verificationTokens).where(and(eq(verificationTokens.userId, existing.id), eq(verificationTokens.purpose, 'register'))).run()
         } catch (err) {
           console.error('Failed to delete old verification tokens for overwrite-register:', existing.id, err)
         }
@@ -135,11 +142,11 @@ export const userRoutes = new Elysia()
           return { error: '服务器错误：无法更新用户状态' }
         }
 
-        // generate & store new token
-        const code = generateCode()
+        // generate & store new token（链接 token，URL-safe，长度足够防爆破）
+        const code = generateOpaqueToken()
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
         try {
-          db.insert(verificationTokens).values({ token: code, userId: existing.id, expiresAt }).run()
+          db.insert(verificationTokens).values({ token: code, userId: existing.id, purpose: 'register', expiresAt }).run()
         } catch (err) {
           console.error('Failed to insert new verification token for overwrite-register:', existing.id, err)
           set.status = 500
@@ -161,11 +168,11 @@ export const userRoutes = new Elysia()
       // 3) not existing -> create new user (unchanged behavior)
       const user = await userService.create(username, password, email)
 
-      // generate token and store
-      const code = generateCode()
+      // generate token and store（链接 token，URL-safe）
+      const code = generateOpaqueToken()
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 分钟有效
       try {
-        db.insert(verificationTokens).values({ token: code, userId: user.id, expiresAt }).run()
+        db.insert(verificationTokens).values({ token: code, userId: user.id, purpose: 'register', expiresAt }).run()
       } catch (err) {
         console.error('Failed to insert verification token for new user:', user.id, err)
         set.status = 500
@@ -195,58 +202,42 @@ export const userRoutes = new Elysia()
   .post(
     '/verify',
     async ({ body, set }) => {
-      const { email, code } = body
+      const { token } = body
 
-      const user = await userService.findByEmail(email)
-      if (!user) {
-        set.status = 404
-        return { error: '用户不存在' }
-      }
-
+      // 直接按 token + purpose 查，不再依赖 email 提交
       const row = db
         .select()
         .from(verificationTokens)
-        .where(eq(verificationTokens.userId, user.id))
+        .where(and(eq(verificationTokens.token, token), eq(verificationTokens.purpose, 'register')))
         .get()
 
       if (!row) {
         set.status = 400
-        return { error: '没有找到验证凭证，请重新注册' }
+        return { error: '无效的验证链接' }
       }
 
       const expiresAt = row.expiresAt instanceof Date ? row.expiresAt.getTime() : new Date(row.expiresAt).getTime()
-      const now = Date.now()
-
-      if (row.token !== code) {
+      if (expiresAt < Date.now()) {
+        // token expired -> 删 token，临时未验证用户也清掉，鼓励重新注册
+        try {
+          db.delete(verificationTokens).where(eq(verificationTokens.token, token)).run()
+        } catch (err) {
+          console.error('Failed to delete expired verification token', err)
+        }
+        try {
+          await userService.delete(row.userId)
+        } catch (err) {
+          console.error('Failed to delete unverified (expired) user', row.userId, err)
+        }
         set.status = 400
-        return { error: '验证码错误' }
+        return { error: '验证链接已过期，请重新注册' }
       }
 
-      if (expiresAt < now) {
-        // token expired -> delete token and delete the unverified user
-        try {
-          db.delete(verificationTokens).where(eq(verificationTokens.userId, user.id)).run()
-        } catch (err) {
-          console.error('Failed to delete expired verification token for user', user.id, err)
-        }
-
-        try {
-          // delete unverified user
-          await userService.delete(user.id)
-        } catch (err) {
-          console.error('Failed to delete unverified (expired) user', user.id, err)
-        }
-
-        set.status = 400
-        return { error: '验证码已过期，已删除临时用户，请重新注册' }
-      }
-
-      // valid token and not expired
-      await userService.markVerified(user.id)
+      await userService.markVerified(row.userId)
       try {
-        db.delete(verificationTokens).where(eq(verificationTokens.userId, user.id)).run()
+        db.delete(verificationTokens).where(eq(verificationTokens.token, token)).run()
       } catch (err) {
-        console.error('Failed to delete verification token after successful verify for user', user.id, err)
+        console.error('Failed to delete verification token after success', err)
       }
 
       return { success: true, message: '邮箱验证成功，可登录' }
@@ -256,20 +247,22 @@ export const userRoutes = new Elysia()
       response: {
         200: messageRespSchema,
         400: errorRespSchema,
-        404: errorRespSchema
       }
     }
   )
   .post(
     '/login',
     async ({ body, cookie: { sid }, set }) => {
-      // `body` is now fully typed
+      // 入参 `username` 字段历史上是 username，现在也接受 email。
+      // 优先按 username 查；查不到再按 email 兜底，覆盖"用户用邮箱登录"场景。
       const { username, password } = body;
-      const user = await userService.findByUsername(username)
+      let user = await userService.findByUsername(username)
+      if (!user) {
+        user = await userService.findByEmail(username)
+      }
       if (!user) {
         set.status = 401
         return { error: 'user not found' }
-
       }
       if (!userService.verifyPassword(password, user.password)) {
         set.status = 401
@@ -343,21 +336,18 @@ export const userRoutes = new Elysia()
     async ({ body }) => {
       const { token, newPassword } = body;
 
-      // Verify token exists and is not expired
+      // 用途必须是 reset-password，防止注册验证码 / 改邮箱 token 被拿来改密码
       const verificationToken = db
         .select()
         .from(verificationTokens)
-        .where(eq(verificationTokens.token, token))
+        .where(and(eq(verificationTokens.token, token), eq(verificationTokens.purpose, 'reset-password')))
         .get();
 
       if (!verificationToken || new Date(verificationToken.expiresAt) < new Date()) {
         return { error: '无效或过期的重置链接', valid: false };
       }
 
-      // Update user's password
       await userService.updatePassword(verificationToken.userId, newPassword);
-
-      // Delete used token
       db.delete(verificationTokens).where(eq(verificationTokens.token, token)).run();
 
       return { success: true, message: '密码重置成功', valid: true };
@@ -368,6 +358,187 @@ export const userRoutes = new Elysia()
         200: passwordResetTokenRespSchema,
         400: errorRespSchema
       }
+    }
+  )
+  /**
+   * 忘记密码：邮箱存在就发 reset 链接，邮箱不存在也返回 200，避免泄露注册情况
+   */
+  .post(
+    '/forgot-password',
+    async ({ body }) => {
+      const { email } = body
+      const user = await userService.findByEmail(email)
+
+      // 邮箱命中再发邮件；不命中静默 200。出错的话也吞掉，统一 200 不漏信息
+      if (user) {
+        try {
+          // 清掉这个用户旧的 reset-password token，保证只有一条有效
+          db.delete(verificationTokens)
+            .where(and(eq(verificationTokens.userId, user.id), eq(verificationTokens.purpose, 'reset-password')))
+            .run()
+          const token = generateOpaqueToken()
+          const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
+          db.insert(verificationTokens)
+            .values({ token, userId: user.id, purpose: 'reset-password', expiresAt })
+            .run()
+          await sendPasswordResetEmail(email, token)
+        } catch (err) {
+          console.error('forgot-password: failed for', email, err)
+          // 故意不暴露细节
+        }
+      }
+      return { success: true, message: '如果该邮箱已注册，我们已发送重置链接' }
+    },
+    {
+      body: requestPasswordResetReqSchema,
+      response: { 200: messageRespSchema, 400: errorRespSchema },
+    }
+  )
+  /**
+   * 登录态下改密码：必须验当前密码
+   */
+  .post(
+    '/change-password',
+    async ({ body, cookie: { sid }, set }) => {
+      const session = sid?.value ? sessionService.get(sid.value) : undefined
+      if (!session) {
+        set.status = 401
+        return { error: '未登录' }
+      }
+      const user = await userService.findById(session.userId)
+      if (!user) {
+        set.status = 404
+        return { error: '用户不存在' }
+      }
+      if (!userService.verifyPassword(body.currentPassword, user.password)) {
+        set.status = 401
+        return { error: '当前密码错误' }
+      }
+      if (body.currentPassword === body.newPassword) {
+        set.status = 400
+        return { error: '新密码不能与当前密码相同' }
+      }
+      await userService.updatePassword(user.id, body.newPassword)
+      return { success: true, message: '密码已更新' }
+    },
+    {
+      body: changePasswordReqSchema,
+      response: { 200: messageRespSchema, 400: errorRespSchema, 401: errorRespSchema, 404: errorRespSchema },
+      cookie: cookieScheme,
+    }
+  )
+  /**
+   * 登录态下发起改邮箱：验当前密码 + 检查新邮箱未被占用 + 发确认链接到新邮箱
+   */
+  .post(
+    '/change-email',
+    async ({ body, cookie: { sid }, set }) => {
+      const session = sid?.value ? sessionService.get(sid.value) : undefined
+      if (!session) {
+        set.status = 401
+        return { error: '未登录' }
+      }
+      const user = await userService.findById(session.userId)
+      if (!user) {
+        set.status = 404
+        return { error: '用户不存在' }
+      }
+      if (!userService.verifyPassword(body.currentPassword, user.password)) {
+        set.status = 401
+        return { error: '当前密码错误' }
+      }
+      const newEmail = body.newEmail.trim().toLowerCase()
+      if (newEmail === user.email.toLowerCase()) {
+        set.status = 400
+        return { error: '新邮箱与当前邮箱相同' }
+      }
+      const taken = await userService.findByEmail(newEmail)
+      if (taken && taken.id !== user.id) {
+        set.status = 409
+        return { error: '该邮箱已被使用' }
+      }
+
+      // 清旧 change-email token，保证只有一条有效
+      try {
+        db.delete(verificationTokens)
+          .where(and(eq(verificationTokens.userId, user.id), eq(verificationTokens.purpose, 'change-email')))
+          .run()
+      } catch { /* ignore */ }
+
+      const token = generateOpaqueToken()
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
+      try {
+        db.insert(verificationTokens)
+          .values({ token, userId: user.id, purpose: 'change-email', newEmail, expiresAt })
+          .run()
+      } catch (err) {
+        console.error('change-email: insert token failed for', user.id, err)
+        set.status = 500
+        return { error: '服务器错误：无法创建变更凭证' }
+      }
+
+      // 给新邮箱发确认链接；给旧邮箱发通知。任一失败都不致命，回 200 提示用户去新邮箱看
+      try { await sendEmailChangeConfirmation(newEmail, token) } catch (e) { console.error('confirm email failed', e) }
+      try { await sendEmailChangeNotification(user.email, newEmail) } catch (e) { console.error('notify old email failed', e) }
+
+      return { success: true, message: '确认链接已发到新邮箱，30 分钟内点击生效' }
+    },
+    {
+      body: changeEmailReqSchema,
+      response: { 200: messageRespSchema, 400: errorRespSchema, 401: errorRespSchema, 404: errorRespSchema, 409: errorRespSchema },
+      cookie: cookieScheme,
+    }
+  )
+  /**
+   * 改邮箱确认：用户点新邮箱里链接、前端再 POST 过来
+   */
+  .post(
+    '/confirm-email-change',
+    async ({ body, set }) => {
+      const { token } = body
+      const row = db
+        .select()
+        .from(verificationTokens)
+        .where(and(eq(verificationTokens.token, token), eq(verificationTokens.purpose, 'change-email')))
+        .get()
+      if (!row) {
+        set.status = 400
+        return { error: '无效的链接' }
+      }
+      if (new Date(row.expiresAt) < new Date()) {
+        // 顺手删过期 token
+        db.delete(verificationTokens).where(eq(verificationTokens.token, token)).run()
+        set.status = 400
+        return { error: '链接已过期，请重新发起变更' }
+      }
+      if (!row.newEmail) {
+        // 数据不一致 —— 不应该发生，因为 change-email 插入时一定带了 newEmail
+        set.status = 500
+        return { error: '服务器错误：变更凭证不完整' }
+      }
+      // 临门检查：变更期间新邮箱可能被别人占了
+      const taken = await userService.findByEmail(row.newEmail)
+      if (taken && taken.id !== row.userId) {
+        db.delete(verificationTokens).where(eq(verificationTokens.token, token)).run()
+        set.status = 409
+        return { error: '该邮箱已被使用' }
+      }
+      try {
+        db.update(users)
+          .set({ email: row.newEmail, updatedAt: new Date() })
+          .where(eq(users.id, row.userId))
+          .run()
+      } catch (err) {
+        console.error('confirm-email-change: update users failed for', row.userId, err)
+        set.status = 500
+        return { error: '服务器错误：无法更新邮箱' }
+      }
+      db.delete(verificationTokens).where(eq(verificationTokens.token, token)).run()
+      return { success: true, message: '邮箱已更新，请用新邮箱登录' }
+    },
+    {
+      body: confirmEmailChangeReqSchema,
+      response: { 200: messageRespSchema, 400: errorRespSchema, 409: errorRespSchema, 500: errorRespSchema },
     }
   )
 
