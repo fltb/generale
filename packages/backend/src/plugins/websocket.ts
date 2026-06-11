@@ -215,7 +215,20 @@ class WebSocketConnectionManager<T = unknown, Context extends WSContextBase = WS
   }
 
   openSubConnector(domain: string, context: Partial<Context>): boolean {
-    if (this.subConnectors.has(domain)) return false;
+    const existing = this.subConnectors.get(domain);
+    if (existing) {
+      if (!existing.isExplicitlyClosed()) {
+        // domain 已打开且活跃：幂等地重发一次 open ack。
+        // 修复进场卡死：客户端可能因竞态/重连漏收了上一次 ack（sub 没标 ready），
+        // 于是不断重发 open，而旧逻辑直接 return false 不回 ack -> 永远卡住、只能整页刷新。
+        // 这里重发 ack 让客户端恢复 ready，随后它发 sync_request 即可取到当前快照。
+        this.sendRaw({ domain, type: 'open', payload: existing.getContext() });
+        return true;
+      }
+      // 之前被显式 close 过的残留条目（closeSubConnector 没从 map 删除）。
+      // 丢弃旧的，下面按全新 open 重建（GameWithSync unmount->remount / 路由切换会触发）。
+      this.subConnectors.delete(domain);
+    }
     const handler = domainHandlers.get(domain);
     if (!handler) return false;
 
