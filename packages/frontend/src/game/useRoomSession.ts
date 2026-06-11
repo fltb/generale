@@ -37,6 +37,9 @@ export function useRoomSession(gameId: () => string | undefined) {
   // 表示"游戏刚结束、结算 UI 正显示中"，Match 在此期间维持 GameWithSync 挂载，
   // 不被 selfStatus 翻位（Playing -> Lobby）立刻 unmount。
   const [gameJustEnded, setGameJustEnded] = createSignal(false);
+  // 本次会话是否经由 GAME_STARTED 进入对局（区分"全新开局" vs "刷新/重连/观战进入进行中的对局"）。
+  // 只有全新开局才放开局倒计时；重连进来不放。
+  const [startedThisSession, setStartedThisSession] = createSignal(false);
   // gameJustEnded 的兜底计时器：万一 Game.tsx 没机会调 dismiss（异常 unmount 等），
   // ~15s 后强制走 dismiss 路径，避免房间永远卡在隐藏。
   const GAME_END_FALLBACK_MS = 15_000;
@@ -151,6 +154,7 @@ export function useRoomSession(gameId: () => string | undefined) {
          * GAME_STARTED 只是 notification（服务器权威）
          * 我们需要再次请求连接信息以拿到 game-* domain。
          */
+        setStartedThisSession(true); // 标记为全新开局 -> 放倒计时
         await new Promise(res => setTimeout(res, 1000));
         await refreshConnectionInfo();
         break;
@@ -181,6 +185,7 @@ export function useRoomSession(gameId: () => string | undefined) {
   function handleDismissGameEnd() {
     cancelGameEndFallback();
     setGameJustEnded(false);
+    setStartedThisSession(false); // 回到房间，清掉"全新开局"标记
     setPhase(GamePhase.PREGAME);
     refreshConnectionInfo();
   }
@@ -212,6 +217,7 @@ export function useRoomSession(gameId: () => string | undefined) {
     loading,
     error,
     showingGameUI,
+    startedThisSession,
     // handlers
     handleStateUpdate,
     handleGameEndedReceived,

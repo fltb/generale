@@ -118,6 +118,18 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
   /** domains we've asked the server to open but haven't yet received server 'open' ack */
   private pendingOpens = new Set<string>();
 
+  /**
+   * 每个 domain 的 open-ack 超时重试定时器。
+   *
+   * 修复进场竞态：openDomain 发出 open 后若服务端尚未就绪（如 GAME_STARTED 后 game
+   * 实例还没建好），ack 不会回来，sub 永远 ready 不了 -> 卡在"同步中"，过去只能整页刷新
+   * （刷新会触发 reconnection_ack -> _retryPendingOpens 重发 open）。这里给每个未 ack 的
+   * open 加一个超时重发，等价于自动刷新那一次，不必整页刷新。
+   */
+  private openRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private static readonly OPEN_RETRY_MS = 1500;
+  private static readonly OPEN_RETRY_MAX = 6;
+
   /** small reactive signal to allow UI to subscribe */
   public isConnectedSignal = createSignal(false);
 
@@ -154,7 +166,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.debug("[WS] onopen readyState", this.ws.readyState);
+        console.debug("[WS] onopen readyState", this.ws?.readyState);
         this.isConnected = true;
         this.isConnectedSignal[1](true);
         this.reconnectAttempts = 0;
@@ -271,6 +283,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
   deleteSub(domain: string) {
     this.subConnectors.delete(domain);
     this.pendingOpens.delete(domain);
+    this._clearOpenRetry(domain);
   }
 
   // ask server to open a sub-domain
@@ -293,7 +306,39 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
     this.pendingOpens.add(domain);
     this.sendRaw({ domain, type: "open", payload: ctx });
     console.debug("[WS] openDomain requested:", domain, ctx);
+    this._scheduleOpenRetry(domain, ctx, 0);
     return sub;
+  }
+
+  /** 安排一次 open-ack 超时重试：到点仍未 ack（仍在 pendingOpens）就重发 open。 */
+  private _scheduleOpenRetry(domain: string, ctx: Partial<Ctx>, attempt: number) {
+    this._clearOpenRetry(domain);
+    const timer = setTimeout(() => {
+      this.openRetryTimers.delete(domain);
+      // 已 ack（不在 pending）或已不再需要 -> 收手
+      if (!this.pendingOpens.has(domain)) return;
+      if (attempt >= ClientConnectionManager.OPEN_RETRY_MAX) {
+        console.warn(`[WS] openDomain '${domain}' still not acked after ${attempt} retries; giving up`);
+        return;
+      }
+      // socket 没连上就先不发（重连后 _retryPendingOpens 会兜底）
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const sub = this.subConnectors.get(domain);
+        const c = sub ? sub.getContext() : ctx;
+        console.warn(`[WS] openDomain '${domain}' not acked, resending (attempt ${attempt + 1})`);
+        this.sendRaw({ domain, type: "open", payload: c });
+      }
+      this._scheduleOpenRetry(domain, ctx, attempt + 1);
+    }, ClientConnectionManager.OPEN_RETRY_MS);
+    this.openRetryTimers.set(domain, timer);
+  }
+
+  private _clearOpenRetry(domain: string) {
+    const t = this.openRetryTimers.get(domain);
+    if (t) {
+      clearTimeout(t);
+      this.openRetryTimers.delete(domain);
+    }
   }
 
   closeDomain(domain: string, code?: number, reason?: string) {
@@ -304,6 +349,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       this.sendRaw({ domain, type: "close", payload: { code, reason } });
       this.subConnectors.delete(domain);
       this.pendingOpens.delete(domain);
+      this._clearOpenRetry(domain);
     }
   }
 
@@ -351,6 +397,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
           const sub = this.getOrCreateSub(domain, payload as Partial<Ctx>);
           // remove from pending opens since server confirmed open
           this.pendingOpens.delete(domain);
+          this._clearOpenRetry(domain);
           sub._triggerOpen(payload as Partial<Ctx>);
           console.debug("[WS] domain open ack:", domain, payload);
           break;
@@ -395,6 +442,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       const ctx = sub ? sub.getContext() : {};
       console.debug("[WS] retrying open for pending domain:", domain);
       this.sendRaw({ domain, type: "open", payload: ctx });
+      this._scheduleOpenRetry(domain, ctx as Partial<Ctx>, 0);
     }
   }
 }

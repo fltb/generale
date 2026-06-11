@@ -88,6 +88,14 @@ export function useGameSession(params: UseGameSessionParams) {
     }, GAME_END_AUTO_DISMISS_MS);
   });
 
+  // 同步看门狗：进场后若地图迟迟为空（连接/快照竞态，表现为"只剩蓝底没有地图，刷新就好"），
+  // 自动重发 sync nudge —— 等价于用户手动刷新，把概率性卡进场救回来。地图一旦就绪就停。
+  let resyncInterval: ReturnType<typeof setInterval> | null = null;
+  function stopResyncWatchdog() {
+    if (resyncInterval) { clearInterval(resyncInterval); resyncInterval = null; }
+  }
+  onCleanup(stopResyncWatchdog);
+
   onMount(async () => {
     try {
       await synced.connect();
@@ -95,6 +103,18 @@ export function useGameSession(params: UseGameSessionParams) {
       if (!params.spectate) {
         // TODO:: HACK:: 临时发送一个 CLEAN_ALL 来同步，因为不发送一个 action 会导致状态不和后端同步，原因还在排查，先 hack
         synced.dispatch({ type: SyncedGameClientActionTypes.CLEAN_ALL });
+
+        // 看门狗：最多重试若干次，地图就绪即止
+        let attempts = 0;
+        resyncInterval = setInterval(() => {
+          const ready = ((mergedState()?.map?.width ?? 0) > 0);
+          if (ready || attempts >= 5) { stopResyncWatchdog(); return; }
+          attempts++;
+          console.warn(`[game] map still empty after connect, resync attempt ${attempts}`);
+          try {
+            synced.dispatch({ type: SyncedGameClientActionTypes.CLEAN_ALL });
+          } catch { }
+        }, 1000);
       }
     } catch (e) {
       console.warn("GameWithSync connect error", e);

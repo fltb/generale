@@ -34,6 +34,8 @@ export interface GameWithSyncProps {
    * 所以这里通过 onLeaveSpectate 回调把意图上报给父级（routes/room.tsx）路由处理。
    */
   spectate?: boolean;
+  /** 是否为全新开局（经 GAME_STARTED 进入）。仅全新开局放开局倒计时；重连/刷新/观战进来不放。 */
+  freshStart?: boolean;
   onStateUpdate?: (payload: { event?: SyncedPreGameServerEventPayload }) => void;
   onDismissGameEnd?: () => void;
   onLeaveSpectate?: () => void;
@@ -60,6 +62,10 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
   const mergedState = ctrl.mergedState;
   const endgameResult = ctrl.endgameResult;
 
+  // 地图是否已同步到（width>0）。pixi Application 只在地图就绪后挂载，
+  // 避免在空地图(0x0)上初始化画布导致"只剩蓝底没有地图、刷新才好"的进场竞态。
+  const mapReady = () => ((mergedState()?.map?.width ?? 0) > 0);
+
   // 开局倒计时：进入对局 UI 时播一次
   const [showCountdown, setShowCountdown] = createSignal(true);
 
@@ -80,7 +86,8 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
 
   return (
     <div class="p-4">
-      <Show when={showCountdown()}>
+      {/* 倒计时只在"全新开局"且战场就绪后播放；重连/刷新/观战进入进行中的对局不播 */}
+      <Show when={props.freshStart && mapReady() && showCountdown()}>
         <Countdown from={3} onDone={() => setShowCountdown(false)} />
       </Show>
 
@@ -107,20 +114,32 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
       <PlayerList state={ctrl.state} />
 
       <Card class="bg-base-200 p-3">
-        <Application
-          background={DEFAULT_TILE_THEME.colors.appBackground}
-          resizeTo={window}
-          resolution={window.devicePixelRatio}
-          autoDensity={true}
-          antialias={true}
+        {/* 地图就绪后才挂载 pixi 画布；未就绪时显示"召集军队中"占位，
+            避免 pixi 在空地图上初始化引发的蓝屏进场竞态 */}
+        <Show
+          when={mapReady()}
+          fallback={
+            <div class="flex flex-col items-center justify-center gap-3 py-24 text-base-content">
+              <div class="font-display text-2xl text-primary animate-pulse">召集军队中…</div>
+              <div class="text-sm opacity-60">正在与战场同步</div>
+            </div>
+          }
         >
-          <MapRender
-            state={mergedState()}
-            onOperationQueued={ctrl.handleOperationQueued}
-            selfId={props.spectate ? undefined : props.playerId}
-            onClearQueue={props.spectate ? undefined : ctrl.handleClearQueue}
-          />
-        </Application>
+          <Application
+            background={DEFAULT_TILE_THEME.colors.appBackground}
+            resizeTo={window}
+            resolution={window.devicePixelRatio}
+            autoDensity={true}
+            antialias={true}
+          >
+            <MapRender
+              state={mergedState()}
+              onOperationQueued={ctrl.handleOperationQueued}
+              selfId={props.spectate ? undefined : props.playerId}
+              onClearQueue={props.spectate ? undefined : ctrl.handleClearQueue}
+            />
+          </Application>
+        </Show>
       </Card>
 
       {/* Displaced overlay：被同 user 另一个 sub 接管，盖整屏，不可关。

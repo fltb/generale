@@ -60,6 +60,7 @@ const RoomRoute: Component = () => {
             gameId={params.id!}
             playerId={session.playerId()!}
             spectate={session.selfStatus() === PreGamePlayerStatus.Spectating}
+            freshStart={session.startedThisSession()}
             onStateUpdate={session.handleStateUpdate}
             onDismissGameEnd={session.handleDismissGameEnd}
             onLeaveSpectate={() => session.roomApi()?.leaveSpectate()}
