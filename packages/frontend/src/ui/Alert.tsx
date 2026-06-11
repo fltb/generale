@@ -18,7 +18,7 @@ const VARIANT_CLASS: Record<AlertVariant, string> = {
 export const Alert: Component<AlertProps> = (props) => {
   const [local, rest] = splitProps(props, ["variant", "class"]);
   const cls = () =>
-    ["alert", VARIANT_CLASS[local.variant ?? "neutral"], local.class ?? ""]
+    ["alert pixel-border", VARIANT_CLASS[local.variant ?? "neutral"], local.class ?? ""]
       .filter(Boolean)
       .join(" ");
   return <div {...rest} class={cls()} />;

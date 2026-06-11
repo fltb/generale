@@ -25,7 +25,7 @@ const VARIANT_CLASS: Record<BadgeVariant, string> = {
 export const Badge: Component<BadgeProps> = (props) => {
   const [local, rest] = splitProps(props, ["variant", "class"]);
   const cls = () =>
-    ["badge", VARIANT_CLASS[local.variant ?? "neutral"], local.class ?? ""]
+    ["badge pixel-border", VARIANT_CLASS[local.variant ?? "neutral"], local.class ?? ""]
       .filter(Boolean)
       .join(" ");
   return <span {...rest} class={cls()} />;

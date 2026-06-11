@@ -3,6 +3,7 @@ import { createSignal, createEffect, onCleanup, JSX, Show } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { useAuth } from "~/hooks/useAuth";
 import Avatar from "~/components/Avatar";
+import { MuteToggle } from "~/ui";
 
 /**
  * Navigation bar component
@@ -55,6 +56,9 @@ export default function Nav(): JSX.Element {
 
         {/* ❗右侧整体：包含 About + 用户区 */}
         <div class="flex items-center gap-6">
+          {/* 音效开关 */}
+          <MuteToggle />
+
           {/* 右侧导航（已移动） */}
           <A
             href="/about"

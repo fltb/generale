@@ -1,4 +1,4 @@
-import { type Component, Show } from "solid-js";
+import { type Component, Show, createSignal, createEffect } from "solid-js";
 import {
   type SyncedPreGameServerEventPayload,
   type PlayerId,
@@ -10,7 +10,7 @@ import PlayerList from "./PlayerList";
 import { useNavigate } from "@solidjs/router";
 import { useGameSession } from "~/game/useGameSession";
 import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
-import { Button, Card, Badge, Overlay, TakeoverOverlay, uiTheme } from "~/ui";
+import { Button, Card, Badge, Overlay, TakeoverOverlay, uiTheme, Countdown, Confetti, sfx } from "~/ui";
 
 /**
  * Props:
@@ -60,8 +60,30 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
   const mergedState = ctrl.mergedState;
   const endgameResult = ctrl.endgameResult;
 
+  // 开局倒计时：进入对局 UI 时播一次
+  const [showCountdown, setShowCountdown] = createSignal(true);
+
+  // 结算音效 + 胜利纸屑：selfOutcome 落定时各播一次
+  const [celebrate, setCelebrate] = createSignal(false);
+  let outcomePlayed = false;
+  createEffect(() => {
+    const outcome = endgameResult()?.selfOutcome;
+    if (!outcome || outcomePlayed) return;
+    outcomePlayed = true;
+    if (outcome === "won") {
+      sfx.victory();
+      setCelebrate(true);
+    } else if (outcome === "lost") {
+      sfx.defeat();
+    }
+  });
+
   return (
     <div class="p-4">
+      <Show when={showCountdown()}>
+        <Countdown from={3} onDone={() => setShowCountdown(false)} />
+      </Show>
+
       <Card class="bg-base-200 p-3 mb-3 flex items-center justify-between">
         <div>
           <div class="text-lg font-semibold">游戏中 — {props.gameId}</div>
@@ -107,6 +129,10 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
         <TakeoverOverlay scope="游戏" dim={70} />
       </Show>
 
+      <Show when={celebrate()}>
+        <Confetti />
+      </Show>
+
       <Show when={ctrl.gameEndedInfo()}>
         <Overlay dim={70}>
           <Show
@@ -114,13 +140,13 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
             fallback={
               <Show
                 when={endgameResult()?.selfOutcome === "lost"}
-                fallback={<h1 class="text-4xl font-bold mb-4">游戏结束</h1>}
+                fallback={<h1 class="font-display text-4xl mb-4 animate-slam">游戏结束</h1>}
               >
-                <h1 class={`text-5xl font-bold mb-4 ${uiTheme.outcome.lost}`}>你输了</h1>
+                <h1 class={`font-display text-5xl mb-4 animate-slam ${uiTheme.outcome.lost}`}>你输了</h1>
               </Show>
             }
           >
-            <h1 class={`text-5xl font-bold mb-4 ${uiTheme.outcome.won}`}>你赢了</h1>
+            <h1 class={`font-display text-5xl mb-4 animate-slam ${uiTheme.outcome.won}`}>你赢了</h1>
           </Show>
 
           <Show when={endgameResult()?.winnerLabel}>

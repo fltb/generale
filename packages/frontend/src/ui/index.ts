@@ -18,3 +18,7 @@ export { Modal, type ModalProps } from "./Modal";
 export { Overlay, TakeoverOverlay, type OverlayProps, type TakeoverOverlayProps } from "./Overlay";
 export { confirmDialog, alertDialog } from "./dialogs";
 export { uiTheme, type UiTheme } from "./theme";
+export { sfx, isMuted, setMuted, toggleMuted } from "./sound";
+export { Confetti, type ConfettiProps } from "./Confetti";
+export { Countdown, type CountdownProps } from "./Countdown";
+export { MuteToggle } from "./MuteToggle";

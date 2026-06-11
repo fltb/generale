@@ -1,4 +1,5 @@
 import { type Component, type JSX, splitProps } from "solid-js";
+import { sfx } from "./sound";
 
 /**
  * Button primitive.
@@ -27,6 +28,8 @@ export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement>
   outline?: boolean;
   circle?: boolean;
   block?: boolean;
+  /** 设为 true 关闭点击音效（默认开） */
+  silent?: boolean;
 }
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
@@ -57,11 +60,13 @@ export const Button: Component<ButtonProps> = (props) => {
     "circle",
     "block",
     "class",
+    "silent",
+    "onClick",
   ]);
 
   const cls = () =>
     [
-      "btn",
+      "btn pixel-btn",
       VARIANT_CLASS[local.variant ?? "neutral"],
       SIZE_CLASS[local.size ?? "md"],
       local.active ? "btn-active" : "",
@@ -73,7 +78,12 @@ export const Button: Component<ButtonProps> = (props) => {
       .filter(Boolean)
       .join(" ");
 
-  return <button {...rest} class={cls()} />;
+  const handleClick: JSX.EventHandler<HTMLButtonElement, MouseEvent> = (e) => {
+    if (!local.silent) sfx.click();
+    if (typeof local.onClick === "function") local.onClick(e);
+  };
+
+  return <button {...rest} class={cls()} onClick={handleClick} />;
 };
 
 export default Button;

@@ -1,7 +1,141 @@
+/* ── Pixel fonts ──────────────────────────────────────────────
+   "Pixelify Sans" = 可读的像素正文/数字；"Press Start 2P" = 大字横幅时刻。
+   （目前从 Google Fonts 拉取，便于 demo；将来要离线可自托管字体文件） */
+@import url("https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Press+Start+2P&display=swap");
+
 @import "tailwindcss";
 @plugin "daisyui";
 
+/* ── 16-bit 奇幻战旗 主题（暗底 + 饱和点缀，比浅色更像游戏） ───── */
+@plugin "daisyui/theme" {
+  name: "fantasy16";
+  default: true;
+  prefersdark: true;
+  color-scheme: "dark";
+
+  --color-base-100: #241b2e;   /* 主面板：暗紫 */
+  --color-base-200: #1a1424;   /* 更深底 */
+  --color-base-300: #36294a;   /* 抬高/边框 */
+  --color-base-content: #f5e6c8; /* 羊皮纸字色 */
+
+  --color-primary: #f2b21c;        /* 黄金（战旗主色） */
+  --color-primary-content: #2a1c05;
+  --color-secondary: #3b82c4;      /* 王室蓝 */
+  --color-secondary-content: #06121f;
+  --color-accent: #3fa34d;         /* 翡翠绿 */
+  --color-accent-content: #06160a;
+  --color-neutral: #2c2438;
+  --color-neutral-content: #f5e6c8;
+
+  --color-info: #4aa3d8;
+  --color-info-content: #04141f;
+  --color-success: #4fb05a;
+  --color-success-content: #04160a;
+  --color-warning: #e89b2c;
+  --color-warning-content: #251603;
+  --color-error: #d23b3b;
+  --color-error-content: #210505;
+
+  /* 像素风 = 直角，不要圆角 */
+  --radius-selector: 0rem;
+  --radius-field: 0rem;
+  --radius-box: 0rem;
+
+  --border: 2px;
+}
+
+/* ── 基础排版 / 背景 ─────────────────────────────────────────── */
+:root {
+  --pixel-ink: #140d1c;            /* 描边/阴影的深色 */
+  --pixel-light: rgba(255, 255, 255, 0.14);
+  --pixel-dark: rgba(0, 0, 0, 0.30);
+}
+
+html,
+body {
+  font-family: "Pixelify Sans", ui-monospace, monospace;
+  /* 棋盘格暗纹背景，像战旗桌面 */
+  background-color: #15101f;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 16px 16px;
+  letter-spacing: 0.3px;
+}
+
 #root {
-    height: 100vh;
-    width: 100vw;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* 大字横幅时刻用的展示字体（倒计时 / VICTORY 等） */
+.font-display {
+  font-family: "Press Start 2P", "Pixelify Sans", monospace;
+  letter-spacing: 1px;
+  line-height: 1.4;
+}
+
+/* 头像/像素素材保持硬边缩放（不模糊） */
+.pixel-img {
+  image-rendering: pixelated;
+}
+
+/* ── 像素描边工具类 ─────────────────────────────────────────── */
+/* 面板：直角 + 双色内阴影制造"凸起"的 16-bit 板子感 */
+.pixel-border {
+  border: 3px solid var(--pixel-ink);
+  border-radius: 0 !important;
+  box-shadow:
+    inset 3px 3px 0 0 var(--pixel-light),
+    inset -3px -3px 0 0 var(--pixel-dark);
+}
+
+/* 按钮：底部硬阴影，按下时整体下沉 4px（街机按键手感） */
+.pixel-btn {
+  border: 3px solid var(--pixel-ink) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 4px 0 0 var(--pixel-ink);
+  text-shadow: 1px 1px 0 var(--pixel-dark);
+  transition: transform 0.04s steps(1), box-shadow 0.04s steps(1), filter 0.1s;
+}
+.pixel-btn:hover {
+  filter: brightness(1.1);
+}
+.pixel-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 0 var(--pixel-ink);
+}
+.pixel-btn:disabled {
+  filter: grayscale(0.6) brightness(0.7);
+}
+
+/* ── Juice 关键帧 ───────────────────────────────────────────── */
+@keyframes pixel-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-4px, 2px); }
+  40% { transform: translate(4px, -2px); }
+  60% { transform: translate(-3px, -2px); }
+  80% { transform: translate(3px, 2px); }
+}
+.animate-shake { animation: pixel-shake 0.4s steps(2) 1; }
+
+@keyframes countdown-pop {
+  0% { transform: scale(0.2); opacity: 0; }
+  35% { transform: scale(1.15); opacity: 1; }
+  70% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.animate-countdown { animation: countdown-pop 1s steps(8) 1; }
+
+@keyframes banner-slam {
+  0% { transform: translateY(-40px) scale(1.4); opacity: 0; }
+  50% { transform: translateY(0) scale(1); opacity: 1; }
+  60% { transform: translateY(0) scale(1.05); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.animate-slam { animation: banner-slam 0.5s steps(6) 1; }
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(540deg); opacity: 1; }
 }

@@ -11,7 +11,7 @@ const SIZE_CLASS = { xs: "select-xs", sm: "select-sm", md: "" } as const;
 export const Select: Component<SelectProps> = (props) => {
   const [local, rest] = splitProps(props, ["size", "bordered", "class", "children"]);
   const cls = () =>
-    ["select", SIZE_CLASS[local.size ?? "md"], local.bordered ? "select-bordered" : "", local.class ?? ""]
+    ["select pixel-border", SIZE_CLASS[local.size ?? "md"], local.bordered ? "select-bordered" : "", local.class ?? ""]
       .filter(Boolean)
       .join(" ");
   return <select {...rest} class={cls()}>{local.children}</select>;

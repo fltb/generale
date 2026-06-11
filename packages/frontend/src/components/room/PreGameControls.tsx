@@ -1,5 +1,5 @@
 import { type Component, Show } from "solid-js";
-import { Button } from "~/ui";
+import { Button, sfx } from "~/ui";
 
 export interface PreGameControlsProps {
   started: boolean;
@@ -17,8 +17,11 @@ export const PreGameControls: Component<PreGameControlsProps> = (props) => {
       <div class="flex gap-3">
         <Show when={!props.isHost}>
           <Button
+            silent
             variant={props.ready ? "success" : "primary"}
             onClick={() => {
+              // 准备/取消准备各有专属音效
+              if (props.ready) sfx.unready(); else sfx.ready();
               // 交由父组件处理切换（父组件会 dispatch READY/UNREADY）
               props.onReadyToggle(!props.ready);
             }}

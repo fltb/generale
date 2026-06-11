@@ -8,7 +8,7 @@ export interface CardProps extends JSX.HTMLAttributes<HTMLDivElement> {}
 
 export const Card: Component<CardProps> = (props) => {
   const [local, rest] = splitProps(props, ["class"]);
-  return <div {...rest} class={["card", local.class ?? ""].filter(Boolean).join(" ")} />;
+  return <div {...rest} class={["card pixel-border", local.class ?? ""].filter(Boolean).join(" ")} />;
 };
 
 export default Card;
