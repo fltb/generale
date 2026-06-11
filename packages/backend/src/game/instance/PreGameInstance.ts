@@ -415,9 +415,10 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
 
   /** 切换队伍模式（仅房主）
    *
-   * - team → ffa：拆队 —— 把每个玩家分到一支独占的新队伍，旧 teams 数组重建
-   * - ffa → team：当前布局保留下来（每人一支队），房主可以再用 RENAME_TEAM / 把别人 CHANGE_TEAM
-   *               过来组队。MIN_TEAMS=2 已经成立（只要至少有 2 玩家），不需要补
+   * - team → ffa：拆队 —— 每人一支独占队伍
+   * - ffa → team：合并到 2 支队（Team 1 / Team 2），玩家**交替**分配。
+   *   这样房主点一下切换就能立刻 1v1 / 2v2 / 3v3 开打，不需要再手动建队删队。
+   *   想细调队伍分布的话用 CHANGE_TEAM。
    * - 相同 → 相同：no-op
    */
   private changeTeamMode(pid: PlayerId, next: PreGameTeamMode) {
@@ -440,8 +441,19 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       }
       this.state.teams = newTeams;
       this.state.teamCount = newTeams.length;
+    } else {
+      // ffa → team：建 2 支默认队伍，玩家按索引奇偶交替分配
+      const teamA: TeamId = this.createTeamId();
+      const teamB: TeamId = this.createTeamId();
+      this.state.teams = [
+        { id: teamA, name: "Team 1" },
+        { id: teamB, name: "Team 2" },
+      ];
+      this.state.teamCount = 2;
+      this.state.players.forEach((p, idx) => {
+        p.teamId = idx % 2 === 0 ? teamA : teamB;
+      });
     }
-    // ffa→team：当前每人一支独占队的状态保留，让房主自由编辑
 
     this.state.teamMode = next;
   }
