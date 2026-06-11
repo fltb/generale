@@ -8,18 +8,10 @@ import {
 import * as P from "solid-pixi";
 import * as PIXI from "pixi.js";
 import type { Coordinates, Tile, SyncedGameState } from "@generale/types";
-import { TileType, PlayerColor } from "@generale/types";
-
-/** 把 tileColor 可能的 number / string（历史 enum 名）统一映射成数字色 */
-function normalizeTileColor(c: number | string | undefined): number {
-  if (typeof c === "number") return c;
-  if (typeof c === "string") {
-    const num = (PlayerColor as any)[c];
-    if (typeof num === "number") return num;
-  }
-  return 0xffffff;
-}
+import { TileType } from "@generale/types";
+import { tileColorNumber } from "~/utils/playerColor";
 import { type FaIconKey, createScaledFaIcon } from "~/utils/faIconGraphic";
+import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
 
 export interface MapTileProps {
   coord: Coordinates;
@@ -36,10 +28,10 @@ export const MapTile: Component<MapTileProps> = (props) => {
 
   const tileColor = createMemo(() =>
     props.tile.type === TileType.Fog
-      ? 0x444444
+      ? DEFAULT_TILE_THEME.colors.fog
       : (props.tile.ownerId
-          ? normalizeTileColor(props.playerDisplay[props.tile.ownerId]?.tileColor as any)
-          : 0xffffff)
+          ? tileColorNumber(props.playerDisplay[props.tile.ownerId]?.tileColor as any)
+          : DEFAULT_TILE_THEME.colors.unowned)
   );
 
   // 选出对应的 FaIconKey
@@ -71,7 +63,7 @@ export const MapTile: Component<MapTileProps> = (props) => {
     const color = tileColor();
     graphics.clear();
     graphics.rect(0, 0, size, size).fill({ color });
-    graphics.stroke({ width: 1, color: 0x000000, alpha: 0.15 });
+    graphics.stroke({ width: 1, color: DEFAULT_TILE_THEME.colors.gridStroke, alpha: DEFAULT_TILE_THEME.colors.gridStrokeAlpha });
   });
 
   // 图标绘制（防御性：clear + removeChildren）
@@ -90,7 +82,7 @@ export const MapTile: Component<MapTileProps> = (props) => {
 
     if (key) {
       const iconSize = Math.round(props.size * 0.6);
-      const scaledIcon = createScaledFaIcon(key, iconSize, 0xff0000);
+      const scaledIcon = createScaledFaIcon(key, iconSize, DEFAULT_TILE_THEME.colors.tileIcon);
       
       // 设置位置到瓦片中心
       scaledIcon.x = props.size / 2;

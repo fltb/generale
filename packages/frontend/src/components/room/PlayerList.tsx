@@ -1,7 +1,9 @@
-import { type PreGamePlayerInfo, type TeamInfo, type PreGameTeamMode, PreGamePlayerStatus, PlayerColor } from "@generale/types";
+import { type PreGamePlayerInfo, type TeamInfo, type PreGameTeamMode, PreGamePlayerStatus } from "@generale/types";
 import { type Component, For, Show, createMemo, createSignal } from "solid-js";
 import { A } from "@solidjs/router";
 import Avatar from "~/components/Avatar";
+import { playerColorCss } from "~/utils/playerColor";
+import { Button, Badge, confirmDialog, alertDialog } from "~/ui";
 
 /**
  * PlayerListProps
@@ -34,17 +36,6 @@ export interface PlayerListProps {
   onRenameTeam?: (teamId: string, name: string) => void;
   onDeleteTeam?: (teamId: string) => void;
 }
-
-/* ---------------------- 小工具 ---------------------- */
-// 兼容旧数据：服务端历史 bug 曾把 PlayerColor 的 enum 字符串名（如 "DarkSlateGray"）
-// 当作 tileColor 落库；这里支持 string|number，string 就反查到对应数字。
-const colorHex = (c: number | string | undefined): string => {
-  if (c == null) return "#cccccc";
-  if (typeof c === "number") return `#${c.toString(16).padStart(6, "0")}`;
-  const num = (PlayerColor as any)[c];
-  if (typeof num === "number") return `#${num.toString(16).padStart(6, "0")}`;
-  return "#cccccc";
-};
 
 /* ---------------------- PlayerCard 子组件 ---------------------- */
 const PlayerCard: Component<{
@@ -87,13 +78,13 @@ const PlayerCard: Component<{
               {p().displayName ?? p().name}
             </A>
             <Show when={p().isHost}>
-              <span class="badge text-xs ml-1">Host</span>
+              <Badge class="text-xs ml-1">Host</Badge>
             </Show>
             <Show when={p().status === PreGamePlayerStatus.Playing}>
-              <span class="badge badge-info text-xs">游戏中</span>
+              <Badge variant="info" class="text-xs">游戏中</Badge>
             </Show>
             <Show when={p().status === PreGamePlayerStatus.Disconnected}>
-              <span class="badge badge-warning text-xs">离线</span>
+              <Badge variant="warning" class="text-xs">离线</Badge>
             </Show>
           </div>
 
@@ -107,7 +98,7 @@ const PlayerCard: Component<{
 
         <div
           class="w-5 h-5 rounded ml-2 border shrink-0"
-          style={{ "background-color": colorHex(p().tileColor as any) }}
+          style={{ "background-color": playerColorCss(p().tileColor as any) }}
         />
       </div>
 
@@ -121,12 +112,15 @@ const PlayerCard: Component<{
           </div>
 
           <Show when={isSelf()}>
-            <button
-              class={`btn btn-xs mt-1 ${p().ready === 1 ? "btn-success" : "btn-outline"}`}
+            <Button
+              size="xs"
+              class="mt-1"
+              variant={p().ready === 1 ? "success" : "neutral"}
+              outline={p().ready !== 1}
               onClick={() => props.onToggleReady(p().id, p().ready !== 1)}
             >
               {p().ready === 1 ? "取消准备" : "准备"}
-            </button>
+            </Button>
           </Show>
         </div>
 
@@ -135,23 +129,25 @@ const PlayerCard: Component<{
           <div class="flex flex-col gap-1 ml-2 items-end">
             <div class="flex gap-1">
               <Show when={props.onTransferHost}>
-                <button
-                  class="btn btn-xs btn-warning"
+                <Button
+                  size="xs"
+                  variant="warning"
                   onClick={() => props.onTransferHost?.(p().id)}
                 >
                   设为房主
-                </button>
+                </Button>
               </Show>
 
               <Show when={props.onKick}>
-                <button
-                  class="btn btn-xs btn-error"
+                <Button
+                  size="xs"
+                  variant="error"
                   disabled={p().status !== PreGamePlayerStatus.Lobby}
                   title={p().status !== PreGamePlayerStatus.Lobby ? "游戏中无法踢出该玩家" : "踢出该玩家"}
                   onClick={() => props.onKick?.(p().id)}
                 >
                   踢出
-                </button>
+                </Button>
               </Show>
             </div>
 
@@ -191,8 +187,6 @@ const TeamGroup: Component<{
     // 逻辑调整：
     // - 普通玩家点击 header -> 加入该队（onChangeTeam(undefined, id)）
     // - 房主点击 header -> 也把自己加入该队（快速切换）。房主管理（重命名/删除）请使用右侧按钮。
-    const isHost = gp.props.selfId === gp.props.hostId;
-
     if (gp.team) {
       if (gp.props.onChangeTeam) {
         // 将自己加入该队（如果 host 也会用同一行为）
@@ -222,10 +216,10 @@ const TeamGroup: Component<{
     // local safety: only allow delete if no members (client-side)
     if ((gp.members?.length ?? 0) > 0) {
       // UI-level guard; server is authoritative.
-      alert("队伍非空，无法删除（请先移除队员或将其分配到其他队）");
+      alertDialog("队伍非空，无法删除（请先移除队员或将其分配到其他队）");
       return;
     }
-    if (confirm(`确定删除队伍 "${gp.team.name ?? gp.team.id}" 吗？`)) {
+    if (confirmDialog(`确定删除队伍 "${gp.team.name ?? gp.team.id}" 吗？`)) {
       gp.props.onDeleteTeam(gp.team.id);
     }
   };
@@ -253,13 +247,13 @@ const TeamGroup: Component<{
               value={editName()}
               onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
             />
-            <button class="btn btn-xs" onClick={submitRename}>保存</button>
-            <button class="btn btn-xs btn-ghost" onClick={() => setEditing(false)}>取消</button>
+            <Button size="xs" onClick={submitRename}>保存</Button>
+            <Button size="xs" variant="ghost" onClick={() => setEditing(false)}>取消</Button>
           </Show>
 
           <Show when={!editing() && (gp.props.selfId === gp.props.hostId)}>
-            <button class="btn btn-xs" onClick={() => setEditing(true)}>重命名</button>
-            <button class="btn btn-xs btn-error" onClick={tryDelete}>删除</button>
+            <Button size="xs" onClick={() => setEditing(true)}>重命名</Button>
+            <Button size="xs" variant="error" onClick={tryDelete}>删除</Button>
           </Show>
         </div>
       </div>
@@ -324,7 +318,7 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
   const createTeam = () => {
     const name = (newTeamName() ?? "").trim();
     if (!name) {
-      alert("请输入队伍名");
+      alertDialog("请输入队伍名");
       return;
     }
     props.onCreateTeam?.(name);
@@ -343,7 +337,7 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
             value={newTeamName()}
             onInput={(e) => setNewTeamName((e.target as HTMLInputElement).value)}
           />
-          <button class="btn btn-sm" onClick={createTeam}>新建队伍并加入</button>
+          <Button size="sm" onClick={createTeam}>新建队伍并加入</Button>
         </div>
       </Show>
 

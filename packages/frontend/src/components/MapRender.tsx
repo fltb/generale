@@ -1,4 +1,4 @@
-import { For, Show, createMemo, createSignal, createEffect, type Component, onMount, onCleanup } from "solid-js";
+import { For, createMemo, createSignal, createEffect, type Component } from "solid-js";
 import * as P from "solid-pixi";
 import * as PIXI from "pixi.js";
 
@@ -7,6 +7,8 @@ import { PlayerOperationType, TileType } from "@generale/types";
 
 import { MapTile } from "./MapTile";
 import { type FaIconKey, createScaledFaIcon } from "~/utils/faIconGraphic";
+import { DEFAULT_TILE_THEME, DIRECTION_ICON } from "~/game/render/tileTheme";
+import { useMapInput } from "~/game/render/useMapInput";
 
 export interface MapRenderProps {
   state: SyncedGameState;
@@ -18,23 +20,7 @@ export interface MapRenderProps {
   onClearQueue?: () => void;
 }
 
-const ICON_MAP = {
-  right: "faArrowRight",
-  left: "faArrowLeft",
-  up: "faArrowUp",
-  down: "faArrowDown",
-} as const;
-
-type DirectionKey = keyof typeof ICON_MAP;
-
-const TILE_ICON_MAP: Record<TileType, FaIconKey | null> = {
-  [TileType.Plain]: null,
-  [TileType.Fog]: null,
-  [TileType.Throne]: "faCrown",
-  [TileType.Barracks]: "faHelmetSafety",
-  [TileType.Mountain]: "faMountain",
-  [TileType.Swamp]: "faWater",
-};
+type DirectionKey = keyof typeof DIRECTION_ICON;
 
 const OperationArrow: Component<{
   op: PlayerOperation;
@@ -81,7 +67,7 @@ const OperationArrow: Component<{
     }
 
     const arrowSize = Math.min(24, props.size * 0.4);
-    const arrow = createScaledFaIcon(ICON_MAP[dir], arrowSize, 0x222222);
+    const arrow = createScaledFaIcon(DIRECTION_ICON[dir], arrowSize, DEFAULT_TILE_THEME.colors.arrow);
 
     const mx = (sx + ex) / 2;
     const my = (sy + ey) / 2;
@@ -104,38 +90,20 @@ const OperationArrow: Component<{
 };
 
 export const MapRender: Component<MapRenderProps> = (props) => {
-  const TILE_SIZE = 36;
+  const TILE_SIZE = DEFAULT_TILE_THEME.tileSize;
   const map = createMemo(() => props.state?.map ?? { width: 0, height: 0, tiles: [] });
-  const iconTextures = createMemo<Record<TileType, FaIconKey | null>>(() => TILE_ICON_MAP);
+  const iconTextures = createMemo<Record<TileType, FaIconKey | null>>(() => DEFAULT_TILE_THEME.tileIcon);
 
-  // active cursor。默认 (1,1) 只是占位，下面的 effect 会在拿到自己的 throne 后覆盖。
-  const [active, setActive] = createSignal<Coordinates | null>({ x: 1, y: 1 });
-  const [gCursor, setGCursor] = createSignal<PIXI.Graphics | undefined>(undefined);
-
-  // 自动定位 cursor 到自己 throne：第一次扫到属于 selfId 的 throne 就置位，置位后不再覆盖
-  // （用户随后点击 / 方向键移动的位置由 active signal 自己管，不应该被 state 更新拽回）。
-  // spectator 没有 selfId 或地图里没有自己的 throne 时不做事，保持默认。
-  const [cursorInitialized, setCursorInitialized] = createSignal(false);
-  createEffect(() => {
-    if (cursorInitialized()) return;
-    const id = props.selfId;
-    if (!id) return;
-    const m = map();
-    const tiles = m?.tiles;
-    if (!tiles || tiles.length === 0) return;
-    for (let y = 0; y < m.height; y++) {
-      const row = tiles[y];
-      if (!row) continue;
-      for (let x = 0; x < m.width; x++) {
-        const tile = row[x];
-        if (tile && tile.type === TileType.Throne && tile.ownerId === id) {
-          setActive({ x, y });
-          setCursorInitialized(true);
-          return;
-        }
-      }
-    }
+  // 输入逻辑（cursor active、点击选格、键盘移动）下沉到 useMapInput
+  const input = useMapInput({
+    map,
+    selfId: () => props.selfId,
+    onOperationQueued: props.onOperationQueued,
+    onClearQueue: props.onClearQueue,
   });
+  const active = input.active;
+
+  const [gCursor, setGCursor] = createSignal<PIXI.Graphics | undefined>(undefined);
 
   createEffect(() => {
     const graphics = gCursor();
@@ -160,88 +128,11 @@ export const MapRender: Component<MapRenderProps> = (props) => {
 
     graphics
       .rect(pad / 2, pad / 2, TILE_SIZE - pad, TILE_SIZE - pad)
-      .stroke({ width: 3, color: 0xffd34d, alpha: 0.95 });
+      .stroke({ width: 3, color: DEFAULT_TILE_THEME.colors.cursor, alpha: 0.95 });
 
     graphics
       .rect(pad / 2, pad / 2, TILE_SIZE - pad, TILE_SIZE - pad)
-      .stroke({ width: 6, color: 0xffd34d, alpha: 0.12 });
-  });
-
-  // 检查坐标是否在地图范围内
-  const inBounds = (c: Coordinates) =>
-    c.x >= 0 && c.y >= 0 && c.x < (map()?.width ?? 0) && c.y < (map()?.height ?? 0);
-
-  // 点击格子回调（MapTile 会调用）
-  const handleTileClick = (coord: Coordinates) => {
-    const cur = active();
-    if (cur && cur.x === coord.x && cur.y === coord.y) {
-      setActive(null);
-    } else {
-      setActive(coord);
-    }
-  };
-
-  // 将移动指令通过回调上报给宿主（MapRender 不再存 localOps）
-  const enqueueMove = (from: Coordinates, to: Coordinates, percentage = 100) => {
-    if (!inBounds(to)) return;
-    const op: PlayerOperation = {
-      type: PlayerOperationType.Move,
-      payload: { from, to, percentage },
-    } as any;
-    props.onOperationQueued?.(op);
-  };
-
-  // 键盘控制：方向键/WASD 移动；c 清空操作队列
-  onMount(() => {
-    const handler = (e: KeyboardEvent) => {
-      // 'c' 不依赖 active，单独处理
-      if (e.key === "c" || e.key === "C") {
-        e.preventDefault();
-        props.onClearQueue?.();
-        return;
-      }
-
-      const a = active();
-      if (!a) return;
-
-      let dx = 0;
-      let dy = 0;
-      switch (e.key) {
-        case "ArrowUp":
-        case "w":
-        case "W":
-          dy = -1;
-          break;
-        case "ArrowDown":
-        case "s":
-        case "S":
-          dy = 1;
-          break;
-        case "ArrowLeft":
-        case "a":
-        case "A":
-          dx = -1;
-          break;
-        case "ArrowRight":
-        case "d":
-        case "D":
-          dx = 1;
-          break;
-        default:
-          return;
-      }
-
-      e.preventDefault();
-
-      const target = { x: a.x + dx, y: a.y + dy };
-      if (!inBounds(target)) return;
-
-      enqueueMove(a, target, 100);
-      setActive(target);
-    };
-
-    window.addEventListener("keydown", handler);
-    onCleanup(() => window.removeEventListener("keydown", handler));
+      .stroke({ width: 6, color: DEFAULT_TILE_THEME.colors.cursor, alpha: 0.12 });
   });
 
   const offsetX = 0;
@@ -264,7 +155,7 @@ export const MapRender: Component<MapRenderProps> = (props) => {
                     size={TILE_SIZE}
                     playerDisplay={props.state.playerDisplay}
                     iconTextures={iconTextures()}
-                    onClick={handleTileClick}
+                    onClick={input.handleTileClick}
                   />
                 );
               }}

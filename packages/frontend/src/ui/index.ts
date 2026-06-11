@@ -1,0 +1,15 @@
+/**
+ * UI primitives 桶文件。
+ *
+ * 业务组件统一从 `~/ui` 导入视觉组件，使所有视觉类名收口到 src/ui。
+ * 将来切像素风时只需重写 src/ui/* 内部实现 + theme.ts，业务组件无需改动。
+ */
+export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from "./Button";
+export { Card, type CardProps } from "./Card";
+export { Panel, type PanelProps, type PanelTone } from "./Panel";
+export { Badge, type BadgeProps, type BadgeVariant } from "./Badge";
+export { Alert, type AlertProps, type AlertVariant } from "./Alert";
+export { Spinner, type SpinnerProps } from "./Spinner";
+export { Overlay, TakeoverOverlay, type OverlayProps, type TakeoverOverlayProps } from "./Overlay";
+export { confirmDialog, alertDialog } from "./dialogs";
+export { uiTheme, type UiTheme } from "./theme";

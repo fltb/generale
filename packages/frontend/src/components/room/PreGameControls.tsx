@@ -1,4 +1,5 @@
 import { type Component, Show } from "solid-js";
+import { Button } from "~/ui";
 
 export interface PreGameControlsProps {
   started: boolean;
@@ -15,8 +16,8 @@ export const PreGameControls: Component<PreGameControlsProps> = (props) => {
     <div class="space-y-3">
       <div class="flex gap-3">
         <Show when={!props.isHost}>
-          <button
-            class={`btn ${props.ready ? 'btn-success' : 'btn-primary'}`}
+          <Button
+            variant={props.ready ? "success" : "primary"}
             onClick={() => {
               // 交由父组件处理切换（父组件会 dispatch READY/UNREADY）
               props.onReadyToggle(!props.ready);
@@ -25,23 +26,23 @@ export const PreGameControls: Component<PreGameControlsProps> = (props) => {
             title={props.started ? "游戏已开始，无法改变准备" : (props.ready ? "取消准备" : "准备")}
           >
             {props.ready ? '取消准备' : '准备'}
-          </button>
+          </Button>
         </Show>
 
         <Show when={props.isHost}>
-          <button
-            class="btn btn-accent"
+          <Button
+            variant="accent"
             onClick={() => props.onStartGame?.()}
             disabled={props.started}
           >
             开始游戏
-          </button>
+          </Button>
         </Show>
 
-        <button class="btn btn-ghost" onClick={() => props.onLeave?.()}>离开房间</button>
+        <Button variant="ghost" onClick={() => props.onLeave?.()}>离开房间</Button>
 
         <Show when={props.isHost}>
-          <button class="btn btn-error" onClick={() => props.onDisband?.()}>解散房间</button>
+          <Button variant="error" onClick={() => props.onDisband?.()}>解散房间</Button>
         </Show>
       </div>
     </div>
