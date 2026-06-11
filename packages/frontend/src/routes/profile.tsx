@@ -262,6 +262,16 @@ export default function ProfilePage() {
             {/* ---------- 改密码 ---------- */}
             <section class="card bg-base-200 p-4 space-y-3">
               <h2 class="text-lg font-semibold">修改密码</h2>
+              {/* 隐藏的 username 输入：让浏览器密码管理器把新密码关联到 username（兜底 email），
+                  而不是 displayName 这种可变字段。display:none 不影响 autofill 抓取。 */}
+              <input
+                type="text"
+                class="hidden"
+                autocomplete="username"
+                readonly
+                tabIndex={-1}
+                value={auth.user?.username ?? auth.user?.email ?? ""}
+              />
               <input
                 type="password"
                 class="input input-bordered w-full"

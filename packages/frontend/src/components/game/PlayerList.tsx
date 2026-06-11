@@ -1,8 +1,16 @@
 import { type Component, For, createMemo } from "solid-js";
-import type { SyncedGameState, PlayerId } from "@generale/types";
+import { A } from "@solidjs/router";
+import { type SyncedGameState, type PlayerId, PlayerColor } from "@generale/types";
+import Avatar from "~/components/Avatar";
 
-const colorHex = (c: number | undefined) =>
-  c == null ? "#cccccc" : `#${c.toString(16).padStart(6, "0")}`;
+// 兼容历史 bug 落库的字符串 enum 名（如 "DarkSlateGray"）
+const colorHex = (c: number | string | undefined): string => {
+  if (c == null) return "#cccccc";
+  if (typeof c === "number") return `#${c.toString(16).padStart(6, "0")}`;
+  const num = (PlayerColor as any)[c];
+  if (typeof num === "number") return `#${num.toString(16).padStart(6, "0")}`;
+  return "#cccccc";
+};
 
 type Props = {
   state: () => SyncedGameState;
@@ -39,14 +47,17 @@ export const PlayerList: Component<Props> = (props) => {
     // 2. 构造 summary 数组
     const arr = Object.values(players).map((p) => {
       const id = p.id;
-      const name = playerDisplay[p.id]?.name;
+      const display = playerDisplay[id];
+      const name = display?.name;
 
-      const colorNum = playerDisplay[id].tileColor;
+      const colorNum = display?.tileColor;
       const colorCss = colorHex(colorNum);
 
       return {
         id,
         name,
+        displayName: display?.displayName,
+        avatarThumbUrl: display?.avatarThumbUrl,
         army: p.army ?? 0,
         land: landCounts[id] ?? 0,
         status: p.status,
@@ -72,8 +83,10 @@ export const PlayerList: Component<Props> = (props) => {
           {(p) => (
             <div class="flex items-center justify-between gap-3 p-2 rounded border border-base-300 bg-base-100">
               <div class="flex items-center gap-3">
+                {/* 颜色色块（地图上的玩家颜色） */}
                 <div
                   title={p.id}
+                  class="shrink-0"
                   style={{
                     width: "14px",
                     height: "14px",
@@ -82,8 +95,20 @@ export const PlayerList: Component<Props> = (props) => {
                     "box-shadow": "inset 0 0 0 1px rgba(0,0,0,0.2)",
                   }}
                 />
+                {/* 头像，点击查看 profile */}
+                <A
+                  href={`/profile/${p.id}`}
+                  class="shrink-0"
+                  title={p.displayName ?? p.name}
+                >
+                  <Avatar
+                    src={p.avatarThumbUrl ?? "/api/avatars/default/thumb.webp"}
+                    size={28}
+                    alt={p.displayName ?? p.name}
+                  />
+                </A>
                 <div>
-                  <div class="text-sm font-medium">{p.name}</div>
+                  <div class="text-sm font-medium">{p.displayName ?? p.name}</div>
                   <div class="text-xs opacity-60">
                     land: {p.land} · army: {p.army}
                   </div>

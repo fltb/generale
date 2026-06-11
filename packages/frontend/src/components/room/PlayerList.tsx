@@ -1,5 +1,7 @@
-import { type PreGamePlayerInfo, type TeamInfo, type PreGameTeamMode, PreGamePlayerStatus } from "@generale/types";
+import { type PreGamePlayerInfo, type TeamInfo, type PreGameTeamMode, PreGamePlayerStatus, PlayerColor } from "@generale/types";
 import { type Component, For, Show, createMemo, createSignal } from "solid-js";
+import { A } from "@solidjs/router";
+import Avatar from "~/components/Avatar";
 
 /**
  * PlayerListProps
@@ -34,8 +36,15 @@ export interface PlayerListProps {
 }
 
 /* ---------------------- 小工具 ---------------------- */
-const colorHex = (c: number | undefined) =>
-  c == null ? "#cccccc" : `#${c.toString(16).padStart(6, "0")}`;
+// 兼容旧数据：服务端历史 bug 曾把 PlayerColor 的 enum 字符串名（如 "DarkSlateGray"）
+// 当作 tileColor 落库；这里支持 string|number，string 就反查到对应数字。
+const colorHex = (c: number | string | undefined): string => {
+  if (c == null) return "#cccccc";
+  if (typeof c === "number") return `#${c.toString(16).padStart(6, "0")}`;
+  const num = (PlayerColor as any)[c];
+  if (typeof num === "number") return `#${num.toString(16).padStart(6, "0")}`;
+  return "#cccccc";
+};
 
 /* ---------------------- PlayerCard 子组件 ---------------------- */
 const PlayerCard: Component<{
@@ -59,13 +68,24 @@ const PlayerCard: Component<{
     <div class="flex items-center justify-between p-3 bg-base-200 rounded shadow-sm w-full sm:w-1/2 md:w-1/3 lg:w-1/4">
       {/* Left: avatar + info */}
       <div class="flex items-center gap-3 overflow-hidden">
-        <div class="w-10 h-10 rounded-full bg-primary text-base-100 flex items-center justify-center shrink-0">
-          {p().name?.slice(0, 1).toUpperCase() ?? "?"}
-        </div>
+        {/* 头像点开可查看该玩家公开 profile。颜色识别交给右侧独立色块。 */}
+        <A
+          href={`/profile/${p().id}`}
+          title={`查看 ${p().displayName ?? p().name} 的资料`}
+          class="shrink-0"
+        >
+          <Avatar
+            src={p().avatarThumbUrl ?? "/api/avatars/default/thumb.webp"}
+            size={40}
+            alt={p().displayName ?? p().name}
+          />
+        </A>
 
         <div class="flex flex-col min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
-            <div class="truncate font-medium">{p().name}</div>
+            <A href={`/profile/${p().id}`} class="truncate font-medium hover:underline">
+              {p().displayName ?? p().name}
+            </A>
             <Show when={p().isHost}>
               <span class="badge text-xs ml-1">Host</span>
             </Show>
@@ -77,8 +97,11 @@ const PlayerCard: Component<{
             </Show>
           </div>
 
+          {/* displayName 存在时把 username 也露一下，否则显示 id 兜底 */}
           <div class="text-xs opacity-60 truncate">
-            id: {p().id}
+            <Show when={p().displayName} fallback={<>id: {p().id}</>}>
+              @{p().name}
+            </Show>
           </div>
         </div>
 

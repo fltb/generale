@@ -1,5 +1,5 @@
 import { db } from '../db/client'
-import { users } from '../db/schema'
+import { users, profiles } from '../db/schema'
 import { verificationTokens } from '../db/schema' // 用于删除 token
 import { randomBytes, pbkdf2Sync, timingSafeEqual } from 'crypto'
 import { randomUUID } from 'crypto'
@@ -55,6 +55,15 @@ export class UserService {
       verified: false,
       createdAt: now,
       updatedAt: now
+    }).run()
+
+    // 顺手建一行 profile，displayName 默认 = username。
+    // 这样新用户一注册就有 displayName，下游全链路（/me、WS context、PlayerList）
+    // 直接拿到字符串值，不用再做 "?? username" 兜底。
+    db.insert(profiles).values({
+      userId: id,
+      displayName: username,
+      updatedAt: now,
     }).run()
 
     return { id, username, email, password: hashedPassword, verified: false, createdAt: now, updatedAt: now }

@@ -2,6 +2,7 @@ import { Elysia } from "elysia"; // FIX: Removed unused 't' import
 import type { ServerSyncConnector } from '@generale/types/src/connection/conn-type';
 import { sessionService } from "../services/sessionService";
 import { userService } from "../services/userService";
+import { profileService } from "../services/profileService";
 
 
 
@@ -61,6 +62,10 @@ function extractSessionIdFromWsData(wsData: any): string | undefined {
 export interface WSContextBase {
   userid: string;   // always filled by backend
   username: string;
+  /** 用户在 profile 表里设的昵称；UI 优先用它，缺省 fallback 到 username */
+  displayName?: string;
+  /** profile 缩略头像 URL；用于 PlayerList 等小尺寸场景 */
+  avatarThumbUrl?: string;
 };
 
 export type WebSocketMessage<T = unknown, Context extends WSContextBase = WSContextBase> =
@@ -335,14 +340,24 @@ export const websocketPlugin = new Elysia()
       // session 有效，取出 userId
       const userId = session.userId;
 
-      // 尝试拉取 username（可选，但在 open payload 想发送 username 时有用）
+      // 拉 username + profile 信息（displayName / avatarThumbUrl），后续 domain handler
+      // 通过 connector.context 直接读，避免每次 addPlayer 都跑 DB。
+      // 任一失败都不阻塞连接，缺字段时 UI 会 fallback 到默认值。
       let username: string | undefined;
+      let displayName: string | undefined;
+      let avatarThumbUrl: string | undefined;
       try {
         const user = await userService.findById(userId);
         username = user?.username;
       } catch (err) {
-        // 如果查询 username 失败，不影响连接，保持 userId 可用
         console.warn("Failed to fetch username for websocket session:", err);
+      }
+      try {
+        const profile = await profileService.getProfile(userId);
+        displayName = profile?.displayName ?? undefined;
+        avatarThumbUrl = profile?.avatarThumbUrl ?? undefined;
+      } catch (err) {
+        console.warn("Failed to fetch profile for websocket session:", err);
       }
 
       // 填充 ws.data
@@ -359,7 +374,12 @@ export const websocketPlugin = new Elysia()
         wsData.manager = manager;
 
         // 使用 session info 填充 manager context（保持最新）
-        manager.setContext({ userid: userId, username: username || "no-name" });
+        manager.setContext({
+  userid: userId,
+  username: username || "no-name",
+  ...(displayName ? { displayName } : {}),
+  ...(avatarThumbUrl ? { avatarThumbUrl } : {}),
+});
         ws.send({ type: "reconnection_ack", payload: { success: true, connectionId } });
       } else {
         // 新连接
@@ -369,7 +389,12 @@ export const websocketPlugin = new Elysia()
         wsData.manager = manager;
         connectionManagers.set(connectionId, manager);
 
-        manager.setContext({ userid: userId, username: username || "no-name" });
+        manager.setContext({
+  userid: userId,
+  username: username || "no-name",
+  ...(displayName ? { displayName } : {}),
+  ...(avatarThumbUrl ? { avatarThumbUrl } : {}),
+});
         ws.send({ type: "connection_ack", payload: { connectionId } });
       }
 

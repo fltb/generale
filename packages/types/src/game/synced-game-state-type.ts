@@ -6,7 +6,9 @@ export interface SyncedGameState extends MaskedGameState {
     playerDisplay: {
         [k: PlayerId]: {
             tileColor: number; // hex color value
-            name: string; // player name to display
+            name: string; // username 兜底
+            displayName?: string; // profile 昵称
+            avatarThumbUrl?: string; // 缩略头像，用于游戏内 PlayerList
         }
     },
     playerOperationQueue: PlayerOperation[];

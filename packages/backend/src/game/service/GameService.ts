@@ -168,7 +168,15 @@ export class GameService {
       // 将玩家添加到 PreGameInstance
       if (this.preGameInstance) {
         console.debug(`[GameService]: Adding player: ${userid} ${username} to preGameInstance`)
-        const result = this.preGameInstance.addPlayer({ id: userid, name: username }, this.adaptToPregameConnector(connector));
+        const result = this.preGameInstance.addPlayer(
+          {
+            id: userid,
+            name: username,
+            ...(ctx.displayName ? { displayName: ctx.displayName } : {}),
+            ...(ctx.avatarThumbUrl ? { avatarThumbUrl: ctx.avatarThumbUrl } : {}),
+          },
+          this.adaptToPregameConnector(connector),
+        );
         if (!result.success) {
           connector.close(4003, result.message || 'Failed to add to pregame');
           return;
@@ -498,7 +506,12 @@ export class GameService {
     const gameInstanceSettings: GameInstanceSettings = {
       playerDisplay: preGameState.players.reduce(
         (acc, p) => {
-          acc[p.id] = { tileColor: p.tileColor, name: p.name };
+          acc[p.id] = {
+            tileColor: p.tileColor,
+            name: p.name,
+            ...(p.displayName ? { displayName: p.displayName } : {}),
+            ...(p.avatarThumbUrl ? { avatarThumbUrl: p.avatarThumbUrl } : {}),
+          };
           return acc;
         },
         {} as SyncedGameState["playerDisplay"]

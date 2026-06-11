@@ -93,7 +93,12 @@ export enum PreGamePlayerStatus {
 // 玩家房间信息（只保留房间阶段必需字段）
 export interface PreGamePlayerInfo {
   id: PlayerId;
+  /** 服务端从 user.username 拷过来，作为兜底显示名 */
   name: string;
+  /** 用户在 profile 里设的昵称（可选）；UI 优先展示这个 */
+  displayName?: string;
+  /** profile 缩略头像 URL，用于房间内 PlayerList */
+  avatarThumbUrl?: string;
   teamId: TeamId;
   isHost: boolean;
   ready: PreGamePlayerReadyState;

@@ -13,6 +13,7 @@ import LoginPage from "./routes/login";
 import { WebSocketProvider } from "./hooks/useWebsocket";
 import RoomRoute from "./routes/room";
 import ProfilePage from "./routes/profile";
+import PublicProfilePage from "./routes/profile-view";
 import ForgotPasswordPage from "./routes/forgot-password";
 import ResetPasswordPage from "./routes/reset-password";
 import ConfirmEmailChangePage from "./routes/confirm-email-change";
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="/test" component={Test} />
               <Route path="/login" component={LoginPage} />
               <Route path="/profile" component={ProfilePage} />
+              <Route path="/profile/:userId" component={PublicProfilePage} />
               <Route path="/forgot-password" component={ForgotPasswordPage} />
               <Route path="/reset-password" component={ResetPasswordPage} />
               <Route path="/verify-email" component={VerifyEmailPage} />

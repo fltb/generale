@@ -183,6 +183,7 @@ export default function LoginPage() {
                 value={regUsername()}
                 onInput={(e) => setRegUsername(e.currentTarget.value)}
                 class="input input-bordered"
+                autocomplete="username"
                 required
               />
               <input
@@ -191,6 +192,7 @@ export default function LoginPage() {
                 onInput={(e) => setRegEmail(e.currentTarget.value)}
                 class="input input-bordered"
                 type="email"
+                autocomplete="email"
                 required
               />
               <input
@@ -199,6 +201,7 @@ export default function LoginPage() {
                 value={regPassword()}
                 onInput={(e) => setRegPassword(e.currentTarget.value)}
                 class="input input-bordered"
+                autocomplete="new-password"
                 required
               />
               <button

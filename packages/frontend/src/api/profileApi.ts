@@ -7,9 +7,17 @@ import { api, ApiError } from "./base";
 import type {
   ProfileUpdateReqBody,
   AvatarUploadRespBody,
+  ProfileRespBody,
   ErrorResp,
   MessageResp,
 } from "@generale/types/dist/api";
+
+/** 公开 profile 查询：任意 userId 都能查（不返回 email 等敏感字段） */
+export function getProfileApi(userId: string): Promise<ProfileRespBody> {
+  return api<ProfileRespBody, ErrorResp>(`/api/profile/${encodeURIComponent(userId)}`, {
+    method: "GET",
+  });
+}
 
 export async function patchMyProfileApi(
   body: ProfileUpdateReqBody

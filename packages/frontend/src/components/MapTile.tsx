@@ -8,7 +8,17 @@ import {
 import * as P from "solid-pixi";
 import * as PIXI from "pixi.js";
 import type { Coordinates, Tile, SyncedGameState } from "@generale/types";
-import { TileType } from "@generale/types";
+import { TileType, PlayerColor } from "@generale/types";
+
+/** 把 tileColor 可能的 number / string（历史 enum 名）统一映射成数字色 */
+function normalizeTileColor(c: number | string | undefined): number {
+  if (typeof c === "number") return c;
+  if (typeof c === "string") {
+    const num = (PlayerColor as any)[c];
+    if (typeof num === "number") return num;
+  }
+  return 0xffffff;
+}
 import { type FaIconKey, createScaledFaIcon } from "~/utils/faIconGraphic";
 
 export interface MapTileProps {
@@ -28,7 +38,7 @@ export const MapTile: Component<MapTileProps> = (props) => {
     props.tile.type === TileType.Fog
       ? 0x444444
       : (props.tile.ownerId
-          ? (props.playerDisplay[props.tile.ownerId]?.tileColor ?? 0xffffff)
+          ? normalizeTileColor(props.playerDisplay[props.tile.ownerId]?.tileColor as any)
           : 0xffffff)
   );
 

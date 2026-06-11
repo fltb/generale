@@ -915,9 +915,15 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
   }
 
   private getAvailableTileColor(): PlayerColor {
+    // TS 的数字 enum 会被反向映射成"数字↔字符串"双向表：
+    //   Object.values(PlayerColor)  →  ["DarkSlateGray", ..., 0x2f4f4f, ...]
+    // 直接 find 会先命中字符串 key（"DarkSlateGray"），导致 tileColor 落库成字符串，
+    // 前端 colorHex 拼出 `#DarkSlateGray` 这种非法 CSS，浏览器 silently 丢掉。
+    // 必须过滤成纯数字数组。
     const usedColors = this.state.players.map(p => p.tileColor);
-    const color = Object.values(PlayerColor).find(color => !usedColors.includes(color as PlayerColor));
-    return color as PlayerColor;
+    const numericColors = Object.values(PlayerColor).filter(c => typeof c === 'number') as PlayerColor[];
+    const color = numericColors.find(c => !usedColors.includes(c));
+    return color ?? numericColors[0]!;
   }
 
   /** 主动销毁实例 */
@@ -1039,9 +1045,14 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     connector.onClose(() => this.handleDisconnect(pid, connector));
   }
   /** 动态添加玩家（用于 GameService） */
-  public addPlayer(user: { id: PlayerId, name: string }, connector: PreGameServerConnector): { success: true } | { success: false, message: string } {
+  public addPlayer(
+    user: { id: PlayerId; name: string; displayName?: string; avatarThumbUrl?: string },
+    connector: PreGameServerConnector,
+  ): { success: true } | { success: false, message: string } {
     const playerId = user.id;
     const playerName = user.name;
+    const displayName = user.displayName;
+    const avatarThumbUrl = user.avatarThumbUrl;
 
     const res = this.canJoin(playerId);
     if (!res.success) {
@@ -1049,13 +1060,12 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     }
 
     // —— 已存在玩家的二次接入：displacement 路径 ——
-    // 触发场景：
-    //   1) Disconnected 玩家重连（座位本来就给他留着的）
-    //   2) 新设备登录踢掉旧设备：旧 sub-connector 还活着，把槽位让给新 connector
-    //   3) 同一设备多 tab 同时连接（罕见，但语义保持一致：新接管）
     const existing = this.state.players.find(p => p.id === playerId);
     if (existing) {
       this.displaceConnector(playerId, connector);
+      // 顺手刷新可能在 profile 改动过的展示字段（用户改昵称 / 换头像后再次接入）
+      if (displayName !== undefined) existing.displayName = displayName;
+      if (avatarThumbUrl !== undefined) existing.avatarThumbUrl = avatarThumbUrl;
       if (existing.status === PreGamePlayerStatus.Disconnected) {
         existing.status = PreGamePlayerStatus.Playing;
       }
@@ -1094,6 +1104,8 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     this.state.players.push({
       id: playerId,
       name: playerName,
+      ...(displayName ? { displayName } : {}),
+      ...(avatarThumbUrl ? { avatarThumbUrl } : {}),
       isHost,
       ready: isHost ? 1 : 0,
       teamId: defaultTeamId!,
