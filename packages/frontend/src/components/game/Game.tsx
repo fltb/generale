@@ -56,6 +56,8 @@ export interface GameWithSyncProps {
 export const GameWithSync: Component<GameWithSyncProps> = (props) => {
     const [notice, setNotice] = createSignal<string | null>(null);
     const [gameEndedInfo, setGameEndedInfo] = createSignal<SyncedPreGameServerEventPayload | null>(null);
+    // 同 user 另一个 sub 接管了 game 域，本端不再权威；用 overlay 挡住交互
+    const [displaced, setDisplaced] = createSignal(false);
     const navigate = useNavigate();
 
     // minimal initial game state fallback (masked shape)
@@ -84,6 +86,11 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
                 case SyncedPreGameServerEventPayloadType.GAME_ENDED:
                     console.debug("[GameWithSync] Game ended");
                     setGameEndedInfo(evt);
+                    break;
+                case SyncedPreGameServerEventPayloadType.DISPLACED:
+                    // 另一个 sub 接管 game 域。本端 dispatch 也已不会被服务端处理；
+                    // 用 overlay 把整个游戏 UI 盖住，明确告知用户。
+                    setDisplaced(true);
                     break;
                 default:
                     props.onStateUpdate?.({ event: evt });
@@ -310,6 +317,18 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
                     />
                 </Application>
             </div>
+
+            {/* Displaced overlay：被同 user 另一个 sub 接管，盖整屏，不可关。
+                优先级高于 end-game overlay（虽然两者一般不会同时出现）。 */}
+            <Show when={displaced()}>
+                <div class="fixed inset-0 z-50 bg-black/70 flex flex-col items-center justify-center text-white px-6">
+                    <h1 class="text-3xl font-bold mb-3">该页面已被接管</h1>
+                    <p class="opacity-80 mb-4 text-center max-w-md">
+                        你的账号在另一个标签页或设备上打开了这个游戏，操作都将在那一边进行。
+                    </p>
+                    <p class="text-sm opacity-60">关掉这个页面或刷新可重新接管</p>
+                </div>
+            </Show>
 
             <Show when={gameEndedInfo()}>
                 {/* fixed + z-50：相对视口铺满，覆盖在房间组件、chat 浮窗等之上。

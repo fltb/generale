@@ -138,7 +138,14 @@ export enum SyncedPreGameServerEventPayloadType {
   DISBANDED = "disbanded",
   GAME_STARTED = "gamestarted",
   GAME_ENDED = "gameended",
-  START_REJECTED = "startrejected"
+  START_REJECTED = "startrejected",
+  /**
+   * 当前 sub-connector 被同 user 的另一个连接（另一个 tab / 另一台设备登录）替换。
+   * 服务端关旧 sub 之前会先发这条事件；客户端收到之后应：
+   *  - 提示"此页面已被另一个标签页/设备接管"
+   *  - 阻止本地继续触发 action（反正服务端也不会再处理该 sub 的 action）
+   */
+  DISPLACED = "displaced",
 }
 
 
@@ -167,12 +174,18 @@ export interface SyncedPreGameServerStartRejectedPayload {
   reason?: string;
 }
 
+export interface SyncedPreGameServerDisplacedPayload {
+  type: SyncedPreGameServerEventPayloadType.DISPLACED;
+  reason?: string;
+}
+
 export type SyncedPreGameServerEventPayload =
   | SyncedPreGameServerKickedPayload
   | SyncedPreGameServerDisbandedPayload
   | SyncedPreGameServerGameStartedPayload
   | SyncedPreGameServerGameEndedPayload
-  | SyncedPreGameServerStartRejectedPayload;
+  | SyncedPreGameServerStartRejectedPayload
+  | SyncedPreGameServerDisplacedPayload;
 
 export type SyncedPreGameServerEvent = SyncedStateServerEvent<SyncedPreGameState, SyncedPreGameServerEventPayload>
 

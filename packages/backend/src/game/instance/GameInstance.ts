@@ -161,8 +161,23 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
             return res;
         }
 
-        // set connector
+        // 关键：先把新 connector 写入 map，再 close 旧的。
+        // 顺序保证旧 connector.onClose 跑 removeConnector 时，map 里已经是新的，
+        // source guard (`this.connectors.get(pid) !== connector`) 会把它弹掉，
+        // 不会把刚接进来的新 connector 误删。
+        // 触发场景：用户在另一端重新登录，旧 game-* sub 还活着；新端走到这里替换。
+        const stale = this.connectors.get(playerId);
         this.connectors.set(playerId, connector);
+        if (stale && stale !== connector) {
+            // 通知旧 sub 它被替换了；前端 GameWithSync 会显示"被另一个标签页/设备接管"
+            try {
+                stale.send({
+                    type: SyncedGameServerEventType.CUSTOM,
+                    payload: { type: SyncedPreGameServerEventPayloadType.DISPLACED },
+                });
+            } catch { /* ignore */ }
+            try { stale.close(); } catch { /* ignore */ }
+        }
 
         // ensure we have a sync entry for this player (in case they were not in initial playerIds)
         const entry = this.ensureSyncEntry(playerId);
@@ -532,14 +547,22 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
             return { success: false, message: '[GameInstance] player already in game; should connect as player not spectator' };
         }
 
-        // 替换旧的（重连情形）
+        // 替换旧的（重连 / 同 user 另一个 tab）
         const existing = this.spectatorConnectors.get(sid);
-        if (existing) {
-            try { existing.close(); } catch { }
-        }
+        // 先入 map 再 close 旧，让旧 sub 的 onClose source guard 短路
         this.spectatorConnectors.set(sid, connector);
         this.spectatorPrevSentState.delete(sid);
         this.spectatorDisconnected.delete(sid);
+        if (existing && existing !== connector) {
+            // 通知旧观战 sub 它被替换；前端会显示"被另一个标签页/设备接管"
+            try {
+                existing.send({
+                    type: SyncedGameServerEventType.CUSTOM,
+                    payload: { type: SyncedPreGameServerEventPayloadType.DISPLACED },
+                });
+            } catch { /* ignore */ }
+            try { existing.close(); } catch { /* ignore */ }
+        }
 
         connector.onOpen(() => {
             try {

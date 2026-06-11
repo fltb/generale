@@ -428,6 +428,39 @@ export const websocketPlugin = new Elysia()
 // 5. DEBUGGING & UTILITY FUNCTIONS
 // =================================================================================
 
+/**
+ * 关掉某 userId 当前所有活跃的 WS 连接（含其上挂的所有 sub-connector）。
+ *
+ * 用于：
+ *  - /login 走"last-login-wins"反重复登录策略：踢旧端
+ *  - /logout 主动断旧连接，避免 sub-connector 残留
+ *  - /change-password 改密后撤销所有 WS（让其它端立刻掉线）
+ *
+ * 返回被关掉的连接数。
+ *
+ * 注意：这里只关 WS（连带各 sub-connector 的 onClose 链路触发 PreGameInstance /
+ * GameInstance 的清理）。session 表的删除由 sessionService 单独处理，两者解耦。
+ */
+export function closeAllConnectionsForUser(userId: string, code = 4001, reason = 'session-revoked'): number {
+  const connIds = userConnections.get(userId);
+  if (!connIds || connIds.size === 0) return 0;
+  let closed = 0;
+  // 拷贝一份避免在迭代中改集合（onClose 会从 userConnections 里 delete）
+  for (const cid of Array.from(connIds)) {
+    const manager = connectionManagers.get(cid);
+    if (manager && manager.isConnected) {
+      try {
+        (manager as any).ws?.close(code, reason);
+        closed++;
+      } catch (err) {
+        console.warn(`[closeAllConnectionsForUser] close failed for ${cid}`, err);
+      }
+    }
+  }
+  console.log(`[closeAllConnectionsForUser] userId=${userId} closed=${closed}`);
+  return closed;
+}
+
 export function getConnectionManager(connectionId: string): WebSocketConnectionManager | undefined {
   return connectionManagers.get(connectionId);
 }

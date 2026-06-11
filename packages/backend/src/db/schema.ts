@@ -64,6 +64,24 @@ export const verificationTokens = sqliteTable('verification_tokens', {
     .notNull()
 })
 
+/**
+ * 登录 session。一个用户在任一时刻只允许一个有效 session：
+ * 新登录会调用 sessionService.deleteAllForUser(userId) 把这里的旧记录清掉。
+ *
+ * 老实现是 in-memory Map，重启即丢；落到 DB 之后服务端可以平滑重启不掉登录。
+ */
+export const sessions = sqliteTable('sessions', {
+  id: text('id').primaryKey().notNull(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+  /** 滑动过期：每次访问会把这个字段往后推 */
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+});
+
 // User profiles
 export const profiles = sqliteTable('profiles', {
   userId: text('user_id').primaryKey().references(() => users.id),

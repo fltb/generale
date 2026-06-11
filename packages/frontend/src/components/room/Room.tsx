@@ -188,6 +188,9 @@ function applyPregameEventLocal(state: SyncedPreGameState | null, action: Synced
 export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   const [notice, setNotice] = createSignal<string | null>(null);
   const [isKicked, setIsKicked] = createSignal(false);
+  // 同一 user 的另一个标签页/设备接管了这个 pregame sub。收到 DISPLACED 之后
+  // 这个 sub 不再收 server 事件，本地操作也没意义。给用户一个明确提示，盖住操作。
+  const [displaced, setDisplaced] = createSignal(false);
 
   const initialSyncedState: SyncedPreGameState = {
     room: makeEmptyRoom(props.gameId),
@@ -223,6 +226,11 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         case SyncedPreGameServerEventPayloadType.START_REJECTED:
           // 显示原因（通常只由 host 收到），不需要向上传递
           setNotice(evt.reason ?? "开始被拒绝，队伍或准备条件不满足");
+          break;
+        case SyncedPreGameServerEventPayloadType.DISPLACED:
+          // 同 user 的另一个 sub 已经接管 pregame 域。后续 server 事件都走那边，
+          // 这边不再处理任何 state；只显示提示挡住操作。
+          setDisplaced(true);
           break;
         default:
           setNotice(JSON.stringify(evt));
@@ -440,6 +448,17 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
 
   return (
     <div style={wrapperStyle()} class="p-6" aria-hidden={props.visible === false}>
+      {/* 被同 user 另一个 sub 接管：盖一层模态挡住操作 */}
+      <Show when={displaced()}>
+        <div class="fixed inset-0 z-50 bg-black/60 flex flex-col items-center justify-center text-white px-6">
+          <h2 class="text-3xl font-bold mb-3">该页面已被接管</h2>
+          <p class="opacity-80 mb-4 text-center max-w-md">
+            你的账号在另一个标签页或设备上打开了这个房间，所有操作都将在那一边进行。
+          </p>
+          <p class="text-sm opacity-60">关掉这个页面或刷新可重新接管</p>
+        </div>
+      </Show>
+
       <Show when={gameInProgress()}>
         <div class="alert alert-info shadow-sm mb-3">
           <div class="flex items-center justify-between w-full gap-3">

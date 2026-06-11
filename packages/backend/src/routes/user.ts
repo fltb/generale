@@ -22,6 +22,7 @@ import { userService } from '../services/userService'
 import { profileService, ProfileService } from '../services/profileService'
 import { sendVerificationEmail, sendPasswordResetEmail, sendEmailChangeConfirmation, sendEmailChangeNotification } from '../services/emailService'
 import { sessionService } from '../services/sessionService'
+import { closeAllConnectionsForUser } from '../plugins/websocket'
 import { and, eq } from 'drizzle-orm'
 
 /** 32 字节 URL-safe 随机串，用于 register / reset / change-email 这类放在链接里的不可记忆 token */
@@ -268,6 +269,14 @@ export const userRoutes = new Elysia()
         set.status = 401
         return { error: 'invalid credentials' }
       }
+      // 反重复登录：清旧 session + 立刻关掉旧端的所有 WS 连接
+      //   - 旧端 HTTP 端点拿 401 → 前端 useAuth 自动清空 user
+      //   - 旧端 WS 各 sub-connector 触发 onClose → PreGameInstance/GameInstance
+      //     的 handleDisconnect 正常清理（Playing → Disconnected 等）
+      // 顺序：先删 session，再关 WS。这样 WS 关闭如果触发重连，新连接的 auth
+      // 校验已经失败，不会留下漏网的旧权限。
+      sessionService.deleteAllForUser(user.id)
+      closeAllConnectionsForUser(user.id)
       const session = sessionService.create(user.id)
 
       sid!.set({
@@ -291,7 +300,12 @@ export const userRoutes = new Elysia()
     '/logout',
     async ({ cookie: { sid } }) => {
       if (sid?.value) {
+        // 拿到 userId 后再删 session，方便顺手把 WS 关掉，避免 sub-connector 残留
+        const session = sessionService.get(sid.value)
         sessionService.delete(sid.value)
+        if (session) {
+          closeAllConnectionsForUser(session.userId)
+        }
         sid.set({
           value: '',
           path: '/',
@@ -419,7 +433,21 @@ export const userRoutes = new Elysia()
         return { error: '新密码不能与当前密码相同' }
       }
       await userService.updatePassword(user.id, body.newPassword)
-      return { success: true, message: '密码已更新' }
+
+      // 改密成功 → 撤销该用户所有 session + 关掉所有 WS（包括当前调用的这一端）。
+      // 然后给当前调用方重发一个新 session/cookie，让"自己"无缝继续；其它端被踢。
+      // 这是改密的标准安全姿势：怀疑泄露才会改密，旧凭证应该立刻全部失效。
+      sessionService.deleteAllForUser(user.id)
+      closeAllConnectionsForUser(user.id)
+      const newSession = sessionService.create(user.id)
+      sid!.set({
+        value: newSession.id,
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+      })
+
+      return { success: true, message: '密码已更新；其它已登录设备已被踢下线' }
     },
     {
       body: changePasswordReqSchema,

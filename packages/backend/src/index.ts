@@ -9,10 +9,33 @@ import { authPlugin } from "./middleware/authPlugin";
 import { registerDomainHandler, websocketPlugin } from "./plugins/websocket";
 import { initEmailServiceWithEnv } from "./services/emailService";
 import { ProfileService } from "./services/profileService";
+import { sessionService } from "./services/sessionService";
 
 await initEmailServiceWithEnv();
 // 启动期确保默认头像存在，避免新用户首次访问时拿不到图
 await ProfileService.ensureDefaultAvatars();
+
+// session 维护：
+//  - 启动期跑一次 prune，清掉上次运行期间堆积的过期记录
+//  - 每小时再跑一次。get() 已经做了 lazy 删除，这里只是把"长期没人 touch"
+//    的死会话也回收，避免 sessions 表无限增长
+{
+  try {
+    const removed = sessionService.pruneExpired();
+    if (removed > 0) console.info(`[session] startup prune removed ${removed} expired sessions`);
+  } catch (err) {
+    console.warn('[session] startup prune failed', err);
+  }
+  const SESSION_PRUNE_INTERVAL_MS = 60 * 60 * 1000; // 1h
+  setInterval(() => {
+    try {
+      const removed = sessionService.pruneExpired();
+      if (removed > 0) console.info(`[session] periodic prune removed ${removed} expired sessions`);
+    } catch (err) {
+      console.warn('[session] periodic prune failed', err);
+    }
+  }, SESSION_PRUNE_INTERVAL_MS);
+}
 
 const app = new Elysia()
   .use(cors())

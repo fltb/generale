@@ -986,14 +986,12 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     }
 
     const existing = this.state.players.find(p => p.id === playerId);
-    // Disconnected 玩家允许重连（座位本来就给他留着的）
-    if (existing && existing.status === PreGamePlayerStatus.Disconnected) {
-      return { success: true };
-    }
+    // 已存在玩家（任何状态：Lobby / Playing / Spectating / Disconnected）一律放行：
+    //   addPlayer 内部会按"位移（displacement）"语义关掉旧 connector、替换为新 connector。
+    // 配合 sessionService 的"last-login-wins"反重复登录策略：HTTP 层旧 session 已失效，
+    // 走到 WS 层的新 connector 必然是有效新 session，应该接管玩家槽位。
     if (existing) {
-      const msg = `[PreGameInstance] Player ${playerId} already in room`;
-      console.warn(msg);
-      return { success: false, message: msg };
+      return { success: true };
     }
 
     if (this.state.players.length >= this.state.playerLimit) {
@@ -1003,6 +1001,42 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     }
 
     return { success: true };
+  }
+
+  /**
+   * 用 `connector` 替换 pid 当前已有的 connector（如果有）。
+   *
+   * 关键顺序：先把新 connector 写入 map，再 close 旧 connector。
+   * 这样旧 connector 的 onClose 跑到 handleDisconnect 时，source guard
+   * (`this.connectors.get(pid) !== source`) 会因为 map 里已经是新 connector
+   * 而短路掉，不会误把新连接的 status 翻成 Disconnected / 误清新连接。
+   *
+   * 同时清掉 prevSentState / syncData：让新 client 首帧一定是 SNAPSHOT，
+   * 不是基于旧基线算出来的、新 client 无法应用的 PATCH。
+   */
+  private displaceConnector(pid: PlayerId, connector: PreGameServerConnector) {
+    const stale = this.connectors.get(pid);
+    this.connectors.set(pid, connector);
+    this.prevSentState.delete(pid);
+    this.syncData.delete(pid);
+
+    if (stale && stale !== connector) {
+      // 先告诉旧 sub 它被替换了，再 close。前端收到 DISPLACED 后会显示
+      // "此页面已被另一个标签页/设备接管"的提示。best-effort：发不出去就当 sub 已经死了。
+      try {
+        stale.send({
+          type: SyncedPreGameServerEventType.CUSTOM,
+          payload: { type: SyncedPreGameServerEventPayloadType.DISPLACED },
+        });
+      } catch { /* ignore */ }
+      try { stale.close(); } catch { /* ignore */ }
+    }
+
+    connector.onOpen(() => this.sendState(pid, true));
+    connector.onDisconnect(() => this.handleDisconnect(pid, connector));
+    connector.onReconnect(() => this.sendState(pid, true));
+    connector.onClientMessage(evt => this.handleClientAction(pid, evt));
+    connector.onClose(() => this.handleDisconnect(pid, connector));
   }
   /** 动态添加玩家（用于 GameService） */
   public addPlayer(user: { id: PlayerId, name: string }, connector: PreGameServerConnector): { success: true } | { success: false, message: string } {
@@ -1014,24 +1048,20 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
       return res;
     }
 
-    // —— 重连分支：Disconnected 玩家回来了，恢复为 Playing，复用原座位 ——
+    // —— 已存在玩家的二次接入：displacement 路径 ——
+    // 触发场景：
+    //   1) Disconnected 玩家重连（座位本来就给他留着的）
+    //   2) 新设备登录踢掉旧设备：旧 sub-connector 还活着，把槽位让给新 connector
+    //   3) 同一设备多 tab 同时连接（罕见，但语义保持一致：新接管）
     const existing = this.state.players.find(p => p.id === playerId);
-    if (existing && existing.status === PreGamePlayerStatus.Disconnected) {
-      existing.status = PreGamePlayerStatus.Playing;
-      // 如果旧 connector 还残留在 map 里（不应该发生，但兜底），先关掉避免漏 socket
-      const stale = this.connectors.get(playerId);
-      if (stale && stale !== connector) {
-        try { stale.close(); } catch { }
+    if (existing) {
+      this.displaceConnector(playerId, connector);
+      if (existing.status === PreGamePlayerStatus.Disconnected) {
+        existing.status = PreGamePlayerStatus.Playing;
       }
-      this.connectors.set(playerId, connector);
-      connector.onOpen(() => this.sendState(playerId, true));
-      connector.onDisconnect(() => this.handleDisconnect(playerId, connector));
-      connector.onReconnect(() => this.sendState(playerId, true));
-      connector.onClientMessage(evt => this.handleClientAction(playerId, evt));
-      connector.onClose(() => this.handleDisconnect(playerId, connector));
       this.version++;
       this.broadcastState();
-      console.log(`[PreGameInstance] Player ${playerId} reconnected (Disconnected -> Playing)`);
+      console.log(`[PreGameInstance] Player ${playerId} displaced/reconnected; status=${existing.status}`);
       return { success: true };
     }
 
