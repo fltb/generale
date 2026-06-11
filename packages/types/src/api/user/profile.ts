@@ -12,13 +12,16 @@ export const profileUpdateReqSchema = t.Object({
 export type ProfileUpdateReqBody = Static<typeof profileUpdateReqSchema>;
 
 /**
- * Schema for profile response
+ * Schema for profile response.
+ * 必返字段：userId（UUID）+ username（登录名）+ displayName（缺省 fallback 到 username）。
+ * 这样前端拿到 response 不管 profile 行存不存在，都能直接渲染。
  */
 export const profileRespSchema = t.Object({
     userId: t.String(),
-    displayName: t.Optional(t.String()),
-    avatarUrl: t.Optional(t.String()),
-    avatarThumbUrl: t.Optional(t.String()),
+    username: t.String(),
+    displayName: t.String(),
+    avatarUrl: t.String(),
+    avatarThumbUrl: t.String(),
     bio: t.Optional(t.String()),
     updatedAt: t.Optional(t.String({ format: 'date-time' }))
 });

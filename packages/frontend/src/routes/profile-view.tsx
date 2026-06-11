@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/solid-query";
 import { getProfileApi } from "~/api/profileApi";
 import { useAuth } from "~/hooks/useAuth";
 import Avatar from "~/components/Avatar";
-import type { ProfileRespBody } from "@generale/types/dist/api";
+import { ApiError } from "~/api/base";
+import type { ProfileRespBody, ErrorResp } from "@generale/types/dist/api";
 
 /**
  * 公开 profile 查看页：`/profile/:userId`
@@ -26,9 +27,16 @@ export default function PublicProfilePage() {
     retry: false,
   }));
 
-  const isSelf = createMemo(() => auth.user?.id === params.userId);
   const data = createMemo<ProfileRespBody | undefined>(() => query.data);
-  const displayName = () => data()?.displayName ?? params.userId;
+  // 用 response 里的 userId 比较：URL 写的是 username 时也能判断"看的是不是自己"
+  const isSelf = createMemo(() => !!data() && auth.user?.id === data()!.userId);
+  const displayName = () => data()?.displayName ?? data()?.username ?? params.userId;
+
+  // 区分"用户不存在 (404)" 和其它请求错误，给前者一个明确的 UI
+  const notFound = createMemo(() => {
+    const e = query.error;
+    return e instanceof ApiError && (e as ApiError<ErrorResp>).status === 404;
+  });
 
   return (
     <div class="container mx-auto p-6 max-w-2xl space-y-4">
@@ -40,7 +48,23 @@ export default function PublicProfilePage() {
       >
         <Show
           when={!query.isError}
-          fallback={<div class="alert alert-error">{query.error?.message ?? "无法加载该用户资料"}</div>}
+          fallback={
+            <Show
+              when={notFound()}
+              fallback={<div class="alert alert-error">{query.error?.message ?? "无法加载该用户资料"}</div>}
+            >
+              {/* 404 专用 UI：明确说找不到，并显示用户输入的标识符方便检查拼写 */}
+              <div class="card bg-base-200 p-8 flex flex-col items-center text-center space-y-3">
+                <div class="text-5xl">🤷</div>
+                <h1 class="text-2xl font-bold">用户不存在</h1>
+                <p class="opacity-70">
+                  找不到 <span class="font-mono bg-base-300 px-2 py-0.5 rounded">{params.userId}</span> 对应的账号
+                </p>
+                <p class="text-sm opacity-60">检查一下用户名或 ID 是否拼对了。</p>
+                <A href="/" class="btn btn-primary btn-sm">回首页</A>
+              </div>
+            </Show>
+          }
         >
           <section class="card bg-base-200 p-6 flex flex-col items-center text-center space-y-3">
             <Avatar

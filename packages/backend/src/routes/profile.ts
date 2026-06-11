@@ -1,6 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { profileService, ProfileService, AVATAR_MAX_BYTES } from '../services/profileService';
 import { sessionService } from '../services/sessionService';
+import { userService } from '../services/userService';
 import {
   profileRespSchema,
   profileUpdateReqSchema,
@@ -26,13 +27,23 @@ const ALLOWED_AVATAR_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
 export const profileRoutes = new Elysia({ prefix: '/profile' })
   .get(
     '/:userId',
-    async ({ params: { userId } }) => {
-      // 单次查 profile，默认头像兜底直接用静态常量，避免再调一次 DB
-      const profile = await profileService.getProfile(userId);
+    async ({ params: { userId }, set }) => {
+      // URL 里的 :userId 同时接受真实 UUID 或 username。
+      // 先按 id 查；找不到再按 username 查；都没就 404，不再返回"空架子"假装存在。
+      let user = await userService.findById(userId);
+      if (!user) user = await userService.findByUsername(userId);
+      if (!user) {
+        set.status = 404;
+        return { error: '用户不存在' };
+      }
+
+      const profile = await profileService.getProfile(user.id);
       const defaults = ProfileService.defaultAvatarUrls();
       return {
-        userId,
-        ...(profile?.displayName ? { displayName: profile.displayName } : {}),
+        userId: user.id,
+        username: user.username,
+        // displayName 默认 fallback 到 username，前端永远有东西可展示
+        displayName: profile?.displayName || user.username,
         avatarUrl: profile?.avatarUrl || defaults.avatarUrl,
         avatarThumbUrl: profile?.avatarThumbUrl || defaults.avatarThumbUrl,
         ...(profile?.bio ? { bio: profile.bio } : {}),
