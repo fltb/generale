@@ -27,8 +27,10 @@ export interface UseMapInputParams {
  * 这里只维护 active 坐标并产出移动指令。
  */
 export function useMapInput(params: UseMapInputParams) {
-  // active cursor。默认 (1,1) 只是占位，下面的 effect 会在拿到自己的 throne 后覆盖。
-  const [active, setActive] = createSignal<Coordinates | null>({ x: 1, y: 1 });
+  // active cursor。默认 null（不放占位），由下面的 effect 在拿到自己的 throne 后置位，
+  // 或由用户点击置位。避免在 cursor 还没定位到自己地盘时，方向键从占位坐标(1,1)发出
+  // 一个非己方格子的无效移动 —— 服务端会丢弃，表现为"移动没反应"。
+  const [active, setActive] = createSignal<Coordinates | null>(null);
 
   // 自动定位 cursor 到自己 throne：第一次扫到属于 selfId 的 throne 就置位，置位后不再覆盖
   // （用户随后点击 / 方向键移动的位置由 active signal 自己管，不应该被 state 更新拽回）。

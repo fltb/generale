@@ -1,4 +1,4 @@
-import { For, createMemo, createSignal, createEffect, type Component } from "solid-js";
+import { For, Index, createMemo, createSignal, createEffect, onCleanup, type Component } from "solid-js";
 import * as P from "solid-pixi";
 import * as PIXI from "pixi.js";
 
@@ -6,7 +6,7 @@ import type { SyncedGameState, Coordinates, PlayerOperation } from "@generale/ty
 import { PlayerOperationType, TileType } from "@generale/types";
 
 import { MapTile } from "./MapTile";
-import { type FaIconKey, createScaledFaIcon } from "~/utils/faIconGraphic";
+import { type FaIconKey, createScaledFaIcon, destroyGcCache } from "~/utils/faIconGraphic";
 import { DEFAULT_TILE_THEME, DIRECTION_ICON } from "~/game/render/tileTheme";
 import { useMapInput } from "~/game/render/useMapInput";
 
@@ -90,6 +90,15 @@ const OperationArrow: Component<{
 };
 
 export const MapRender: Component<MapRenderProps> = (props) => {
+  // 关键：每次地图视图挂载（= 进入一局对局）前清空 FA 图标的 GraphicsContext 缓存。
+  // gcCache 是模块级、跨对局存活的；其中的 GraphicsContext 绑定在上一局 pixi 渲染器上，
+  // 再次进入游戏时是新的渲染器，复用这些旧 context 会导致 faicon 画不出来
+  // （"首次进入正常、再次进入出问题，刷新就好"正是这个症状——刷新清掉了整个模块缓存）。
+  // 在组件体顶部同步清空，保证早于下面任何 MapTile 的图标 effect 构建图标。
+  destroyGcCache();
+  // 离开对局时也清一次，及时释放并让下一局从干净状态开始。
+  onCleanup(() => destroyGcCache());
+
   const TILE_SIZE = DEFAULT_TILE_THEME.tileSize;
   const map = createMemo(() => props.state?.map ?? { width: 0, height: 0, tiles: [] });
   const iconTextures = createMemo<Record<TileType, FaIconKey | null>>(() => DEFAULT_TILE_THEME.tileIcon);
@@ -141,17 +150,21 @@ export const MapRender: Component<MapRenderProps> = (props) => {
   return (
     // world container：所有地图内容都在这里（由外层的 Application 决定缩放/分辨率）
     <P.Container x={offsetX} y={offsetY} name="world" sortableChildren>
-      {/* ===== map layer: tiles ===== */}
+      {/* ===== map layer: tiles =====
+          用 <Index> 而非 <For>：地图尺寸在一局内固定，按"格子位置"复用节点、只更新数据，
+          避免 mergedState 每 tick structuredClone 出新数组导致 <For>（按引用 key）
+          每 tick 销毁+重建全部 MapTile —— 那种churn会和 createScaledFaIcon 抢跑，
+          造成"有概率图标/箭头画不出来"。 */}
       <P.Container name="mapLayer">
-        <For each={map().tiles}>
+        <Index each={map().tiles}>
           {(row, yIdx) => (
-            <For each={row ?? []}>
+            <Index each={row() ?? []}>
               {(tile, xIdx) => {
-                const coord: Coordinates = { x: xIdx(), y: yIdx() };
+                const coord: Coordinates = { x: xIdx, y: yIdx };
                 return (
                   <MapTile
                     coord={coord}
-                    tile={tile}
+                    tile={tile()}
                     size={TILE_SIZE}
                     playerDisplay={props.state.playerDisplay}
                     iconTextures={iconTextures()}
@@ -159,9 +172,9 @@ export const MapRender: Component<MapRenderProps> = (props) => {
                   />
                 );
               }}
-            </For>
+            </Index>
           )}
-        </For>
+        </Index>
       </P.Container>
 
       {/* ===== entity layer: (units / players) - keep separate in case you add sprites later ===== */}
