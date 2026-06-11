@@ -21,11 +21,29 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
         props.onChange(next);
     };
 
-    // 更新 speed（0.5 - 3）
+    /** 离散倍速档位：拖动条只在这些值之间跳；与后端 cap (MAX_TICKS_PER_SEC=4) 对齐 */
+    const SPEED_PRESETS = [0.5, 1, 2, 3, 4];
+    const MAX_TICKS_PER_SEC = 4;
+
+    /** 当前 speed 在 SPEED_PRESETS 里的索引；找不到精确命中就取最近的一档 */
+    const speedIndex = () => {
+        const s = props.state.speed;
+        let best = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < SPEED_PRESETS.length; i++) {
+            const d = Math.abs(SPEED_PRESETS[i]! - s);
+            if (d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
+    };
+
     const onSpeedChange = (v: number) => {
-        const next = { ...props.state, speed: clampNumber(v, 0.5, 3) };
+        const next = { ...props.state, speed: clampNumber(v, 0.5, 4) };
         commit(next);
     };
+
+    const effectiveTicksPerSec = () =>
+        Math.min(MAX_TICKS_PER_SEC, Math.max(0.1, props.state.speed));
 
     // 更新 afkThreshold（整数 >= 0）
     const onAfkChange = (v: number) => {
@@ -59,32 +77,40 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
         <form class="p-4 space-y-6 bg-base-100 rounded-lg shadow-sm">
             <div>
                 <label class="label">
-                    <span class="label-text">游戏倍速 (speed)</span>
-                    <span class="label-text-alt">范围 0.5 — 3</span>
+                    <span class="label-text">
+                        游戏倍速 {props.state.speed.toFixed(1)}×
+                        <span class="opacity-60 ml-2">（每秒 {effectiveTicksPerSec().toFixed(1)} 帧）</span>
+                    </span>
+                    <span class="label-text-alt">范围 0.5 — 4</span>
                 </label>
 
-                <div class="flex items-center gap-4">
-                    {/* range 控件 */}
-                    <input
-                        type="range"
-                        min={0.5}
-                        max={3}
-                        step={0.1}
-                        value={String(props.state.speed)}
-                        class="range range-primary flex-1"
-                        onInput={(e) => onSpeedChange(Number((e.currentTarget as HTMLInputElement).value))}
-                    />
-                    {/* 精确数值输入 */}
-                    <input
-                        type="number"
-                        min={0.5}
-                        max={3}
-                        step={0.1}
-                        value={String(props.state.speed)}
-                        class="input input-bordered w-28"
-                        onInput={(e) => onSpeedChange(Number((e.currentTarget as HTMLInputElement).value))}
-                    />
+                {/* range 控件：min/max/step 用"档位索引"，每次拖动都落在 SPEED_PRESETS 的某档 */}
+                <input
+                    type="range"
+                    min={0}
+                    max={SPEED_PRESETS.length - 1}
+                    step={1}
+                    value={String(speedIndex())}
+                    class="range range-primary w-full"
+                    list="speed-preset-marks"
+                    onInput={(e) => {
+                        const idx = Number((e.currentTarget as HTMLInputElement).value);
+                        const v = SPEED_PRESETS[Math.max(0, Math.min(SPEED_PRESETS.length - 1, idx))]!;
+                        onSpeedChange(v);
+                    }}
+                />
+                {/* slider 下方刻度标签，让用户一眼看到每档值 */}
+                <div class="flex justify-between text-xs opacity-70 px-1 mt-1">
+                    <For each={SPEED_PRESETS}>
+                        {(s) => <span>{s}×</span>}
+                    </For>
                 </div>
+                {/* datalist 让浏览器在 slider 上画小刻度（chromium 系支持，其它浏览器静默忽略） */}
+                <datalist id="speed-preset-marks">
+                    <For each={SPEED_PRESETS}>
+                        {(_, i) => <option value={String(i())} />}
+                    </For>
+                </datalist>
             </div>
 
             <div>

@@ -654,17 +654,33 @@ export class GameService {
   // ============ Tick Scheduling ============
 
   /**
+   * 每秒最多多少个 tick 的硬上限。
+   *
+   * 限制理由：
+   *  - 服务端每个 tick 都跑一次 mask 计算 + per-player 状态拷贝；4 t/s 已经对
+   *    CPU 有压力，更快单局会拖累其它房间
+   *  - 客户端是 SNAPSHOT/PATCH 同步，4 t/s 时 WS 推送带宽和 patch 计算还能跟得上；
+   *    再快前端 MapRender 的 Pixi 渲染会卡顿，体感反而变差
+   *
+   * 对应 tick interval = 1000 / 4 = 250 ms。
+   */
+  private static readonly MAX_TICKS_PER_SEC = 4;
+
+  /**
    * Schedule game ticks according to speed, with initial delay.
-   * @param speed Game speed factor (default 1.0)
+   * @param speed Game speed factor (默认 1.0)。1× = 1 t/s，2× = 2 t/s，依此类推；
+   *              speed 超过 MAX_TICKS_PER_SEC 会被截到 cap 对应的 interval。
    */
   private scheduleGameTicks(speed: number) {
     this.clearTickTimer(); // Prevent double scheduling
     if (this.phase !== GamePhase.INGAME || !this.gameInstance) return;
 
     const initialDelayMs = 5000; // 5 seconds before first tick
-    const tickIntervalMs = Math.max(250, Math.floor(1000 / (speed || 1.0))); // Minimum 250ms interval
+    const minIntervalMs = Math.floor(1000 / GameService.MAX_TICKS_PER_SEC);
+    const tickIntervalMs = Math.max(minIntervalMs, Math.floor(1000 / (speed || 1.0)));
+    const effectiveTps = (1000 / tickIntervalMs).toFixed(2);
 
-    console.log(`[GameService ${this.gameId}] Scheduling first tick in ${initialDelayMs}ms, interval: ${tickIntervalMs}ms`);
+    console.log(`[GameService ${this.gameId}] Scheduling first tick in ${initialDelayMs}ms, interval: ${tickIntervalMs}ms (≈ ${effectiveTps} t/s, requested speed: ${speed}×)`);
 
     // Start after initial delay
     this.tickTimerId = setTimeout(() => {
