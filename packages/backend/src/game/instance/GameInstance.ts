@@ -186,6 +186,14 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         // 否则重连后 sendState 会把"该玩家断线那一帧冻结的 syncedState"当成快照发回，
         // 客户端基于过期视图操作会被服务端 validateMove 拒掉但 lastConfirmedOp 仍推进，
         // 表现为"乐观队列里有 move op 但格子没动、一帧后 op 消失"。
+        //
+        // 同时把 lastConfirmedOp 也归零：新 tab 页面刚加载，模块级 optimisticIdCounter
+        // 从 0 重新计数；如果服务端这边还停在旧值（比如 50），新 client 头 N 条 action
+        // 会被 `lastConfirmedOp >= optimisticId` 误判为过期直接丢，玩家体验为"前几下
+        // 移动指令没反应、几秒后才开始正常"。
+        // 自然断连路径上 removeConnector 已经做了重置；displacement 路径走 source guard
+        // 短路，不会经过 removeConnector，所以这里必须显式置 0。
+        entry.lastConfirmedOp = 0;
         const masked = mask(this.state, playerId);
         entry.syncedState = {
             ...entry.syncedState,
