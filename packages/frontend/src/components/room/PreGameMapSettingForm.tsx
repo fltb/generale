@@ -1,4 +1,5 @@
 import { type Component, For, Show } from "solid-js";
+import { Button, Input, Textarea } from "~/ui";
 import {
   type PreGameMapSetting,
   PreGameMapType,
@@ -190,18 +191,21 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
               <span class="label-text-alt">standard 模式仅支持 small / medium / large</span>
             </label>
             <div class="btn-group">
-              <button
-                class={`btn btn-sm ${currentLabel() === "small" ? "btn-active" : ""}`}
+              <Button
+                size="sm"
+                active={currentLabel() === "small"}
                 onClick={() => applyStandardPreset("small")}
-              >Small (10×10)</button>
-              <button
-                class={`btn btn-sm ${currentLabel() === "medium" ? "btn-active" : ""}`}
+              >Small (10×10)</Button>
+              <Button
+                size="sm"
+                active={currentLabel() === "medium"}
                 onClick={() => applyStandardPreset("medium")}
-              >Medium (20×20)</button>
-              <button
-                class={`btn btn-sm ${currentLabel() === "large" ? "btn-active" : ""}`}
+              >Medium (20×20)</Button>
+              <Button
+                size="sm"
+                active={currentLabel() === "large"}
                 onClick={() => applyStandardPreset("large")}
-              >Large (40×40)</button>
+              >Large (40×40)</Button>
             </div>
           </div>
         </div>
@@ -213,24 +217,27 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
           <span class="label-text">地图类型</span>
         </label>
         <div class="btn-group">
-          <button
-            class={`btn btn-sm ${props.setting.type === PreGameMapType.Random ? "btn-active" : ""}`}
+          <Button
+            size="sm"
+            active={props.setting.type === PreGameMapType.Random}
             onClick={() => switchTo(PreGameMapType.Random)}
           >
             随机
-          </button>
-          <button
-            class={`btn btn-sm ${props.setting.type === PreGameMapType.Custom ? "btn-active" : ""}`}
+          </Button>
+          <Button
+            size="sm"
+            active={props.setting.type === PreGameMapType.Custom}
             onClick={() => switchTo(PreGameMapType.Custom)}
           >
             自定义
-          </button>
-          <button
-            class={`btn btn-sm ${props.setting.type === PreGameMapType.Imported ? "btn-active" : ""}`}
+          </Button>
+          <Button
+            size="sm"
+            active={props.setting.type === PreGameMapType.Imported}
             onClick={() => switchTo(PreGameMapType.Imported)}
           >
             导入
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -244,13 +251,14 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
                 <span class="label-text-alt">{CUSTOM_MIN} - {CUSTOM_MAX}</span>
               </Show>
             </label>
-            <input
+            <Input
               type="number"
+              bordered
               min={isCustomRoom() ? CUSTOM_MIN : 1}
               max={isCustomRoom() ? CUSTOM_MAX : undefined}
               step={1}
               value={String((props.setting as any).width ?? (isCompactRandom ? presetSizes.medium.width : 32))}
-              class="input input-bordered w-40"
+              class="w-40"
               onInput={(e) => setWidth(Number((e.currentTarget as HTMLInputElement).value))}
               disabled={!isCustomRoom() && isCompactRandom && props.setting.type === PreGameMapType.Random}
             />
@@ -263,13 +271,14 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
                 <span class="label-text-alt">{CUSTOM_MIN} - {CUSTOM_MAX}</span>
               </Show>
             </label>
-            <input
+            <Input
               type="number"
+              bordered
               min={isCustomRoom() ? CUSTOM_MIN : 1}
               max={isCustomRoom() ? CUSTOM_MAX : undefined}
               step={1}
               value={String((props.setting as any).height ?? (isCompactRandom ? presetSizes.medium.height : 24))}
-              class="input input-bordered w-40"
+              class="w-40"
               onInput={(e) => setHeight(Number((e.currentTarget as HTMLInputElement).value))}
               disabled={!isCustomRoom() && isCompactRandom && props.setting.type === PreGameMapType.Random}
             />
@@ -284,9 +293,9 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
               <span class="label-text-alt">前端临时写死 small / medium / large</span>
             </label>
             <div class="btn-group">
-              <button class={`btn btn-xs`} onClick={() => applyPresetSize("small")}>Small (10×10)</button>
-              <button class={`btn btn-xs`} onClick={() => applyPresetSize("medium")}>Medium (20×20)</button>
-              <button class={`btn btn-xs`} onClick={() => applyPresetSize("large")}>Large (40×40)</button>
+              <Button size="xs" onClick={() => applyPresetSize("small")}>Small (10×10)</Button>
+              <Button size="xs" onClick={() => applyPresetSize("medium")}>Medium (20×20)</Button>
+              <Button size="xs" onClick={() => applyPresetSize("large")}>Large (40×40)</Button>
             </div>
           </div>
         </Show>
@@ -306,12 +315,13 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
                   return (
                     <div class="flex items-center gap-3">
                       <div class="w-32">{t}</div>
-                      <input
+                      <Input
                         type="number"
+                        bordered
                         min={0}
                         step={1}
                         value={String(val)}
-                        class="input input-bordered w-28"
+                        class="w-28"
                         onInput={(e) => setTileFreq(t, Number((e.currentTarget as HTMLInputElement).value))}
                       />
                       <div class="text-sm opacity-60">当前: {val}</div>
@@ -322,12 +332,12 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
             </div>
 
             <div class="flex gap-2 mt-3">
-              <button class="btn btn-xs" onClick={() => balanceFrequencies()}>
+              <Button size="xs" onClick={() => balanceFrequencies()}>
                 均衡频率
-              </button>
-              <button class="btn btn-xs" onClick={() => resetSize()}>
+              </Button>
+              <Button size="xs" onClick={() => resetSize()}>
                 重置尺寸
-              </button>
+              </Button>
             </div>
           </div>
         </Show>
@@ -338,8 +348,9 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
               <span class="label-text">Custom 数据 (customData)</span>
               <span class="label-text-alt">任意 JSON/text（用于测试）</span>
             </label>
-            <textarea
-              class="textarea textarea-bordered w-full"
+            <Textarea
+              bordered
+              class="w-full"
               value={String((props.setting as any).customData ?? "")}
               onInput={(e) => setCustomData((e.currentTarget as HTMLTextAreaElement).value)}
               rows={4}
@@ -353,9 +364,10 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
           <label class="label">
             <span class="label-text">地图名 (mapName)</span>
           </label>
-          <input
+          <Input
             type="text"
-            class="input input-bordered w-64"
+            bordered
+            class="w-64"
             value={String((props.setting as any).mapName ?? "")}
             onInput={(e) => setMapName((e.currentTarget as HTMLInputElement).value)}
           />
@@ -363,13 +375,13 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
       </Show>
 
       <div class="flex justify-end">
-        <button
+        <Button
           type="button"
-          class="btn btn-primary"
+          variant="primary"
           onClick={() => props.onChange(props.setting)}
         >
           应用（回传当前 setting）
-        </button>
+        </Button>
       </div>
     </div>
     </Show>

@@ -7,6 +7,7 @@
 
 import { type Component, createSignal, createEffect, Show } from "solid-js";
 import type { ListGamesQuery } from "@generale/types/dist/api";
+import { Button, Card, Input, Select } from "~/ui";
 
 type Props = {
   value: Partial<ListGamesQuery>;
@@ -78,20 +79,22 @@ export const RoomFilter: Component<Props> = (props) => {
   }
 
   return (
-    <div class="card p-4 mb-4">
+    <Card class="p-4 mb-4">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
 
         {/* room name */}
-        <input
-          class="input input-sm w-full"
+        <Input
+          size="sm"
+          class="w-full"
           placeholder="Room name"
           value={local().roomName ?? ""}
           onInput={(e) => setField("roomName", e.currentTarget.value)}
         />
 
         {/* host name */}
-        <input
-          class="input input-sm w-full"
+        <Input
+          size="sm"
+          class="w-full"
           placeholder="Host name"
           value={local().hostName ?? ""}
           onInput={(e) => setField("hostName", e.currentTarget.value)}
@@ -99,18 +102,18 @@ export const RoomFilter: Component<Props> = (props) => {
 
         {/* mode / status / password */}
         <div class="flex gap-2">
-          <select
-            class="select select-sm"
+          <Select
+            size="sm"
             value={local().type ?? ""}
             onChange={(e) => setField("type", e.currentTarget.value)}
           >
             <option value="">All modes</option>
             <option value="standard">standard</option>
             <option value="custom">custom</option>
-          </select>
+          </Select>
 
-          <select
-            class="select select-sm"
+          <Select
+            size="sm"
             value={local().status ?? ""}
             onChange={(e) => setField("status", e.currentTarget.value)}
           >
@@ -118,32 +121,32 @@ export const RoomFilter: Component<Props> = (props) => {
             <option value="lobby">lobby</option>
             <option value="in-progress">in-progress</option>
             <option value="finished">finished</option>
-          </select>
+          </Select>
 
-          <select
-            class="select select-sm"
+          <Select
+            size="sm"
             value={local().hasPassword ?? ""}
             onChange={(e) => setField("hasPassword", e.currentTarget.value)}
           >
             <option value="">Any lock</option>
             <option value="true">Locked</option>
             <option value="false">Unlocked</option>
-          </select>
+          </Select>
         </div>
 
         {/* players + map */}
         <div class="flex gap-2 items-center">
-          <input
+          <Input
             type="number"
-            class="input input-sm"
+            size="sm"
             placeholder="min players"
             value={local().minPlayers ?? ""}
             onInput={(e) => setField("minPlayers", e.currentTarget.value)}
           />
 
-          <input
+          <Input
             type="number"
-            class="input input-sm"
+            size="sm"
             placeholder="max players"
             value={local().maxPlayers ?? ""}
             onInput={(e) => setField("maxPlayers", e.currentTarget.value)}
@@ -151,8 +154,8 @@ export const RoomFilter: Component<Props> = (props) => {
 
           {/* map filter */}
           <Show when={local().type === "standard"}>
-            <select
-              class="select select-sm"
+            <Select
+              size="sm"
               value={local().map ?? ""}
               onChange={(e) => setField("map", e.currentTarget.value)}
             >
@@ -160,16 +163,17 @@ export const RoomFilter: Component<Props> = (props) => {
               <option value="small">small</option>
               <option value="medium">medium</option>
               <option value="large">large</option>
-            </select>
+            </Select>
           </Show>
 
           <Show when={local().type === "custom"}>
             <div class="flex items-center gap-1">
-              <input
+              <Input
                 type="number"
                 min={10}
                 max={500}
-                class="input input-sm w-20"
+                size="sm"
+                class="w-20"
                 placeholder="W"
                 value={customWidth()}
                 onInput={(e) => {
@@ -179,11 +183,12 @@ export const RoomFilter: Component<Props> = (props) => {
                 }}
               />
               <span>×</span>
-              <input
+              <Input
                 type="number"
                 min={10}
                 max={500}
-                class="input input-sm w-20"
+                size="sm"
+                class="w-20"
                 placeholder="H"
                 value={customHeight()}
                 onInput={(e) => {
@@ -198,8 +203,8 @@ export const RoomFilter: Component<Props> = (props) => {
 
         {/* sort */}
         <div class="flex gap-2 items-center">
-          <select
-            class="select select-sm"
+          <Select
+            size="sm"
             value={local().sortBy ?? ""}
             onChange={(e) => setField("sortBy", e.currentTarget.value)}
           >
@@ -208,23 +213,23 @@ export const RoomFilter: Component<Props> = (props) => {
             <option value="roomName">roomName</option>
             <option value="maxPlayers">maxPlayers</option>
             <option value="status">status</option>
-          </select>
+          </Select>
 
-          <select
-            class="select select-sm"
+          <Select
+            size="sm"
             value={local().sortOrder ?? "desc"}
             onChange={(e) => setField("sortOrder", e.currentTarget.value)}
           >
             <option value="desc">desc</option>
             <option value="asc">asc</option>
-          </select>
+          </Select>
 
-          <button class="btn btn-sm" onClick={clearAll}>
+          <Button size="sm" onClick={clearAll}>
             Clear
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 };
 

@@ -4,6 +4,7 @@ import {
     For,
     Show,
 } from "solid-js";
+import { Button, Input, Range } from "~/ui";
 
 export interface PreGameRoomStateFromProps {
     state: PreGameRoomState["gameSetting"];
@@ -85,13 +86,13 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
                 </label>
 
                 {/* range 控件：min/max/step 用"档位索引"，每次拖动都落在 SPEED_PRESETS 的某档 */}
-                <input
-                    type="range"
+                <Range
+                    variant="primary"
                     min={0}
                     max={SPEED_PRESETS.length - 1}
                     step={1}
                     value={String(speedIndex())}
-                    class="range range-primary w-full"
+                    class="w-full"
                     list="speed-preset-marks"
                     onInput={(e) => {
                         const idx = Number((e.currentTarget as HTMLInputElement).value);
@@ -118,12 +119,13 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
                     <span class="label-text">挂机阈值 (afkThreshold)</span>
                     <span class="label-text-alt">单位：tick（整数）</span>
                 </label>
-                <input
+                <Input
                     type="number"
+                    bordered
                     min={0}
                     step={1}
                     value={String(props.state.afkThreshold)}
-                    class="input input-bordered w-40"
+                    class="w-40"
                     onInput={(e) => onAfkChange(Number((e.currentTarget as HTMLInputElement).value))}
                 />
             </div>
@@ -158,12 +160,13 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
                                                     <span class="label-text">duration</span>
                                                     <span class="label-text-alt">{">"}= 0</span>
                                                 </label>
-                                                <input
+                                                <Input
                                                     type="number"
+                                                    bordered
                                                     min={0}
                                                     step={1}
                                                     value={String(dur)}
-                                                    class="input input-bordered w-full"
+                                                    class="w-full"
                                                     onInput={(e) =>
                                                         onTileGrowChange(tileType, "duration", Number(e.currentTarget.value))
                                                     }
@@ -174,11 +177,12 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
                                                 <label class="label">
                                                     <span class="label-text">growth</span>
                                                 </label>
-                                                <input
+                                                <Input
                                                     type="number"
+                                                    bordered
                                                     step={1}
                                                     value={String(growth)}
-                                                    class="input input-bordered w-full"
+                                                    class="w-full"
                                                     onInput={(e) =>
                                                         onTileGrowChange(tileType, "growth", Number(e.currentTarget.value))
                                                     }
@@ -195,13 +199,13 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
 
             <div class="flex justify-end">
                 {/* 这里给个显式的“应用”按钮（可选） */}
-                <button
+                <Button
                     type="button"
-                    class="btn btn-primary"
+                    variant="primary"
                     onClick={() => props.onChange(props.state)}
                 >
                     应用设置
-                </button>
+                </Button>
             </div>
         </form>
     );

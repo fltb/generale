@@ -8,6 +8,7 @@ import CreateRoomModal from "./CreateRoomModal";
 import { A } from "@solidjs/router";
 import { useGameListQuery } from "~/hooks/useGameListQuery";
 import { useLobbyRealtime } from "~/hooks/useLobbyRealtime";
+import { Button, Card, Badge, Alert, Spinner, Modal } from "~/ui";
 
 export function RoomList() {
   const navigate = useNavigate();
@@ -79,8 +80,8 @@ export function RoomList() {
       <div class="mb-4 flex items-center justify-between">
         <h2 class="text-2xl font-semibold">Active Rooms</h2>
         <div class="flex items-center gap-2">
-          <button class="btn btn-sm btn-secondary" onClick={() => setCreateOpen(true)}>新建房间</button>
-          <button class="btn btn-sm btn-primary" onClick={() => (gamesQuery.refetch ? gamesQuery.refetch() : null)}>Refresh</button>
+          <Button size="sm" variant="secondary" onClick={() => setCreateOpen(true)}>新建房间</Button>
+          <Button size="sm" variant="primary" onClick={() => (gamesQuery.refetch ? gamesQuery.refetch() : null)}>Refresh</Button>
         </div>
       </div>
 
@@ -97,16 +98,16 @@ export function RoomList() {
       <Switch>
         <Match when={gamesQuery.isLoading}>
           <div class="flex justify-center">
-            <div class="inline-block loading loading-spinner loading-md"></div>
+            <Spinner size="md" class="inline-block" />
           </div>
         </Match>
 
         <Match when={gamesQuery.isError}>
-          <div class="alert alert-error shadow-lg">
+          <Alert variant="error" class="shadow-lg">
             <div>
               <span>载入房间列表失败: {gamesQuery.error?.message ?? "Unknown"}</span>
             </div>
-          </div>
+          </Alert>
         </Match>
 
         <Match when={gamesQuery.isSuccess}>
@@ -119,7 +120,7 @@ export function RoomList() {
                   g.playerCount >= g.maxPlayers;
                 const status = g.status ?? "lobby";
                 return (
-                  <div class="card bg-base-100 shadow-md">
+                  <Card class="bg-base-100 shadow-md">
                     <div class="card-body">
                       <div class="flex items-start justify-between">
                         <div>
@@ -136,7 +137,7 @@ export function RoomList() {
                         </div>
 
                         <div class="text-right">
-                          <div class="badge">{status}</div>
+                          <Badge>{status}</Badge>
                           <div class="mt-2">
                             <span class="inline-flex items-center gap-1">
                               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -148,19 +149,19 @@ export function RoomList() {
                           </div>
                           <div class="mt-2">
                             <Show when={g.hasPassword}>
-                              <span class="badge badge-outline">Locked</span>
+                              <Badge variant="outline">Locked</Badge>
                             </Show>
                           </div>
                         </div>
                       </div>
 
                       <div class="card-actions justify-end mt-3">
-                        <button class="btn btn-ghost btn-sm" onClick={() => openDetails(g.id)}>Details</button>
-                        <button class={`btn btn-sm ${isFull ? "btn-disabled" : "btn-primary"}`} onClick={() => handlePrepareConnect(g.id)}>Join</button>
+                        <Button variant="ghost" size="sm" onClick={() => openDetails(g.id)}>Details</Button>
+                        <Button size="sm" variant={isFull ? "neutral" : "primary"} class={isFull ? "btn-disabled" : ""} onClick={() => handlePrepareConnect(g.id)}>Join</Button>
                         <A href={`/game/${g.id}`} class="btn btn-sm">Open</A>
                       </div>
                     </div>
-                  </div>
+                  </Card>
                 );
               }}
             </For>
@@ -170,20 +171,19 @@ export function RoomList() {
 
       {/* details modal */}
       <Show when={!!openId()}>
-        <div class="modal modal-open">
-          <div class="modal-box max-w-3xl">
+        <Modal boxClass="max-w-3xl">
             <div class="flex justify-between items-start">
               <h3 class="font-bold text-lg">Room Details</h3>
-              <button class="btn btn-sm btn-ghost" onClick={closeDetails}>Close</button>
+              <Button size="sm" variant="ghost" onClick={closeDetails}>Close</Button>
             </div>
 
             <div class="mt-4">
               <Show when={detailQuery.isLoading}>
-                <div class="flex items-center gap-2"><div class="loading loading-spinner" /> Loading...</div>
+                <div class="flex items-center gap-2"><Spinner /> Loading...</div>
               </Show>
 
               <Show when={detailQuery.isError}>
-                <div class="alert alert-error">{detailQuery.error?.message ?? "Failed to load details"}</div>
+                <Alert variant="error">{detailQuery.error?.message ?? "Failed to load details"}</Alert>
               </Show>
 
               <Show when={detailQuery.data}>
@@ -219,12 +219,12 @@ export function RoomList() {
                     </div>
 
                     <div class="mt-4 flex items-center gap-3">
-                      <button class="btn btn-primary btn-sm" onClick={() => handlePrepareConnect(detail().id)} disabled={connecting()}>
+                      <Button variant="primary" size="sm" onClick={() => handlePrepareConnect(detail().id)} disabled={connecting()}>
                         {connecting() ? "Preparing..." : "Prepare Connect"}
-                      </button>
+                      </Button>
 
                       <Show when={connectResult()}>
-                        <div class="badge badge-success">Ready — domains: {connectResult().domains?.primary ?? "n/a"}</div>
+                        <Badge variant="success">Ready — domains: {connectResult().domains?.primary ?? "n/a"}</Badge>
                       </Show>
 
                       <Show when={connectError()}>
@@ -235,8 +235,7 @@ export function RoomList() {
                 )}
               </Show>
             </div>
-          </div>
-        </div>
+        </Modal>
       </Show>
 
       {/* Create Room Modal */}

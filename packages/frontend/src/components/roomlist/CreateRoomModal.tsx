@@ -8,6 +8,7 @@ import type {
 } from "@generale/types/dist/api";
 import type { ApiError } from "~/api/base";
 import { useNavigate } from "@solidjs/router";
+import { Button, Input, Select, Alert, Modal, alertDialog } from "~/ui";
 
 /**
  * Props:
@@ -57,7 +58,7 @@ export default function CreateRoomModal(props: {
     },
     onError: (err: any) => {
       console.error("create game failed", err);
-      alert(err?.message ?? "创建房间失败");
+      alertDialog(err?.message ?? "创建房间失败");
     },
   }));
 
@@ -75,7 +76,7 @@ export default function CreateRoomModal(props: {
   function validateAndBuildPayload(): CreateGameReqBody | null {
     const name = roomName().trim();
     if (!name) {
-      alert("请输入房间名字（roomName）");
+      alertDialog("请输入房间名字（roomName）");
       return null;
     }
 
@@ -85,7 +86,7 @@ export default function CreateRoomModal(props: {
     if (maxPlayers() !== "") {
       const n = Number(maxPlayers());
       if (!Number.isInteger(n) || n < 2 || n > 8) {
-        alert("maxPlayers 必须是 2 - 8 之间的整数");
+        alertDialog("maxPlayers 必须是 2 - 8 之间的整数");
         return null;
       }
       settings.maxPlayers = n;
@@ -107,15 +108,15 @@ export default function CreateRoomModal(props: {
       const w = Number(customWidth());
       const h = Number(customHeight());
       if (!w || !h) {
-        alert("custom 模式需要输入宽度和高度 (width / height)");
+        alertDialog("custom 模式需要输入宽度和高度 (width / height)");
         return null;
       }
       if (!Number.isInteger(w) || !Number.isInteger(h)) {
-        alert("width/height 必须为整数");
+        alertDialog("width/height 必须为整数");
         return null;
       }
       if (w < 10 || w > 500 || h < 10 || h > 500) {
-        alert("width/height 必须在 10 - 500 之间");
+        alertDialog("width/height 必须在 10 - 500 之间");
         return null;
       }
       settings.mapSize = { width: w, height: h };
@@ -152,23 +153,24 @@ export default function CreateRoomModal(props: {
 
   return (
     <Show when={props.open()}>
-      <div class="modal modal-open">
-        <div class="modal-box max-w-2xl">
+      <Modal boxClass="max-w-2xl">
           <div class="flex justify-between items-start">
             <h3 class="font-bold text-lg">新建房间</h3>
-            <button
-              class="btn btn-sm btn-ghost"
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={() => props.onClose()}
             >
               Close
-            </button>
+            </Button>
           </div>
 
           <div class="mt-4 space-y-3">
             <label class="block">
               <span class="label-text">房间名 (roomName)</span>
-              <input
-                class="input input-bordered w-full"
+              <Input
+                bordered
+                class="w-full"
                 value={roomName()}
                 onInput={(e: any) => setRoomName(e.target.value)}
                 placeholder="例如：alice 的房间"
@@ -178,23 +180,25 @@ export default function CreateRoomModal(props: {
             <div class="grid grid-cols-2 gap-2">
               <label class="block">
                 <span class="label-text">房间类别 (type)</span>
-                <select
-                  class="select select-bordered w-full"
+                <Select
+                  bordered
+                  class="w-full"
                   value={type()}
                   onChange={(e: any) => setType(e.target.value)}
                 >
                   <option value="standard">standard (快速)</option>
                   <option value="custom">custom (自定义尺寸)</option>
-                </select>
+                </Select>
               </label>
 
               <label class="block">
                 <span class="label-text">最大玩家数（可选）</span>
-                <input
+                <Input
                   type="number"
                   min="2"
                   max="8"
-                  class="input input-bordered w-full"
+                  bordered
+                  class="w-full"
                   value={maxPlayers() === "" ? "" : String(maxPlayers())}
                   onInput={(e: any) => {
                     const v = e.target.value;
@@ -207,22 +211,24 @@ export default function CreateRoomModal(props: {
 
             <label class="block">
               <span class="label-text">队伍模式 (teamMode)</span>
-              <select
-                class="select select-bordered w-full"
+              <Select
+                bordered
+                class="w-full"
                 value={teamMode()}
                 onChange={(e: any) => setTeamMode(e.target.value)}
               >
                 <option value="ffa">单人 (ffa)</option>
                 <option value="team">组队 (team)</option>
-              </select>
+              </Select>
             </label>
 
             <Show when={type() === "standard"}>
               <div>
                 <label class="block">
                   <span class="label-text">地图 (standard)</span>
-                  <select
-                    class="select select-bordered w-full"
+                  <Select
+                    bordered
+                    class="w-full"
                     value={mapSizeStd()}
                     onChange={(e: any) => setMapSizeStd(e.target.value)}
                   >
@@ -230,7 +236,7 @@ export default function CreateRoomModal(props: {
                     <option value="small">small</option>
                     <option value="medium">medium</option>
                     <option value="large">large</option>
-                  </select>
+                  </Select>
                 </label>
               </div>
             </Show>
@@ -239,11 +245,12 @@ export default function CreateRoomModal(props: {
               <div class="grid grid-cols-2 gap-2">
                 <label>
                   <span class="label-text">width (10 - 500)</span>
-                  <input
+                  <Input
                     type="number"
                     min="10"
                     max="500"
-                    class="input input-bordered w-full"
+                    bordered
+                    class="w-full"
                     value={customWidth() === "" ? "" : String(customWidth())}
                     onInput={(e: any) => {
                       const v = e.target.value;
@@ -254,11 +261,12 @@ export default function CreateRoomModal(props: {
                 </label>
                 <label>
                   <span class="label-text">height (10 - 500)</span>
-                  <input
+                  <Input
                     type="number"
                     min="10"
                     max="500"
-                    class="input input-bordered w-full"
+                    bordered
+                    class="w-full"
                     value={customHeight() === "" ? "" : String(customHeight())}
                     onInput={(e: any) => {
                       const v = e.target.value;
@@ -272,8 +280,9 @@ export default function CreateRoomModal(props: {
 
             <label>
               <span class="label-text">游戏玩法 (可选)</span>
-              <select
-                class="select select-bordered w-full"
+              <Select
+                bordered
+                class="w-full"
                 value={gameMode()}
                 onChange={(e: any) => setGameMode(e.target.value)}
               >
@@ -281,32 +290,31 @@ export default function CreateRoomModal(props: {
                 <option value="classic">classic</option>
                 <option value="blitz">blitz</option>
                 <option value="custom">custom</option>
-              </select>
+              </Select>
             </label>
 
             <div class="flex justify-end gap-2 mt-2">
-              <button class="btn btn-ghost" onClick={() => props.onClose()}>
+              <Button variant="ghost" onClick={() => props.onClose()}>
                 取消
-              </button>
-              <button
-                class="btn btn-primary"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={submit}
                 disabled={createMutation.isPending}
               >
                 {createMutation.isPending ? "创建中..." : "创建房间"}
-              </button>
+              </Button>
             </div>
 
             <Show when={createMutation.isError}>
-              <div class="alert alert-error mt-2">
+              <Alert variant="error" class="mt-2">
                 <div>
                   {(createMutation.error as any)?.message ?? "创建失败"}
                 </div>
-              </div>
+              </Alert>
             </Show>
           </div>
-        </div>
-      </div>
+      </Modal>
     </Show>
   );
 }
