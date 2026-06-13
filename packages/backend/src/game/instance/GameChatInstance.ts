@@ -131,13 +131,22 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
       this.sendResult(pid, 'failed', undefined, '消息过长');
       return;
     }
-        const chatMsg: ChatMessage = {
+    const meta = this.getSenderMeta(pid);
+    const scope = msg.scope === 'team' ? 'team' : (meta?.presence === 'game' ? 'game' : 'room');
+    if (scope === 'team' && !this.canSendTeamMessage(pid, meta)) {
+      this.sendResult(pid, 'failed', undefined, '当前不能发送小队消息');
+      return;
+    }
+    const chatMsg: ChatMessage = {
       id: this.generateMessageId(),
       playerId: pid,
       playerName: name,
       content,
       timestamp: Date.now(),
       type: 'user',
+      scope,
+      ...(meta ? { meta } : {}),
+      ...(scope === 'team' ? { recipientIds: this.getTeamRecipientIds(meta!.teamId!) } : {}),
     };
     this.addMessage(chatMsg);
     this.broadcastNewMessage(chatMsg);
@@ -153,6 +162,7 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
       content,
       timestamp: Date.now(),
       type: 'system',
+      scope: 'room',
     };
     this.addMessage(msg);
     this.broadcastNewMessage(msg);
@@ -168,29 +178,32 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
 
   /** 推送新消息给所有在线玩家 */
   private broadcastNewMessage(msg: ChatMessage) {
-    for (const conn of this.connectors.values()) {
+    for (const [pid, conn] of this.connectors) {
+      if (!this.canReceiveMessage(pid, msg)) continue;
       conn.send({ type: 'new_message', message: msg });
     }
   }
 
   /** 发送最近 N 条消息 */
   private sendRecentMessages(pid: PlayerId, limit: number) {
-    const msgs = this.messages.slice(-limit);
+    const visible = this.messages.filter(m => this.canReceiveMessage(pid, m));
+    const msgs = visible.slice(-limit);
     this.connectors.get(pid)?.send({
       type: 'messages_batch',
       messages: msgs,
-      isEnd: msgs.length === this.messages.length,
+      isEnd: msgs.length === visible.length,
     });
   }
 
   /** 滚动历史加载 */
   private sendHistoryMessages(pid: PlayerId, beforeId: string, limit: number) {
-    const idx = this.messages.findIndex(m => m.id === beforeId);
+    const visible = this.messages.filter(m => this.canReceiveMessage(pid, m));
+    const idx = visible.findIndex(m => m.id === beforeId);
     if (idx === -1) {
       this.sendRecentMessages(pid, limit);
       return;
     }
-    const msgs = this.messages.slice(Math.max(0, idx - limit), idx);
+    const msgs = visible.slice(Math.max(0, idx - limit), idx);
     this.connectors.get(pid)?.send({
       type: 'messages_batch',
       messages: msgs,
@@ -209,5 +222,40 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
   /** 生成消息ID */
   private generateMessageId(): string {
     return `msg_${Date.now()}_${++this.messageIdCounter}`;
+  }
+
+  private getSenderMeta(pid: PlayerId): ChatSenderMeta | undefined {
+    const provider = this._activeStageInstance as PreGameInstance;
+    return provider.getPlayerChatMeta(pid);
+  }
+
+  private canSendTeamMessage(pid: PlayerId, meta?: ChatSenderMeta): boolean {
+    const resolved = meta ?? this.getSenderMeta(pid);
+    return !!resolved?.teamId
+      && resolved.teamMode === 'team'
+      && resolved.presence === 'game';
+  }
+
+  private canReceiveMessage(pid: PlayerId, msg: ChatMessage): boolean {
+    if (msg.type === 'system' || msg.scope !== 'team') return true;
+    if (msg.recipientIds?.includes(pid)) return true;
+    const recipientMeta = this.getSenderMeta(pid);
+    return !!recipientMeta?.teamId
+      && recipientMeta.teamId === msg.meta?.teamId
+      && recipientMeta.teamMode === 'team'
+      && recipientMeta.presence === 'game';
+  }
+
+  private getTeamRecipientIds(teamId: string): PlayerId[] {
+    const stateProvider = this._activeStageInstance as unknown as {
+      getState?: () => { players?: Array<{ id: PlayerId; teamId?: string; status?: string }> };
+    } | null;
+    const players = stateProvider?.getState?.()?.players;
+    if (!Array.isArray(players)) {
+      return Array.from(this.connectors.keys()).filter(pid => this.getSenderMeta(pid)?.teamId === teamId);
+    }
+    return players
+      .filter(p => p.teamId === teamId && p.status === 'playing')
+      .map(p => p.id);
   }
 }

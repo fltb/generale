@@ -24,6 +24,7 @@ export interface UsePreGameRoomParams {
   visible?: boolean;
   onStateUpdate?: (payload: { event?: SyncedPreGameServerEventPayload }) => void;
   onSelfStatusChange?: (status: PreGamePlayerStatus) => void;
+  onRoomStateChange?: (room: PreGameRoomState) => void;
   onGameEndedReceived?: () => void;
   onExposeApi?: (api: { leaveSpectate: () => void } | null) => void;
 }
@@ -157,6 +158,10 @@ export function usePreGameRoom(params: UsePreGameRoomParams) {
   // 把 self.status 上报给父级路由组件，让它据此决定显示 Room 还是 Game
   createEffect(() => {
     params.onSelfStatusChange?.(selfStatus());
+  });
+
+  createEffect(() => {
+    params.onRoomStateChange?.(room());
   });
 
   // ---------------- dispatch 处理器 ----------------

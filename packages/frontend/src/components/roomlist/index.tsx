@@ -2,7 +2,7 @@
 import { For, Match, Show, Switch, createSignal, createMemo } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import RoomFilter from "./RoomFilter";
-import { listGamesApi, getGameInfoApi } from "~/api/gameApi";
+import { getGameInfoApi } from "~/api/gameApi";
 import { useQuery } from "@tanstack/solid-query";
 import CreateRoomModal from "./CreateRoomModal";
 import { A } from "@solidjs/router";

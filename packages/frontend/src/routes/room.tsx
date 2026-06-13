@@ -26,7 +26,7 @@ const RoomRoute: Component = () => {
   const session = useRoomSession(() => params.id);
 
   // chat floating visible（纯 UI 开关，留在视图层）
-  const [chatVisible, setChatVisible] = createSignal(false);
+  const [chatVisible, setChatVisible] = createSignal(true);
 
   return (
     <main class="container mx-auto p-6">
@@ -96,14 +96,16 @@ const RoomRoute: Component = () => {
           visible={!session.showingGameUI()}
           onStateUpdate={session.handleStateUpdate}
           onSelfStatusChange={(s) => session.setSelfStatus(s)}
+          onRoomStateChange={(room) => session.setRoomState(room)}
           onGameEndedReceived={session.handleGameEndedReceived}
           onExposeApi={(api) => session.setRoomApi(api)}
         />
       </Show>
 
-      {/* ---------- Chat floating window (bottom-right) ---------- */}
+      {/* ---------- Chat floating window (bottom-right) ----------
+          战局聊天跟 route 同级挂载，pregame / ingame 共享 chat-* domain。 */}
       <Show when={session.chatDomain() && session.playerId()}>
-        <div class="fixed bottom-4 right-4 z-50">
+        <div class="fixed bottom-4 left-4 z-50 max-w-[calc(100vw-2rem)]">
           {/* Minimized button */}
           <Show when={!chatVisible()}>
             <Button
@@ -120,9 +122,14 @@ const RoomRoute: Component = () => {
 
           {/* Expanded panel */}
           <Show when={chatVisible()}>
-            <div class="w-80 md:w-96 bg-base-100 border border-base-300 rounded-lg shadow-lg overflow-hidden">
-              <div class="flex items-center justify-between p-2 border-b border-base-300">
-                <div class="text-sm font-medium">聊天</div>
+            <div class="w-[min(24rem,calc(100vw-2rem))] overflow-hidden bg-base-100 shadow-lg pixel-border">
+              <div class="flex items-center justify-between gap-3 border-b border-base-300 p-2">
+                <div class="min-w-0">
+                  <div class="truncate text-sm font-medium">聊天</div>
+                  <div class="truncate text-xs opacity-60">
+                    {session.phase() === GamePhase.INGAME ? "游戏中" : "准备阶段"}
+                  </div>
+                </div>
                 <div class="flex items-center gap-2">
                   <Button
                     size="xs"
@@ -138,7 +145,7 @@ const RoomRoute: Component = () => {
                     onClick={() => setChatVisible(false)}
                     title="关闭"
                   >
-                    ✕
+                    X
                   </Button>
                 </div>
               </div>
@@ -148,6 +155,9 @@ const RoomRoute: Component = () => {
                   domain={session.chatDomain()!}
                   userId={session.playerId()!}
                   userName={session.playerName() ?? "Guest"}
+                  phase={session.phase()}
+                  selfStatus={session.selfStatus()}
+                  room={session.roomState()}
                   autoOpen
                 />
               </div>

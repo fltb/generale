@@ -986,6 +986,28 @@ export class PreGameInstance implements IBaseInstance<SyncedPreGameClientActions
     return this.state;
   }
 
+  /** 获取聊天展示所需的发送者快照。 */
+  public getPlayerChatMeta(playerId: PlayerId) {
+    const player = this.state.players.find(p => p.id === playerId);
+    if (!player) return null;
+    const team = this.state.teams.find(t => t.id === player.teamId);
+    return {
+      teamId: player.teamId,
+      teamName: team?.name ?? player.teamId,
+      teamMode: this.state.teamMode,
+      status: player.status,
+      presence:
+        player.status === PreGamePlayerStatus.Playing
+          ? "game"
+          : player.status === PreGamePlayerStatus.Spectating
+            ? "spectator"
+            : "room",
+      tileColor: player.tileColor,
+      avatarThumbUrl: player.avatarThumbUrl,
+      displayName: player.displayName,
+    } as const;
+  }
+
   public canJoin(playerId: PlayerId): { success: true } | { success: false, message: string } {
     if (this.destroyed) {
       const msg = `[PreGameInstance] Cannot add player to destroyed instance`;

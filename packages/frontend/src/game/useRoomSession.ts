@@ -4,6 +4,7 @@ import {
   GamePhase,
   PreGamePlayerStatus,
   SyncedPreGameServerEventPayloadType,
+  type PreGameRoomState,
 } from "@generale/types";
 import type { RoomWithSyncProps } from "~/components/room/Room";
 
@@ -28,6 +29,7 @@ export function useRoomSession(gameId: () => string | undefined) {
   const [phase, setPhase] = createSignal<GamePhase>(GamePhase.PREGAME);
   // 自己在房间内的状态：Lobby = 在大厅；Playing = 已被锁入游戏；Disconnected 本地不会出现
   const [selfStatus, setSelfStatus] = createSignal<PreGamePlayerStatus>(PreGamePlayerStatus.Lobby);
+  const [roomState, setRoomState] = createSignal<PreGameRoomState | null>(null);
 
   // RoomWithSync 暴露的 dispatcher，用于观战玩家在 GameWithSync 里点"退出观战"时
   // 把 LEAVE_SPECTATE 发到 pregame 域。Room 卸载时会传 null 进来。
@@ -212,6 +214,8 @@ export function useRoomSession(gameId: () => string | undefined) {
     phase,
     selfStatus,
     setSelfStatus,
+    roomState,
+    setRoomState,
     roomApi,
     setRoomApi,
     loading,

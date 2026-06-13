@@ -4,6 +4,8 @@ import type {
   ChatClientToServer,
   ChatServerToClient,
   ChatMessage,
+  ChatMessageScope,
+  ChatSenderMeta,
 } from "@generale/types";
 import { useWS } from "~/hooks/useWebsocket";
 import type { SubConnectorClient } from "~/ws/manager";
@@ -17,6 +19,7 @@ export function useChat(options: {
   userName: string;
   autoOpen?: boolean;
   initialFetchLimit?: number;
+  getOptimisticMeta?: () => ChatSenderMeta | undefined;
 }) {
   const {
     domain,
@@ -39,7 +42,7 @@ export function useChat(options: {
   const pendingOut: ChatClientToServer[] = [];
 
   // optimistic map: tempId -> content
-  const optimisticMap = new Map<string, string>();
+  const optimisticMap = new Map<string, { content: string; scope?: ChatMessageScope }>();
 
   function makeTempId() {
     return `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -176,9 +179,13 @@ export function useChat(options: {
         const m = msg.message;
 
         // 1️⃣ 先尝试匹配 optimistic（只对自己发的）
-        for (const [tempId, content] of optimisticMap.entries()) {
+        for (const [tempId, optimistic] of optimisticMap.entries()) {
+          const scopeMatches = optimistic.scope
+            ? optimistic.scope === m.scope
+            : m.scope !== "team";
           if (
-            content === m.content &&
+            optimistic.content === m.content &&
+            scopeMatches &&
             m.playerId === userId
           ) {
             setMessages((cur) => {
@@ -276,11 +283,12 @@ export function useChat(options: {
   }
 
   // ---- public actions ----
-  function sendMessage(content: string) {
+  function sendMessage(content: string, scope?: ChatMessageScope) {
     const trimmed = content.trim();
     if (!trimmed) return;
 
     const tempId = makeTempId();
+    const optimisticMeta = options.getOptimisticMeta?.();
     const optimistic: ChatMessage = {
       id: tempId,
       playerId: userId,
@@ -288,14 +296,20 @@ export function useChat(options: {
       content: trimmed,
       timestamp: Date.now(),
       type: "user",
+      ...(scope ? { scope } : {}),
+      ...(optimisticMeta ? { meta: optimisticMeta } : {}),
     };
 
     // add optimistic locally
     setMessages((cur) => [...cur, optimistic]);
-    optimisticMap.set(tempId, trimmed);
+    optimisticMap.set(tempId, { content: trimmed, scope });
 
     // prepare payload
-    const payload: ChatClientToServer = { type: "send_message", content: trimmed } as ChatClientToServer;
+    const payload: ChatClientToServer = {
+      type: "send_message",
+      content: trimmed,
+      ...(scope ? { scope } : {}),
+    } as ChatClientToServer;
 
     // send or buffer
     _sendOrBuffer(payload);

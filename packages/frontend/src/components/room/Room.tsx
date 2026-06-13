@@ -1,6 +1,7 @@
 import { type Component, Show } from "solid-js";
 import {
   type SyncedPreGameServerEventPayload,
+  type PreGameRoomState,
   PreGamePlayerStatus,
   type GameId,
   type PlayerId,
@@ -36,6 +37,7 @@ export interface RoomWithSyncProps {
    * 缺省视为 Lobby（与服务端 enum 默认一致）。
    */
   onSelfStatusChange?: (status: PreGamePlayerStatus) => void;
+  onRoomStateChange?: (room: PreGameRoomState) => void;
   /**
    * 服务端 pregame 域的 GAME_ENDED 到达时调用。父级据此进入"结算窗口"维持
    * GameWithSync 挂载。和"用户 dismiss 结算 UI"是两条独立信号。
@@ -61,6 +63,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     get visible() { return props.visible; },
     onStateUpdate: props.onStateUpdate,
     onSelfStatusChange: props.onSelfStatusChange,
+    onRoomStateChange: props.onRoomStateChange,
     onGameEndedReceived: props.onGameEndedReceived,
     onExposeApi: props.onExposeApi,
   });
@@ -82,6 +85,15 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
       {/* 被同 user 另一个 sub 接管：盖一层模态挡住操作 */}
       <Show when={ctrl.displaced()}>
         <TakeoverOverlay scope="房间" dim={60} />
+      </Show>
+
+      <Show when={ctrl.notice()}>
+        <Alert variant="info" class="shadow-lg">
+          <div>
+            Notice:
+            <span>{ctrl.notice()}</span>
+          </div>
+        </Alert>
       </Show>
 
       <Show when={ctrl.gameInProgress()}>
@@ -225,12 +237,6 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         />
       </Panel>
 
-      <Alert variant="info" class="shadow-lg">
-        <div>
-          Notice:
-          <span>{ctrl.notice()}</span>
-        </div>
-      </Alert>
     </div>
   );
 };

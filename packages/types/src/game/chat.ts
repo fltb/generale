@@ -1,6 +1,20 @@
-import type { PlayerId } from './core-type';
+import type { PlayerId, TeamId } from './core-type';
+import type { PreGamePlayerStatus } from './room/pre-game';
 
 export type ChatMessageType = 'user' | 'system';
+export type ChatMessageScope = 'room' | 'game' | 'team';
+export type ChatSenderPresence = 'room' | 'game' | 'spectator';
+
+export interface ChatSenderMeta {
+  teamId?: TeamId;
+  teamName?: string;
+  teamMode?: 'ffa' | 'team';
+  presence?: ChatSenderPresence;
+  status?: PreGamePlayerStatus;
+  tileColor?: number;
+  avatarThumbUrl?: string;
+  displayName?: string;
+}
 
 export interface ChatMessage {
   id: string;               // 唯一ID
@@ -9,6 +23,9 @@ export interface ChatMessage {
   content: string;          // 消息内容
   timestamp: number;        // 消息时间戳（ms）
   type: ChatMessageType;    // 消息类型：'user' | 'system'
+  scope?: ChatMessageScope;  // 消息范围：房间 / 游戏 / 队伍
+  meta?: ChatSenderMeta;     // 发送时的展示元数据快照
+  recipientIds?: PlayerId[]; // 小队消息的可见收件人快照
 }
 
 // --- WebSocket 协议 ---
@@ -17,6 +34,7 @@ export interface ChatMessage {
 export interface ChatSendMessageReq {
   type: 'send_message';
   content: string;
+  scope?: ChatMessageScope;
 }
 
 export interface ChatFetchRecentReq {
