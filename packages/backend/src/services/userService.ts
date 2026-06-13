@@ -4,6 +4,7 @@ import { verificationTokens } from '../db/schema' // 用于删除 token
 import { randomBytes, pbkdf2Sync, timingSafeEqual } from 'crypto'
 import { randomUUID } from 'crypto'
 import { eq } from 'drizzle-orm'
+import { DEFAULT_AVATAR_THUMB_URL, DEFAULT_AVATAR_URL } from './profileService'
 
 export interface User {
   id: string
@@ -63,6 +64,8 @@ export class UserService {
     db.insert(profiles).values({
       userId: id,
       displayName: username,
+      avatarUrl: DEFAULT_AVATAR_URL,
+      avatarThumbUrl: DEFAULT_AVATAR_THUMB_URL,
       updatedAt: now,
     }).run()
 

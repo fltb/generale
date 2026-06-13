@@ -18,8 +18,8 @@ const AVATAR_URL_PREFIX = '/api/avatars';
 
 /** 默认头像（用户未上传时返回这两个 URL，前端不需要做 fallback） */
 const DEFAULT_AVATAR_DIR = './public/avatars/default';
-const DEFAULT_AVATAR_URL = `${AVATAR_URL_PREFIX}/default/original.webp`;
-const DEFAULT_AVATAR_THUMB_URL = `${AVATAR_URL_PREFIX}/default/thumb.webp`;
+export const DEFAULT_AVATAR_URL = `${AVATAR_URL_PREFIX}/default/original.webp`;
+export const DEFAULT_AVATAR_THUMB_URL = `${AVATAR_URL_PREFIX}/default/thumb.webp`;
 
 /** 允许的输入 MIME 白名单（sharp 自己也会拒非图片，但提前 reject 错误更友好） */
 const ALLOWED_INPUT_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
