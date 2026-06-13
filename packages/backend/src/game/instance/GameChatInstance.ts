@@ -3,7 +3,8 @@ import {
   ChatMessage,
   ChatClientToServer,
   ChatServerToClient,
-  ChatSendMessageReq
+  ChatSendMessageReq,
+  ChatSenderMeta
 } from '@generale/types/src/game/chat';
 
 /**
@@ -59,7 +60,9 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
     if (this._activeStageInstance) {
       const res = this._activeStageInstance.canJoin(id);
       if (res.success) return { success: true };
-      return { success: false, message: `[GameChatInstance] Refused by active stage: ${res.message}` };
+      if (res.success === false) {
+        return { success: false, message: `[GameChatInstance] Refused by active stage: ${res.message}` };
+      }
     }
     return { success: false, message: '[GameChatInstance] No active stage instance, cannot join chat.' };
   }
@@ -69,11 +72,17 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
   public addPlayer(user: { id: PlayerId, name: string }, connector: ServerSyncConnector<ChatClientToServer, ChatServerToClient>): { success: true } | { success: false, message: string } {
     const pid = user.id;
     const name = user.name;
-    if (!this.canJoin(pid)) {
-      const msg = `[GameChatInstance] Player ${pid} not allowed to join`;
+    const canJoin = this.canJoin(pid);
+
+    // TODO::HACK:: host 或 stage 未 ready 时允许加入，因为房主进入聊天的时候 pregame 可能没有生成好，后续后端会进行重构，重新管理这几个 Instance 的生命周期
+    const isHostLike = !this._activeStageInstance;
+
+    if (canJoin.success === false && !isHostLike) {
+      const msg = canJoin.message || `[GameChatInstance] Player ${pid} not allowed to join`;
       console.warn(msg);
       return { success: false, message: msg };
     }
+    console.debug(`[GameChatInstance] user ${name}#${pid} joined chat.`)
     this.playerNames.set(pid, name);
     this.connectors.set(pid, connector);
     connector.onClientMessage(msg => this.handleMessage(pid, msg));
@@ -122,7 +131,7 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
       this.sendResult(pid, 'failed', undefined, '消息过长');
       return;
     }
-    const chatMsg: ChatMessage = {
+        const chatMsg: ChatMessage = {
       id: this.generateMessageId(),
       playerId: pid,
       playerName: name,

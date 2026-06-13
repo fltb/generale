@@ -522,7 +522,9 @@ export class GameService {
     const playerIds = Array.from(preGameState.players.map(p => p.id));
     this.gameInstance = new GameInstance(initialGameState, gameInstanceSettings, playerIds);
     this.phase = GamePhase.INGAME;
-    this.chatInstance.activeStageInstance = this.gameInstance;
+    // Chat permissions/display use PreGameInstance as the room roster source even during INGAME:
+    // it keeps late Lobby users, spectators, and locked Playing users in one place.
+    this.chatInstance.activeStageInstance = this.preGameInstance;
     this.gameInstance.onEndGame(this.endGame.bind(this));
 
     // 开始调度 Tick（必须在 phase 设置为 INGAME 且 gameInstance 创建后）
