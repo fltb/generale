@@ -16,7 +16,6 @@ import type { SubConnectorClient } from "~/ws/manager";
 export function useChat(options: {
   domain: string;
   userId: string;
-  userName: string;
   autoOpen?: boolean;
   initialFetchLimit?: number;
   getOptimisticMeta?: () => ChatSenderMeta | undefined;
@@ -24,7 +23,6 @@ export function useChat(options: {
   const {
     domain,
     userId,
-    userName,
     autoOpen = true,
     initialFetchLimit = 30,
   } = options;
@@ -52,10 +50,7 @@ export function useChat(options: {
   function ensureSubAndAttach() {
     if (!wsMgr) return;
     if (!sub) {
-      sub = wsMgr.getOrCreateSub<ChatClientToServer, ChatServerToClient>(domain, {
-        userid: userId,
-        username: userName,
-      });
+      sub = wsMgr.getOrCreateSub<ChatClientToServer, ChatServerToClient>(domain);
 
       // attach handlers once
       sub.onOpen(() => {
@@ -93,7 +88,7 @@ export function useChat(options: {
       // ensure open request if not ready (same pattern as useSyncedState)
       if (!sub.ready) {
         try {
-          wsMgr.openDomain(domain, { userid: userId, username: userName });
+          wsMgr.openDomain(domain, {});
         } catch (e) {
           console.warn("[useChat] openDomain failed in ensureSubAndAttach", e);
         }
@@ -119,7 +114,7 @@ export function useChat(options: {
       // try to nudge manager if socket connected but domain not opened
       try {
         if (wsMgr && wsMgr.isConnected) {
-          wsMgr.openDomain(domain, { userid: userId, username: userName });
+          wsMgr.openDomain(domain, { });
         }
       } catch (e) {
         // ignore
@@ -218,11 +213,11 @@ export function useChat(options: {
     }
   }
 
-  function _onDisconnect(err?: Error) {
+  function _onDisconnect(_err?: Error) {
     setConnected(false);
   }
 
-  function _onClose(code?: number, reason?: string) {
+  function _onClose(_code?: number, _reason?: string) {
     setConnected(false);
   }
 
@@ -258,7 +253,7 @@ export function useChat(options: {
 
       if (autoOpen) {
         try {
-          wsMgr.openDomain(domain, { userid: userId, username: userName });
+          wsMgr.openDomain(domain, { });
         } catch (e) {
           console.warn("[useChat] openDomain threw", e);
         }
@@ -292,7 +287,7 @@ export function useChat(options: {
     const optimistic: ChatMessage = {
       id: tempId,
       playerId: userId,
-      playerName: userName,
+      playerName: "", // TODO::HACK:: playerName will be auto-filled with real username at backend
       content: trimmed,
       timestamp: Date.now(),
       type: "user",

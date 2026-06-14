@@ -19,7 +19,6 @@ export interface UsePreGameRoomParams {
   domain: string;
   playerId: PlayerId;
   gameId: GameId;
-  playerName: string;
   /** 房间是否可见（用于在可见时清掉过时 notice） */
   visible?: boolean;
   onStateUpdate?: (payload: { event?: SyncedPreGameServerEventPayload }) => void;
@@ -100,7 +99,7 @@ export function usePreGameRoom(params: UsePreGameRoomParams) {
     initialVersion: 0,
     applyEvent: applyPregameEventLocal,
     onCustomEvent: handleCustomEvent,
-    context: { userid: params.playerId, username: params.playerName },
+    openPayload: { },
     onConnectionClosed: ({ code, reason }) => {
       console.warn("connection closed", code, reason);
       if (code === 4003) {

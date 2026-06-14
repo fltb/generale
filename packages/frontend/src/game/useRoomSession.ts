@@ -19,7 +19,6 @@ import type { RoomWithSyncProps } from "~/components/room/Room";
  */
 export function useRoomSession(gameId: () => string | undefined) {
   const [playerId, setPlayerId] = createSignal<string | null>(null);
-  const [playerName, setPlayerName] = createSignal<string | null>(null);
 
   // 分离的 domain signals，避免互相覆盖导致重复 mount
   const [pregameDomain, setPregameDomain] = createSignal<string | null>(null);
@@ -79,7 +78,6 @@ export function useRoomSession(gameId: () => string | undefined) {
 
       // player info
       setPlayerId(prev => (prev !== data.playerId ? data.playerId : prev));
-      setPlayerName(prev => (prev ?? "Guest") || "Guest");
 
       // authoritative phase
       setPhase(prev => (prev !== data.phase ? data.phase : prev));
@@ -207,7 +205,6 @@ export function useRoomSession(gameId: () => string | undefined) {
   return {
     // signals / accessors
     playerId,
-    playerName,
     pregameDomain,
     gameDomain,
     chatDomain,

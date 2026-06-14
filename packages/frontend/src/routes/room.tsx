@@ -90,7 +90,6 @@ const RoomRoute: Component = () => {
           domain={session.pregameDomain()!}
           gameId={params.id!}
           playerId={session.playerId()!}
-          playerName={session.playerName() ?? "Guest"}
           autoOpen
           // 房间和游戏 UI 二选一：游戏在屏上时房间隐藏，反之可见。
           visible={!session.showingGameUI()}
@@ -154,7 +153,6 @@ const RoomRoute: Component = () => {
                 <ChatPanel
                   domain={session.chatDomain()!}
                   userId={session.playerId()!}
-                  userName={session.playerName() ?? "Guest"}
                   phase={session.phase()}
                   selfStatus={session.selfStatus()}
                   room={session.roomState()}

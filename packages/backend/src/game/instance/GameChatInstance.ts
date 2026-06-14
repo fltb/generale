@@ -226,7 +226,7 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
 
   private getSenderMeta(pid: PlayerId): ChatSenderMeta | undefined {
     const provider = this._activeStageInstance as PreGameInstance;
-    return provider.getPlayerChatMeta(pid);
+    return provider.getPlayerChatMeta(pid) as any;
   }
 
   private canSendTeamMessage(pid: PlayerId, meta?: ChatSenderMeta): boolean {

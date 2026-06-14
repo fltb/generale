@@ -75,7 +75,7 @@ export function useGameSession(params: UseGameSessionParams) {
     initialVersion: 0,
     applyEvent: applyGameEventLocal,
     onCustomEvent: handleCustomEvent,
-    context: { userid: params.playerId },
+    openPayload: {},
     autoOpen: false,
   });
 

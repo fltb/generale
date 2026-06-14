@@ -17,7 +17,7 @@ export function useSyncedState<
   initialState,
   initialVersion = 0,
   applyEvent,
-  context = {},
+  openPayload: context = {},
   onCustomEvent = () => { },
   onConnectionClosed = () => { },
   autoOpen = true,
@@ -27,7 +27,7 @@ export function useSyncedState<
   initialVersion?: number;
   applyEvent: (state: TState, event: TAction) => TState;
   onCustomEvent?: (event: Custom) => void;
-  context?: Record<string, any>;
+  openPayload?: Record<string, any>;
   onConnectionClosed?: (info: { code?: number; reason?: string }) => void;
   autoOpen?: boolean;
 }) {
@@ -41,7 +41,7 @@ export function useSyncedState<
   );
 
   // NOTE: we no longer use useSubConnector hook here.
-  // We'll create/attach the sub via wsMgr.getOrCreateSub when connecting.
+  // We'll create/attach the sub via wsMgr.getOrCreateSub when connecting to print debug msg.
   let sub: SubConnectorClient | null = null;
   let connectRequested = false;
 
@@ -59,7 +59,7 @@ export function useSyncedState<
     if (!wsMgr) return;
     if (!sub) {
       // create / reuse a local sub object
-      sub = wsMgr.getOrCreateSub(domain, context);
+      sub = wsMgr.getOrCreateSub(domain);
 
       // attach handlers once
       sub.onOpen(() => {

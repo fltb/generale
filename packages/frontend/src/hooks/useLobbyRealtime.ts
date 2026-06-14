@@ -10,7 +10,7 @@ import {
   type LobbyClientEvent,
   type LobbyMessage,
 } from "@generale/types";
-import type { WSContextBase } from "~/ws/manager";
+import type { WSOpenPayloadBase } from "~/ws/manager";
 
 function stableStringify(v: unknown) {
   try {
@@ -66,7 +66,7 @@ export function useLobbyRealtime(
   const sub = useSubConnector<
     LobbyClientEvent,
     LobbyMessage,
-    { filters?: ListGamesQuery } & WSContextBase
+    { filters?: ListGamesQuery } & WSOpenPayloadBase
   >("lobby-games", { autoOpen: true, context: { filters: serverFilters() } });
 
   // queryKey shape from useGameListQuery: ["games", filtersAccessor(), offset, limit, sortBy, sortOrder]

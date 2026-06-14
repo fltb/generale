@@ -13,7 +13,6 @@ import { useChat } from "~/hooks/useChat";
 export interface UseChatSessionParams {
   domain: string;
   userId: string;
-  userName: string;
   phase?: GamePhase;
   selfStatus?: PreGamePlayerStatus;
   room?: PreGameRoomState | null;
@@ -50,7 +49,6 @@ export function useChatSession(params: UseChatSessionParams) {
   const chat = useChat({
     domain: params.domain,
     userId: params.userId,
-    userName: params.userName,
     autoOpen: params.autoOpen ?? true,
     initialFetchLimit: params.initialFetchLimit ?? 30,
     getOptimisticMeta: selfMeta,

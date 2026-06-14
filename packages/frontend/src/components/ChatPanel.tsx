@@ -12,7 +12,6 @@ import {
 export interface ChatPanelProps {
   domain: string;
   userId: string;
-  userName: string;
   phase?: GamePhase;
   selfStatus?: PreGamePlayerStatus;
   room?: PreGameRoomState | null;
@@ -27,7 +26,6 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
   const chat = useChatSession({
     domain: props.domain,
     userId: props.userId,
-    userName: props.userName,
     get phase() { return props.phase; },
     get selfStatus() { return props.selfStatus; },
     get room() { return props.room; },

@@ -18,7 +18,6 @@ export interface RoomWithSyncProps {
   domain: string;
   playerId: PlayerId;
   gameId: GameId;
-  playerName: string;
   autoOpen?: boolean;
   /**
    * visible: 控制 UI 显示（true 或缺省 显示；false 隐藏但保持挂载）。
@@ -59,7 +58,6 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     domain: props.domain,
     playerId: props.playerId,
     gameId: props.gameId,
-    playerName: props.playerName,
     get visible() { return props.visible; },
     onStateUpdate: props.onStateUpdate,
     onSelfStatusChange: props.onSelfStatusChange,

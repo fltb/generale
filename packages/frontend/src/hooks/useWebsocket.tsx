@@ -1,9 +1,9 @@
 // src/hooks/useWebsocket.tsx
 import { createContext, useContext, JSX, onCleanup } from "solid-js";
 import { ClientConnectionManager, SubConnectorClient } from "~/ws/manager";
-import type { WSContextBase } from "~/ws/manager";
+import type { WSOpenPayloadBase } from "~/ws/manager";
 
-type WSManager<T extends WSContextBase> = ClientConnectionManager<T>;
+type WSManager<T extends WSOpenPayloadBase> = ClientConnectionManager<T>;
 
 /**
  * WebSocket context that exposes a single manager instance.
@@ -18,7 +18,7 @@ const WSContext = createContext<{ manager: WSManager<any> | null } | undefined>(
 );
 
 export function WebSocketProvider<
-  T extends WSContextBase = WSContextBase,
+  T extends WSOpenPayloadBase = WSOpenPayloadBase,
 >(props: { url?: string; autoConnect?: boolean; children?: JSX.Element }) {
   const url =
     props.url ??
@@ -44,7 +44,7 @@ export function WebSocketProvider<
 /**
  * Hook to get the manager
  */
-export function useWS<T extends WSContextBase = WSContextBase>() {
+export function useWS<T extends WSOpenPayloadBase = WSOpenPayloadBase>() {
   const ctx = useContext(WSContext);
   if (!ctx) throw new Error("useWS must be used inside WebSocketProvider");
   return ctx.manager as WSManager<T>;
@@ -58,14 +58,14 @@ export function useWS<T extends WSContextBase = WSContextBase>() {
 export function useSubConnector<
   CEvt = any,
   SEvt = any,
-  Ctx extends WSContextBase = WSContextBase,
+  Ctx extends WSOpenPayloadBase = WSOpenPayloadBase,
 >(domain: string, opts?: { autoOpen?: boolean; context?: Partial<Ctx> }) {
   const manager = useWS<Ctx>();
 
-  const sub = manager.getOrCreateSub<CEvt, SEvt>(domain, opts?.context ?? {});
+  const sub = manager.getOrCreateSub<CEvt, SEvt>(domain);
 
   if (opts?.autoOpen ?? true) {
-    manager.openDomain(domain, opts?.context ?? {});
+    manager.openDomain(domain);
   }
 
   return sub as SubConnectorClient<CEvt, SEvt, Ctx>;

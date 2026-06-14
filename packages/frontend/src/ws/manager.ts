@@ -1,15 +1,10 @@
 // src/ws/manager.ts
 import { createSignal } from "solid-js";
 
-/**
- * Types captured from your server-side definitions (simplified)
- */
-export interface WSContextBase {
-  userid: string;
-  username?: string;
-}
 
-export type WebSocketMessage<T = unknown, Context extends WSContextBase = WSContextBase> =
+export interface WSOpenPayloadBase {}
+
+export type WebSocketMessage<T = unknown, Context extends WSOpenPayloadBase = WSOpenPayloadBase> =
   | { domain: string; type: "open"; payload: Context }
   | { domain: string; type: "close"; payload?: { code?: number; reason?: string } }
   | { domain: string; type: "message"; payload: T }
@@ -22,7 +17,7 @@ export type WebSocketMessage<T = unknown, Context extends WSContextBase = WSCont
 /**
  * SubConnectorClient: client-side mirror of server SubConnectorImpl
  */
-export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSContextBase = WSContextBase> {
+export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSOpenPayloadBase = WSOpenPayloadBase> {
   private openCallbacks: (() => void)[] = [];
   private closeCallbacks: ((code?: number, reason?: string) => void)[] = [];
   private disconnectCallbacks: ((err?: Error) => void)[] = [];
@@ -35,13 +30,11 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSContextBas
 
   constructor(
     public readonly domain: string,
-    public readonly context: Partial<Ctx>,
     private manager: ClientConnectionManager<Ctx>
   ) { }
 
   get ready() { return this._ready; }
   getConnectionId() { return this.manager.connectionId; }
-  getContext() { return this.context as Ctx; }
 
   // lifecycle/callbacks registration
   onOpen(cb: () => void) { this.openCallbacks.push(cb); }
@@ -68,10 +61,9 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSContextBas
   }
 
   // internal triggers called by manager when receiving server-sent events
-  _triggerOpen(ctx?: Partial<Ctx>) {
+  _triggerOpen() {
     this._ready = true;
     this._explicitlyClosed = false;
-    if (ctx) Object.assign(this.context, ctx);
     this.openCallbacks.forEach(cb => cb());
   }
   _triggerClose(code?: number, reason?: string) {
@@ -102,7 +94,7 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSContextBas
  * NOTE: This implementation assumes session/auth is handled via httpOnly cookie.
  * It DOES NOT include session id/token in the WebSocket URL.
  */
-export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> {
+export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSOpenPayloadBase> {
   private ws?: WebSocket | null;
   private url: string;
   private reconnectAttempts = 0;
@@ -113,10 +105,11 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
   public connectionId: string | null = null;
   public isConnected = false;
 
-  private subConnectors = new Map<string, SubConnectorClient<any, any, Ctx>>();
+  private subConnectors = new Map<string, SubConnectorClient<any, any, OpenPayload>>();
 
   /** domains we've asked the server to open but haven't yet received server 'open' ack */
   private pendingOpens = new Set<string>();
+  private openPayloads = new Map<string, any>();
 
   /**
    * 每个 domain 的 open-ack 超时重试定时器。
@@ -267,10 +260,10 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
 
 
   // create or get local subconnector (client-side)
-  getOrCreateSub<CEvt = any, SEvt = any>(domain: string, ctx: Partial<Ctx> = {}) {
-    let sub = this.subConnectors.get(domain) as SubConnectorClient<CEvt, SEvt, Ctx> | undefined;
+  getOrCreateSub<CEvt = any, SEvt = any>(domain: string) {
+    let sub = this.subConnectors.get(domain) as SubConnectorClient<CEvt, SEvt, OpenPayload> | undefined;
     if (!sub) {
-      sub = new SubConnectorClient<CEvt, SEvt, Ctx>(domain, ctx, this);
+      sub = new SubConnectorClient<CEvt, SEvt, OpenPayload>(domain, this);
       this.subConnectors.set(domain, sub);
       console.debug("[WS] getOrCreateSub: CREATED sub", domain, sub);
     } else {
@@ -287,8 +280,8 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
   }
 
   // ask server to open a sub-domain
-  openDomain(domain: string, ctx: Partial<Ctx> = {}) {
-    const sub = this.getOrCreateSub(domain, ctx);
+  openDomain(domain: string, payload: OpenPayload = {} as OpenPayload) {
+    const sub = this.getOrCreateSub(domain);
 
     // If already pending, don't re-send
     if (this.pendingOpens.has(domain)) {
@@ -304,14 +297,15 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
 
     // mark as pending and send open request
     this.pendingOpens.add(domain);
-    this.sendRaw({ domain, type: "open", payload: ctx });
-    console.debug("[WS] openDomain requested:", domain, ctx);
-    this._scheduleOpenRetry(domain, ctx, 0);
+    this.openPayloads.set(domain, payload);
+    this.sendRaw({ domain, type: "open", payload });
+    console.debug("[WS] openDomain requested:", domain, payload);
+    this._scheduleOpenRetry(domain, payload, 0);
     return sub;
   }
 
   /** 安排一次 open-ack 超时重试：到点仍未 ack（仍在 pendingOpens）就重发 open。 */
-  private _scheduleOpenRetry(domain: string, ctx: Partial<Ctx>, attempt: number) {
+  private _scheduleOpenRetry(domain: string, ctx: Partial<OpenPayload>, attempt: number) {
     this._clearOpenRetry(domain);
     const timer = setTimeout(() => {
       this.openRetryTimers.delete(domain);
@@ -324,7 +318,7 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       // socket 没连上就先不发（重连后 _retryPendingOpens 会兜底）
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         const sub = this.subConnectors.get(domain);
-        const c = sub ? sub.getContext() : ctx;
+        const c = sub ? this.openPayloads.get(domain) : ctx;
         console.warn(`[WS] openDomain '${domain}' not acked, resending (attempt ${attempt + 1})`);
         this.sendRaw({ domain, type: "open", payload: c });
       }
@@ -349,12 +343,13 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       this.sendRaw({ domain, type: "close", payload: { code, reason } });
       this.subConnectors.delete(domain);
       this.pendingOpens.delete(domain);
+      this.openPayloads.delete(domain);
       this._clearOpenRetry(domain);
     }
   }
 
   // route incoming server messages
-  private _handleIncoming(msg: WebSocketMessage<any, Ctx>) {
+  private _handleIncoming(msg: WebSocketMessage<any, OpenPayload>) {
     // connection ack
     if (msg.type === "connection_ack") {
       const connectionId = msg.payload.connectionId;
@@ -394,11 +389,11 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
       switch (type) {
         case "open": {
           // server opened subconnector; create if not exists
-          const sub = this.getOrCreateSub(domain, payload as Partial<Ctx>);
+          const sub = this.getOrCreateSub(domain);
           // remove from pending opens since server confirmed open
           this.pendingOpens.delete(domain);
           this._clearOpenRetry(domain);
-          sub._triggerOpen(payload as Partial<Ctx>);
+          sub._triggerOpen();
           console.debug("[WS] domain open ack:", domain, payload);
           break;
         }
@@ -439,10 +434,10 @@ export class ClientConnectionManager<Ctx extends WSContextBase = WSContextBase> 
     if (!this.isConnected || !this.pendingOpens.size) return;
     for (const domain of Array.from(this.pendingOpens)) {
       const sub = this.subConnectors.get(domain);
-      const ctx = sub ? sub.getContext() : {};
+      const ctx = sub ? this.openPayloads.get(domain) : {};
       console.debug("[WS] retrying open for pending domain:", domain);
       this.sendRaw({ domain, type: "open", payload: ctx });
-      this._scheduleOpenRetry(domain, ctx as Partial<Ctx>, 0);
+      this._scheduleOpenRetry(domain, ctx as Partial<OpenPayload>, 0);
     }
   }
 }
