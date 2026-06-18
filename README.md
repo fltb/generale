@@ -49,7 +49,7 @@ A multiplayer turn-based territorial strategy game inspired by Generals.io. Buil
 ## 项目结构 / Project Structure
 
 ```
-generale-vue/
+generale/
 ├── packages/
 │   ├── frontend/                # SolidJS 前端 SPA
 │   │   ├── src/
