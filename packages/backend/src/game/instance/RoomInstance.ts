@@ -18,8 +18,9 @@ import {
   PreGameTeamMode,
   PreGamePlayerStatus,
 } from '@generale/types';
-import { compare } from 'fast-json-patch';
 import type { ChatSenderMeta } from '@generale/types/src/game/chat';
+import { StateSyncState } from './state-sync';
+import { displaceConnector as displace } from './connector-manager';
 
 // 类型别名，便于引用
 export type RoomServerConnector = ServerSyncConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>;
@@ -41,7 +42,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   private syncData: Map<PlayerId, { lastConfirmedOp: number }> = new Map();
 
   private connectors: Map<PlayerId, RoomServerConnector> = new Map();
-  private prevSentState: Map<PlayerId, SyncedPreGameState> = new Map();
+  private stateSync = new StateSyncState<SyncedPreGameState>();
   private version = 0;
   private destroyed = false;
   private onStateChangeCallbacks: Array<(state: PreGameRoomState) => void> = [];
@@ -143,10 +144,10 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   }
 
   /**
-   * 清除某个 pid 的 per-connection 服务端状态：connector / prevSentState / syncData。
+   * 清除某个 pid 的 per-connection 服务端状态：connector / stateSync / syncData。
    * 保留 player entry 本身（是否保留由调用方决定）。
    * 不清这些会导致：
-   *  - prevSentState 残留 → 重连首帧服务端发 PATCH 而不是 SNAPSHOT，客户端 patch 失败
+   *  - stateSync 残留 → 重连首帧服务端发 PATCH 而不是 SNAPSHOT，客户端 patch 失败
    *  - syncData.lastConfirmedOp 残留 → 新 connection 从 optimisticId=0 计数时被
    *    服务端误判为过期 action 丢弃
    */
@@ -156,7 +157,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       try { conn.close(); } catch { }
       this.connectors.delete(pid);
     }
-    this.prevSentState.delete(pid);
+    this.stateSync.clear(pid);
     this.syncData.delete(pid);
   }
 
@@ -844,79 +845,33 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   private sendState(pid: PlayerId, forceSnapshot = false) {
     const conn = this.connectors.get(pid);
     if (!conn) return;
-    const prev = this.prevSentState.get(pid);
+
     const foundSelf = this.state.players.find(p => p.id === pid);
     const curr: SyncedPreGameState = foundSelf
       ? { room: this.state, selfId: pid, self: foundSelf }
       : { room: this.state, selfId: pid };
 
     const confirmedOp = this.syncData.get(pid)?.lastConfirmedOp ?? 0;
-    if (!prev || forceSnapshot) {
-      console.debug("sent state", {
+    this.stateSync.send(pid, forceSnapshot, curr, this.version, confirmedOp,
+      (state, ver, op) => conn.send({
         type: SyncedPreGameServerEventType.STATE_UPDATE,
         payload: {
           type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
-          version: this.version,
-          confirmedOp,
-          payload: curr,
+          version: ver,
+          confirmedOp: op,
+          payload: state,
         },
-      })
-      conn.send({
-        type: SyncedPreGameServerEventType.STATE_UPDATE,
-        payload: {
-          type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
-          version: this.version,
-          confirmedOp,
-          payload: curr,
-        },
-      });
-      this.prevSentState.set(pid, structuredClone(curr));
-      return;
-    }
-    const patches = compare(prev, curr);
-    if (patches.length > 1000) {
-      console.debug("sent state", {
-        type: SyncedPreGameServerEventType.STATE_UPDATE,
-        payload: {
-          type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
-          version: this.version,
-          confirmedOp,
-          payload: curr,
-        },
-      })
-
-      conn.send({
-        type: SyncedPreGameServerEventType.STATE_UPDATE,
-        payload: {
-          type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
-          version: this.version,
-          confirmedOp,
-          payload: curr,
-        },
-      });
-    } else {
-      console.debug("sent state", {
+      }),
+      (patches, ver, op) => conn.send({
         type: SyncedPreGameServerEventType.STATE_UPDATE,
         payload: {
           type: SyncedPreGameServerStateUpdatePayloadType.PATCH,
-          version: this.version,
-          confirmedOp,
+          version: ver,
+          confirmedOp: op,
           payload: patches,
         },
-      })
-
-
-      conn.send({
-        type: SyncedPreGameServerEventType.STATE_UPDATE,
-        payload: {
-          type: SyncedPreGameServerStateUpdatePayloadType.PATCH,
-          version: this.version,
-          confirmedOp,
-          payload: patches,
-        },
-      });
-    }
-    this.prevSentState.set(pid, structuredClone(curr));
+      }),
+    );
   }
 
   /** 广播同步 */
@@ -1065,26 +1020,12 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
    * (`this.connectors.get(pid) !== source`) 会因为 map 里已经是新 connector
    * 而短路掉，不会误把新连接的 status 翻成 Disconnected / 误清新连接。
    *
-   * 同时清掉 prevSentState / syncData：让新 client 首帧一定是 SNAPSHOT，
+   * 同时清掉 stateSync / syncData：让新 client 首帧一定是 SNAPSHOT，
    * 不是基于旧基线算出来的、新 client 无法应用的 PATCH。
    */
   private displaceConnector(pid: PlayerId, connector: RoomServerConnector) {
-    const stale = this.connectors.get(pid);
-    this.connectors.set(pid, connector);
-    this.prevSentState.delete(pid);
-    this.syncData.delete(pid);
-
-    if (stale && stale !== connector) {
-      // 先告诉旧 sub 它被替换了，再 close。前端收到 DISPLACED 后会显示
-      // "此页面已被另一个标签页/设备接管"的提示。best-effort：发不出去就当 sub 已经死了。
-      try {
-        stale.send({
-          type: SyncedPreGameServerEventType.CUSTOM,
-          payload: { type: SyncedPreGameServerEventPayloadType.DISPLACED },
-        });
-      } catch { /* ignore */ }
-      try { stale.close(); } catch { /* ignore */ }
-    }
+    displace(pid, connector, this.connectors, this.stateSync, this.syncData,
+      SyncedPreGameServerEventType.CUSTOM, SyncedPreGameServerEventPayloadType.DISPLACED);
 
     connector.onOpen(() => this.sendState(pid, true));
     connector.onDisconnect(() => this.handleDisconnect(pid, connector));
@@ -1198,7 +1139,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     this.suspended = true;
     // optional: avoid emitting onStateChangeCallbacks
     try {
-      this.prevSentState.clear();
+      this.stateSync.clearAll();
     } catch (e) {
       // ignore
     }

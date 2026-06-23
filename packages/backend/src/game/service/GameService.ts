@@ -11,16 +11,17 @@ import {
   SyncedPreGameServerEvent,
   ChatClientToServer,
   ChatServerToClient,
-  ServerSyncConnector,
   GameSettings,
   GamePhase,
   PRESET_SIZES,
   PreGamePlayerStatus,
   PreGameTeamMode,
 } from '@generale/types';
-import { RoomInstance, RoomServerConnector } from '../instance/RoomInstance';
+import { RoomInstance } from '../instance/RoomInstance';
 import { GameInstance, GameInstanceSettings } from '../instance/GameInstance';
-import { GameChatInstance, GameChatConnector } from '../instance/GameChatInstance';
+import { GameChatInstance } from '../instance/GameChatInstance';
+import { RoomUpdateFilter } from './units/RoomUpdateFilter';
+import { buildGameInfo } from './units/GameInfoPresenter';
 import { registerDomainHandler, unregisterDomainHandler, DomainHandler, SubConnector } from '../../plugins/websocket';
 import { generateMap } from '../core/map-gen';
 import { GameInfoSuccessResp } from '@generale/types/dist/api';
@@ -63,17 +64,13 @@ export type ConnectionResult =
   | { success: true; data: ConnectionInfo }
   | { success: false; reason: 'NOT_AUTHORIZED' | 'GAME_UNAVAILABLE' | 'INVALID_STATE'; message: string; };
 
-/**
- * GameService - 游戏总管理服务
- * 管理游戏的各个阶段和实例，协调 WebSocket sub-connector
- */
-export class GameService {
-  // ...existing fields...
-  /** Tick timer ID for scheduled game advancement */
-  private tickTimerId: NodeJS.Timeout | null = null;
-
-  private gameId: GameId;
-  private phase: GamePhase = GamePhase.PREGAME;
+  /**
+   * GameService - 游戏总管理服务
+   * 管理游戏的各个阶段和实例，协调 WebSocket sub-connector
+   */
+  export class GameService {
+    private gameId: GameId;
+    private phase: GamePhase = GamePhase.PREGAME;
 
   // 各阶段实例
   private roomInstance: RoomInstance | null = null;
@@ -89,13 +86,13 @@ export class GameService {
   private onDisbandCallback?: () => void;
 
   private roomUpdateEmitter?: (gameId: GameId) => void;
-  private roomUpdateFilters: Array<(prev?: PreGameRoomState, curr?: PreGameRoomState) => boolean> = [];
-  // 保存从 room 启动游戏前的快照（用于游戏结束后恢复房间）
-  private lastRoomSnapshot?: PreGameRoomState;
+  private roomUpdateFilter!: RoomUpdateFilter;
 
   constructor(config: GameServiceConfig) {
     this.config = config;
     this.gameId = config.gameId;
+
+    this.roomUpdateFilter = new RoomUpdateFilter(this.gameId, (id) => this.roomUpdateEmitter?.(id));
 
     // 初始化聊天实例（贯穿整个游戏生命周期）
     this.chatInstance = new GameChatInstance(config.chatMaxMessages);
@@ -175,7 +172,7 @@ export class GameService {
             ...(ctx.displayName ? { displayName: ctx.displayName } : {}),
             ...(ctx.avatarThumbUrl ? { avatarThumbUrl: ctx.avatarThumbUrl } : {}),
           },
-          this.adaptToRoomConnector(connector),
+          connector,
         );
         if (!result.success) {
           connector.close(4003, result.message || 'Failed to add to room');
@@ -225,7 +222,7 @@ export class GameService {
       const isSpectator = playerEntry?.status === PreGamePlayerStatus.Spectating;
 
       if (isSpectator) {
-        const res = this.gameInstance.addSpectator({ id: userid, name: username }, this.adaptToGameConnector(connector));
+        const res = this.gameInstance.addSpectator({ id: userid, name: username }, connector);
         if (!res.success) {
           connector.close(4003, res.message);
           return;
@@ -233,7 +230,7 @@ export class GameService {
         return;
       }
 
-      const res = this.gameInstance.addPlayer({ id: userid, name: username }, this.adaptToGameConnector(connector));
+      const res = this.gameInstance.addPlayer({ id: userid, name: username }, connector);
       if (!res.success) {
         connector.close(4003, res.message);
         return;
@@ -267,7 +264,7 @@ export class GameService {
 
       // 获取玩家连接
       // 将玩家添加到 ChatInstance
-      const res = this.chatInstance.addPlayer({ id: userid, name: username }, this.adaptToChatConnector(connector));
+      const res = this.chatInstance.addPlayer({ id: userid, name: username }, connector);
       if (!res.success) {
         connector.close(4003, res.message);
         return;
@@ -275,77 +272,47 @@ export class GameService {
     };
   }
 
-  // ============ Connector 适配方法 ============
-
-  /**
-   * 将 SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent, { playerId: PlayerId; playerName: string }> 适配为 RoomServerConnector
-   */
-  private adaptToRoomConnector(connector: SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>): RoomServerConnector {
-    return connector;
-  }
-
-  /**
-   * 将 SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent, { playerId: PlayerId; playerName: string }> 适配为 ServerSyncConnector
-   */
-  private adaptToGameConnector(connector: SubConnector<SyncedGameClientActions, SyncedGameServerEvent>): ServerSyncConnector<SyncedGameClientActions, SyncedGameServerEvent> {
-    return connector;
-  }
-
-  /**
-   * 将 SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent, { playerId: PlayerId; playerName: string }> 适配为 GameChatConnector
-   */
-  private adaptToChatConnector(connector: SubConnector<ChatClientToServer, ChatServerToClient>): GameChatConnector {
-    return connector;
-  }
-
-  private addRoomUpdateFilter(
-    fn: (prev?: PreGameRoomState, curr?: PreGameRoomState) => boolean
-  ): () => void {
-    this.roomUpdateFilters.push(fn);
-    return () => {
-      const i = this.roomUpdateFilters.indexOf(fn);
-      if (i >= 0) this.roomUpdateFilters.splice(i, 1);
-    };
-  }
   // ============ 游戏阶段管理 ============
 
-  /**
-   * 初始化 Room 阶段
-   */
   private initializeRoom(): void {
-    // determine default map width/height from config
-    let defaultWidth = 20;
-    let defaultHeight = 20;
-    let initialSizeLabel: "small" | "medium" | "large" | undefined;
+    const initialState = this.buildInitialRoomState();
+    this.roomInstance = new RoomInstance(initialState, new Map());
+    this.wireRoomInstance();
+    this.phase = GamePhase.PREGAME;
+    this.chatInstance.activeStageInstance = this.roomInstance;
+    this.roomUpdateFilter.attach(this.roomInstance);
+    console.log(`[GameService ${this.gameId}] Room initialized`);
+  }
 
-    // if config.mapSize provided as numeric object, use it
-    if (this.config.mapSize && typeof this.config.mapSize === "object") {
-      defaultWidth = Math.max(10, Math.min(500, Math.floor(this.config.mapSize.width)));
-      defaultHeight = Math.max(10, Math.min(500, Math.floor(this.config.mapSize.height)));
-    } else if (this.config.mapSize && typeof this.config.mapSize === "string") {
-      // standard 模式：把 label 反映为预设尺寸 + sizeLabel
-      const m = this.config.mapSize;
-      const dims = PRESET_SIZES[m as "small" | "medium" | "large"];
-      defaultWidth = dims.width;
-      defaultHeight = dims.height;
-      initialSizeLabel = m as "small" | "medium" | "large";
+  private resolveMapDimensions(): { width: number; height: number; sizeLabel?: 'small' | 'medium' | 'large' } {
+    const ms = this.config.mapSize;
+    if (ms && typeof ms === 'object') {
+      return {
+        width: Math.max(10, Math.min(500, Math.floor(ms.width))),
+        height: Math.max(10, Math.min(500, Math.floor(ms.height))),
+      };
     }
+    if (ms && typeof ms === 'string') {
+      const dims = PRESET_SIZES[ms as 'small' | 'medium' | 'large'];
+      return { width: dims.width, height: dims.height, sizeLabel: ms as 'small' | 'medium' | 'large' };
+    }
+    return { width: 20, height: 20 };
+  }
 
-    const isStandard = this.config.type === "standard";
+  private buildInitialRoomState(): PreGameRoomState {
+    const { width, height, sizeLabel } = this.resolveMapDimensions();
+    const isStandard = this.config.type === 'standard';
+    const teamMode: PreGameTeamMode = this.config.teamMode ?? 'ffa';
 
-    const teamMode: PreGameTeamMode = this.config.teamMode ?? "ffa";
-
-    const initialState: PreGameRoomState = {
+    return {
       gameId: this.gameId,
-      roomType: isStandard ? "standard" : "custom",
-      // 队伍模式：默认 ffa；config 传 team 时初始为空，addPlayer 在 team 模式会按
-      // <MIN_TEAMS 时给新玩家专属队
+      roomType: isStandard ? 'standard' : 'custom',
       teamMode,
       hostId: '',
       players: [],
       gameSetting: {
         speed: 1.0,
-        tileGrow: { /* same as before */
+        tileGrow: {
           PLAIN: { duration: 40, growth: 1 },
           THRONE: { duration: 1, growth: 1 },
           BARRACKS: { duration: 1, growth: 1 },
@@ -357,86 +324,25 @@ export class GameService {
       },
       mapSetting: {
         type: (isStandard ? PreGameMapType.Random : PreGameMapType.Custom),
-        width: defaultWidth,
-        height: defaultHeight,
+        width,
+        height,
         tileFrequency: {},
-        ...(isStandard && initialSizeLabel ? { sizeLabel: initialSizeLabel } : {}),
+        ...(isStandard && sizeLabel ? { sizeLabel } : {}),
       } as PreGameRoomState['mapSetting'],
       teams: [],
       teamCount: 0,
       playerLimit: this.config.maxPlayers ?? 8,
-      started: false
+      started: false,
     };
-
-    this.roomInstance = new RoomInstance(initialState, new Map());
-    this.roomInstance.onDisband(() => {
-      this.disbandGame();
-    });
-    this.phase = GamePhase.PREGAME;
-    this.chatInstance.activeStageInstance = this.roomInstance;
-
-    this.roomInstance.onStartGame(this.startGame.bind(this));
-
-    this.lastRoomSnapshot = structuredClone(this.roomInstance.getState());
-
-    // 过滤器：只在影响房间列表展示的字段变化时上报。
-    // 房间列表展示的来源是 getGameInfo()：包含 hostId、players(id/name/isHost)、
-    // started、playerLimit、mapSetting(width/height) 等字段。
-    const playerListFingerprint = (s?: PreGameRoomState) =>
-      JSON.stringify(
-        (s?.players ?? []).map((p) => ({ id: p.id, name: p.name, isHost: p.isHost }))
-      );
-
-    const mapSettingFingerprint = (s?: PreGameRoomState) => {
-      const ms: any = s?.mapSetting;
-      if (!ms) return "";
-      return JSON.stringify({ width: ms.width, height: ms.height, sizeLabel: ms.sizeLabel ?? null });
-    };
-
-    const significantChange = (prev?: PreGameRoomState, curr?: PreGameRoomState) => {
-      if ((prev?.players.length ?? 0) !== (curr?.players.length ?? 0)) return true;
-      if ((prev?.hostId ?? "") !== (curr?.hostId ?? "")) return true;
-      if ((prev?.started ?? false) !== (curr?.started ?? false)) return true;
-      if ((prev?.playerLimit ?? 0) !== (curr?.playerLimit ?? 0)) return true;
-      if ((prev?.roomType ?? "") !== (curr?.roomType ?? "")) return true;
-      if (mapSettingFingerprint(prev) !== mapSettingFingerprint(curr)) return true;
-      if (playerListFingerprint(prev) !== playerListFingerprint(curr)) return true;
-      return false;
-    };
-
-    this.addRoomUpdateFilter(significantChange);
-
-    this.roomInstance.onStateChange((newState) => {
-      const prev = this.lastRoomSnapshot;
-      this.lastRoomSnapshot = structuredClone(newState);
-
-      let shouldEmit = false;
-
-      // 如果没有任何过滤器，默认上报（往 manager 发送）
-      if (this.roomUpdateFilters.length === 0) {
-        shouldEmit = true;
-      } else {
-        for (const filter of this.roomUpdateFilters) {
-          try {
-            if (filter(prev, newState)) {
-              shouldEmit = true;
-              break;
-            }
-          } catch (err) {
-            console.error('[GameService] room update filter error', err);
-          }
-        }
-      }
-
-      if (shouldEmit) {
-        this.emitRoomUpdatedToManager();
-      }
-    });
-    console.log(`[GameService ${this.gameId}] Room initialized`);
   }
 
-  private emitRoomUpdatedToManager() {
-    try { this.roomUpdateEmitter?.(this.gameId); } catch (err) { console.error('[GameService] emitRoomUpdatedToManager', err); }
+  private wireRoomInstance() {
+    this.roomInstance!.onDisband(() => this.disbandGame());
+    this.roomInstance!.onStartGame(this.startGame.bind(this));
+  }
+
+  private emitRoomUpdated() {
+    try { this.roomUpdateEmitter?.(this.gameId); } catch (err) { console.error('[GameService] emitRoomUpdated', err); }
   }
 
   public setRoomUpdateEmitter(cb: (gameId: GameId) => void) {
@@ -456,7 +362,6 @@ export class GameService {
 
     // 直接使用传入的 Room 状态
     const roomState = structuredClone(state);
-    this.lastRoomSnapshot = structuredClone(roomState);
 
     // 创建初始游戏状态
     const nowTick = 0;
@@ -527,8 +432,8 @@ export class GameService {
     this.chatInstance.activeStageInstance = this.roomInstance;
     this.gameInstance.onEndGame(this.endGame.bind(this));
 
-    // 开始调度 Tick（必须在 phase 设置为 INGAME 且 gameInstance 创建后）
-    this.scheduleGameTicks(state.gameSetting?.speed ?? 1.0);
+    // 开始调度 Tick
+    this.gameInstance.startTicking(state.gameSetting?.speed ?? 1.0);
 
     // 清理 RoomInstance
     // this.roomInstance.destroy();
@@ -541,7 +446,7 @@ export class GameService {
     }
     // 触发游戏开始回调
     this.onGameStartCallback?.();
-    this.emitRoomUpdatedToManager();
+    this.emitRoomUpdated();
 
     console.log(`[GameService ${this.gameId}] Game started with ${playerIds.length} players`);
   }
@@ -551,7 +456,7 @@ export class GameService {
    */
   public endGame(result?: any): void {
     // 清理 tick timer
-    this.clearTickTimer();
+    this.gameInstance?.stopTicking();
 
     if (this.phase !== GamePhase.INGAME) {
       console.error(`[GameService ${this.gameId}] Cannot end game from phase: ${this.phase}`);
@@ -593,133 +498,41 @@ export class GameService {
     // 因为是 resume，所以无需处理
     // this.roomInstance.onStartGame(this.startGame.bind(this));
     // this.roomInstance.onStateChange(() => {
-    //   this.emitRoomUpdatedToManager();
+    //   this.emitRoomUpdated();
     // });
     // this.roomInstance.onDisband(() => {
     //   this.disbandGame();
     // })
     // 通知 manager 房间已变更（从 INGAME -> PREGAME）
-    this.emitRoomUpdatedToManager();
+    this.emitRoomUpdated();
 
     console.log(`[GameService ${this.gameId}] Game ended and room restored to room with ${this.roomInstance.getState().players.length} players`);
   }
 
   public forceDispose(): void {
-    if (this.phase === GamePhase.DISBANDED) return;
-
-    // Clear tick timer on disband
-    this.clearTickTimer();
-
-    console.log(`[GameService ${this.gameId}] disposing game...`);
-
-    this.phase = GamePhase.DISBANDED;
-    this.roomInstance?.destroy();
-    this.roomInstance = null;
-    this.gameInstance?.destroy();
-    this.gameInstance = null;
-    this.chatInstance.destroy();
-    // 注销域名处理器
-    this.unregisterDomainHandlers();
-
-    console.log(`[GameService ${this.gameId}] Game disposed`);
+    this.cleanupAndSetDisbanded();
+    console.log(`[GameService ${this.gameId}] Game force disposed`);
   }
 
-  /**
-   * 解散游戏
-   */
   private disbandGame(): void {
-    if (this.phase === GamePhase.DISBANDED) return;
-
-    // Clear tick timer on disband
-    this.clearTickTimer();
-
-    console.log(`[GameService ${this.gameId}] Disbanding game...`);
-
-    this.phase = GamePhase.DISBANDED;
-
-    // 清理所有实例
-    this.roomInstance?.destroy();
-    this.roomInstance = null;
-    this.gameInstance?.destroy();
-    this.gameInstance = null;
-    this.chatInstance.destroy();
-
-    // 注销域名处理器
-    this.unregisterDomainHandlers();
-
-    // 触发解散回调
+    this.cleanupAndSetDisbanded();
     this.onDisbandCallback?.();
-    this.emitRoomUpdatedToManager();
-
+    this.emitRoomUpdated();
     console.log(`[GameService ${this.gameId}] Game disbanded`);
   }
-  // ============ Tick Scheduling ============
 
-  /**
-   * 每秒最多多少个 tick 的硬上限。
-   *
-   * 限制理由：
-   *  - 服务端每个 tick 都跑一次 mask 计算 + per-player 状态拷贝；4 t/s 已经对
-   *    CPU 有压力，更快单局会拖累其它房间
-   *  - 客户端是 SNAPSHOT/PATCH 同步，4 t/s 时 WS 推送带宽和 patch 计算还能跟得上；
-   *    再快前端 MapRender 的 Pixi 渲染会卡顿，体感反而变差
-   *
-   * 对应 tick interval = 1000 / 4 = 250 ms。
-   */
-  private static readonly MAX_TICKS_PER_SEC = 4;
+  private cleanupAndSetDisbanded(): void {
+    if (this.phase === GamePhase.DISBANDED) return;
 
-  /**
-   * Schedule game ticks according to speed, with initial delay.
-   * @param speed Game speed factor (默认 1.0)。1× = 1 t/s，2× = 2 t/s，依此类推；
-   *              speed 超过 MAX_TICKS_PER_SEC 会被截到 cap 对应的 interval。
-   */
-  private scheduleGameTicks(speed: number) {
-    this.clearTickTimer(); // Prevent double scheduling
-    if (this.phase !== GamePhase.INGAME || !this.gameInstance) return;
-
-    const initialDelayMs = 5000; // 5 seconds before first tick
-    const minIntervalMs = Math.floor(1000 / GameService.MAX_TICKS_PER_SEC);
-    const tickIntervalMs = Math.max(minIntervalMs, Math.floor(1000 / (speed || 1.0)));
-    const effectiveTps = (1000 / tickIntervalMs).toFixed(2);
-
-    console.log(`[GameService ${this.gameId}] Scheduling first tick in ${initialDelayMs}ms, interval: ${tickIntervalMs}ms (≈ ${effectiveTps} t/s, requested speed: ${speed}×)`);
-
-    // Start after initial delay
-    this.tickTimerId = setTimeout(() => {
-      this.runTickLoop(tickIntervalMs);
-    }, initialDelayMs);
-  }
-
-  /**
-   * Internal tick loop: advances game and reschedules next tick.
-   */
-  private runTickLoop(tickIntervalMs: number) {
-    if (this.phase !== GamePhase.INGAME || !this.gameInstance) {
-      this.clearTickTimer();
-      return;
-    }
-    try {
-      this.gameInstance.advance();
-    } catch (err) {
-      console.error(`[GameService ${this.gameId}] Error during game tick:`, err);
-    }
-    // If game still running, schedule next tick
-    if (this.phase === GamePhase.INGAME && this.gameInstance) {
-      this.tickTimerId = setTimeout(() => this.runTickLoop(tickIntervalMs), tickIntervalMs);
-    } else {
-      this.clearTickTimer();
-    }
-  }
-
-  /**
-   * Clears the tick timer if set.
-   */
-  private clearTickTimer() {
-    if (this.tickTimerId) {
-      clearTimeout(this.tickTimerId);
-      this.tickTimerId = null;
-      console.log(`[GameService ${this.gameId}] Cleared tick timer.`);
-    }
+    this.gameInstance?.stopTicking();
+    this.roomUpdateFilter.detach();
+    this.phase = GamePhase.DISBANDED;
+    this.roomInstance?.destroy();
+    this.roomInstance = null;
+    this.gameInstance?.destroy();
+    this.gameInstance = null;
+    this.chatInstance.destroy();
+    this.unregisterDomainHandlers();
   }
 
   /**
@@ -737,7 +550,7 @@ export class GameService {
   }
 
   /**
-   * 获取玩家数量
+   * 获取玩家数量。
    * RoomInstance 全程存活，始终是玩家名册的权威数据源。
    */
   public getPlayerCount(): number {
@@ -745,16 +558,20 @@ export class GameService {
   }
 
   /**
-   * 获取玩家列表
+   * 获取玩家列表。
    */
   public getPlayers(): PlayerId[] {
     return this.roomInstance?.getState().players.map(p => p.id) ?? [];
   }
 
   /**
-   * 检查玩家是否在房间中
+   * 检查玩家是否在对局中（INGAME 阶段查 gameInstance，其他阶段查 roomInstance）。
+   * 用于 prepareConnectionForPlayer 区分"对局参与者"与"房间内旁观/大厅玩家"。
    */
   public hasPlayer(playerId: PlayerId): boolean {
+    if (this.phase === GamePhase.INGAME && this.gameInstance) {
+      return !!this.gameInstance.getState().players[playerId];
+    }
     return this.roomInstance?.getState().players.some(p => p.id === playerId) ?? false;
   }
 
@@ -864,110 +681,16 @@ export class GameService {
     };
   }
 
-  /**
-   * 获取游戏信息（HTTP API）
-   */
-  /**
-   * 获取游戏信息（HTTP API）
-   */
   public getGameInfo(): GameInfoSuccessResp["data"] {
-    const phase = this.phase;
-
-    // --- status (统一成 schema 要求的三种值) ---
-    let status: "lobby" | "in-progress" | "finished";
-    switch (phase) {
-      case GamePhase.PREGAME: status = "lobby"; break;
-      case GamePhase.INGAME: status = "in-progress"; break;
-      case GamePhase.ENDED:
-      case GamePhase.DISBANDED: status = "finished"; break;
-      default: status = "lobby";
-    }
-
-    // --- collect players & host info ---
-    let players: Array<{ id: string; name: string; isHost: boolean }> = [];
-    let maxPlayers = this.config.maxPlayers ?? 8;
-    let hostId = "";
-    let hostName: string = "";
-
-    if (phase === GamePhase.PREGAME && this.roomInstance) {
-      const state = this.roomInstance.getState();
-      players = state.players.map(p => ({
-        id: String(p.id),
-        name: String(p.name ?? ""),
-        isHost: Boolean(p.isHost),
-      }));
-      maxPlayers = state.playerLimit ?? maxPlayers;
-      hostId = String(state.hostId ?? "");
-      hostName = players.find(p => p.id === hostId)?.name ?? "";
-    } else if (phase === GamePhase.INGAME && this.gameInstance) {
-      const state = this.gameInstance.getState();
-      const display: Record<string, any> = (this.gameInstance as any).getSettings?.()?.playerDisplay ?? {};
-      players = Object.entries(state.players).map(([id, _p]: any) => ({
-        id: String(id),
-        name: String(display[id]?.name ?? ""),
-        isHost: false,
-      }));
-      maxPlayers = Math.max(maxPlayers, Object.keys(state.players).length);
-    }
-
-    const playerCount = players.length;
-
-    // --- map field 与 roomType field：都以 roomInstance 的实时状态为准；
-    //   standard 房间直接读 sizeLabel（first-class 字段，CHANGE_MAP 只能命中预设），
-    //   custom 房间读 {width, height}。无需根据尺寸反推 label。
-    //   roomType 也可能在房间内被房主切换，必须读 state。
-    let mapField: { width: number; height: number } | "small" | "medium" | "large" | undefined =
-      this.config.mapSize as any;
-    let roomTypeField: "standard" | "custom" = this.config.type;
-    if (phase === GamePhase.PREGAME && this.roomInstance) {
-      const state = this.roomInstance.getState();
-      roomTypeField = state.roomType;
-      const ms: any = state.mapSetting;
-      if (state.roomType === "standard" && ms?.sizeLabel) {
-        mapField = ms.sizeLabel as "small" | "medium" | "large";
-      } else if (ms && typeof ms.width === "number" && typeof ms.height === "number") {
-        mapField = { width: ms.width, height: ms.height };
-      }
-    }
-
-    // --- normalize settings ensuring discriminant matches mapSize ---
-    // 跟随实时 roomType，标签/尺寸都基于上面派生出来的 mapField。
-    let settings: any;
-    if (roomTypeField === "custom") {
-      settings = {
-        maxPlayers,
-        mapSize: mapField as { width: number; height: number },
-        type: "custom" as const,
-        roomName: this.config.roomName,
-      };
-    } else {
-      settings = {
-        maxPlayers,
-        mapSize: mapField as "small" | "medium" | "large" | undefined,
-        type: "standard" as const,
-        roomName: this.config.roomName,
-      };
-    }
-
-    // --- hasPassword (placeholder for now) ---
-    const hasPassword = false;
-
-    // Expose roomName & hostName top-level for easy listing
-    const roomName = this.config.roomName ?? "";
-
-    return {
-      id: this.gameId,
-      type: roomTypeField,
-      map: mapField,
-      roomName,
-      hostId,
-      hostName,
-      players,
-      settings,
-      status,
-      playerCount,
-      maxPlayers,
-      hasPassword,
-    } as GameInfoSuccessResp["data"];
+    return buildGameInfo({
+      gameId: this.gameId,
+      roomName: this.config.roomName ?? '',
+      phase: this.phase,
+      maxPlayers: this.config.maxPlayers ?? 8,
+      roomType: this.config.type,
+      mapSizeConfig: this.config.mapSize,
+      roomInstance: this.roomInstance,
+      gameInstance: this.gameInstance,
+    });
   }
 }

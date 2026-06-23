@@ -15,7 +15,8 @@ import {
 import { tick, mask } from '../core';
 import { playerDefeatedBy, autoJudge } from '../core/game-utils';
 import { GameStatus, PlayerStatus } from '@generale/types';
-import { compare } from 'fast-json-patch';
+import { StateSyncState } from './state-sync';
+import { displaceConnector as displace } from './connector-manager';
 
 type GameServerConnector = ServerSyncConnector<SyncedGameClientActions, SyncedGameServerEvent>;
 
@@ -45,19 +46,14 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     private settings: GameInstanceSettings;
     private connectors = new Map<PlayerId, GameServerConnector>();
     private syncData = new Map<PlayerId, SyncEntry>();
-    private prevSentState = new Map<PlayerId, SyncedGameState>();
+    private stateSync = new StateSyncState<SyncedGameState>();
     private disconnected = new Set<PlayerId>();
     private destroyed: boolean = false;
+    private tickTimerId: ReturnType<typeof setTimeout> | null = null;
+    private static readonly MAX_TICKS_PER_SEC = 4;
 
-    /**
-     * 观战 connector：与 `connectors` 同形，但 key 是 spectatorId（在 GameInstance 视角下不是
-     * 游戏内 player，不会出现在 `state.players` 里）。每次 advance / sendState 同步给他们的是
-     * 未 mask 的完整 state。spectator 发来的任何 client action 都直接丢弃。
-     *
-     * spectatorPrevSentState 用于增量同步（patch vs snapshot）的对比，独立于 player 的 prevSent。
-     */
     private spectatorConnectors = new Map<PlayerId, GameServerConnector>();
-    private spectatorPrevSentState = new Map<PlayerId, SyncedGameState>();
+    private spectatorStateSync = new StateSyncState<SyncedGameState>();
     private spectatorDisconnected = new Set<PlayerId>();
 
     private onEndGameCallbacks: Array<(result: GameEndResult) => void> = [];
@@ -97,6 +93,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     }
 
     public destroy() {
+        this.stopTicking();
         this.destroyed = true;
         for (const [_pid, connector] of this.connectors) {
             try { connector.close(); } catch { }
@@ -106,15 +103,39 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         }
         this.connectors.clear();
         this.spectatorConnectors.clear();
-        this.spectatorPrevSentState.clear();
+        this.spectatorStateSync.clearAll();
         this.spectatorDisconnected.clear();
         this.syncData.clear();
-        this.prevSentState.clear();
+        this.stateSync.clearAll();
         this.disconnected.clear();
         // release state reference
         // @ts-ignore
         this.state = null;
         this.version = 0;
+    }
+
+    // ============ Tick Scheduling ============
+
+    public startTicking(speed: number, initialDelayMs = 5000) {
+        this.stopTicking();
+        const minIntervalMs = Math.floor(1000 / GameInstance.MAX_TICKS_PER_SEC);
+        const tickIntervalMs = Math.max(minIntervalMs, Math.floor(1000 / (speed || 1.0)));
+        this.tickTimerId = setTimeout(() => this.tickLoop(tickIntervalMs), initialDelayMs);
+    }
+
+    public stopTicking() {
+        if (this.tickTimerId) {
+            clearTimeout(this.tickTimerId);
+            this.tickTimerId = null;
+        }
+    }
+
+    private tickLoop(tickIntervalMs: number) {
+        if (this.destroyed) return;
+        try { this.advance(); } catch (err) { /* already logged in advance */ }
+        if (!this.destroyed) {
+            this.tickTimerId = setTimeout(() => this.tickLoop(tickIntervalMs), tickIntervalMs);
+        }
     }
 
     public canJoin(id: PlayerId): { success: true; } | { success: false; message: string; } {
@@ -166,18 +187,9 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         // source guard (`this.connectors.get(pid) !== connector`) 会把它弹掉，
         // 不会把刚接进来的新 connector 误删。
         // 触发场景：用户在另一端重新登录，旧 game-* sub 还活着；新端走到这里替换。
-        const stale = this.connectors.get(playerId);
-        this.connectors.set(playerId, connector);
-        if (stale && stale !== connector) {
-            // 通知旧 sub 它被替换了；前端 GameWithSync 会显示"被另一个标签页/设备接管"
-            try {
-                stale.send({
-                    type: SyncedGameServerEventType.CUSTOM,
-                    payload: { type: SyncedPreGameServerEventPayloadType.DISPLACED },
-                });
-            } catch { /* ignore */ }
-            try { stale.close(); } catch { /* ignore */ }
-        }
+        this.stateSync.clear(playerId);
+        displace(playerId, connector, this.connectors, this.stateSync, this.syncData as any,
+          SyncedGameServerEventType.CUSTOM, SyncedPreGameServerEventPayloadType.DISPLACED);
 
         // ensure we have a sync entry for this player (in case they were not in initial playerIds)
         const entry = this.ensureSyncEntry(playerId);
@@ -201,8 +213,8 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
             playerDisplay: this.settings.playerDisplay,
             playerOperationQueue: [], // 重连不继承旧的操作队列
         };
-        // prevSentState 也需要清掉，让首帧确实走 SNAPSHOT 而不是 PATCH against 旧基线
-        this.prevSentState.delete(playerId);
+        // stateSync 也需要清掉，让首帧确实走 SNAPSHOT 而不是 PATCH against 旧基线
+        this.stateSync.clear(playerId);
 
         // register connector callbacks
         connector.onOpen(() => {
@@ -263,7 +275,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
      * 移除某个玩家的 connector。
      *
      * 同时清理：
-     *  - prevSentState[pid] —— 不清会导致重连首帧服务端发 PATCH 而不是 SNAPSHOT，
+     *  - stateSync[pid] —— 不清会导致重连首帧服务端发 PATCH 而不是 SNAPSHOT，
      *    客户端 patch 失败
      *  - syncData[pid].lastConfirmedOp —— 不清会让新 session 从 optimisticId=0
      *    计数时被服务端误判为过期 action 丢弃。
@@ -274,7 +286,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
      */
     public removeConnector(playerId: PlayerId) {
         this.connectors.delete(playerId);
-        this.prevSentState.delete(playerId);
+        this.stateSync.clear(playerId);
         this.disconnected.delete(playerId);
         const entry = this.syncData.get(playerId);
         if (entry) entry.lastConfirmedOp = 0;
@@ -379,77 +391,31 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
      * forceSnapshot: 是否强制发送全量
      */
     private sendState(pid: PlayerId, forceSnapshot = false) {
-        if (this.disconnected.has(pid)) {
-            // client currently disconnected — skip send
-            return;
-        }
+        if (this.disconnected.has(pid)) return;
         const conn = this.connectors.get(pid);
-        if (!conn) {
-            // no connector available
-            return;
-        }
+        if (!conn) return;
 
-        // ensure we have an entry
         const entry = this.ensureSyncEntry(pid);
-        const current = entry.syncedState;
-
-        const payloadBase = {
-            version: this.version,
-            confirmedOp: entry.lastConfirmedOp
-        };
-
-        // if no prevSent or forced snapshot -> send snapshot
-        if (!this.prevSentState.has(pid) || forceSnapshot) {
-            try {
-                conn.send({
-                    type: SyncedGameServerEventType.STATE_UPDATE,
-                    payload: {
-                        type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
-                        ...payloadBase,
-                        payload: current
-                    }
-                });
-                this.prevSentState.set(pid, structuredClone(current));
-            } catch (e) {
-                console.warn(`[GameInstance] failed to send snapshot to ${pid}`, e);
-            }
-            return;
-        }
-
-        const prev = this.prevSentState.get(pid)!;
-        const patches = compare(prev, current);
-
-        // heuristics: if many patches, send snapshot
-        if (patches.length > 1000) {
-            try {
-                conn.send({
-                    type: SyncedGameServerEventType.STATE_UPDATE,
-                    payload: {
-                        type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
-                        ...payloadBase,
-                        payload: current
-                    }
-                });
-            } catch (e) {
-                console.warn(`[GameInstance] failed to send large snapshot to ${pid}`, e);
-            }
-        } else {
-            try {
-                conn.send({
-                    type: SyncedGameServerEventType.STATE_UPDATE,
-                    payload: {
-                        type: SyncedGameServerStateUpdatePayloadType.PATCH,
-                        ...payloadBase,
-                        payload: patches
-                    }
-                });
-            } catch (e) {
-                console.warn(`[GameInstance] failed to send patch to ${pid}`, e);
-            }
-        }
-
-        // update prevSentState copy
-        this.prevSentState.set(pid, structuredClone(current));
+        this.stateSync.send(pid, forceSnapshot, entry.syncedState, this.version, entry.lastConfirmedOp,
+            (state, ver, op) => conn.send({
+                type: SyncedGameServerEventType.STATE_UPDATE,
+                payload: {
+                    type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
+                    version: ver,
+                    confirmedOp: op,
+                    payload: state,
+                },
+            }),
+            (patches, ver, op) => conn.send({
+                type: SyncedGameServerEventType.STATE_UPDATE,
+                payload: {
+                    type: SyncedGameServerStateUpdatePayloadType.PATCH,
+                    version: ver,
+                    confirmedOp: op,
+                    payload: patches,
+                },
+            }),
+        );
     }
 
     private broadcastGameEnded(): void {
@@ -487,54 +453,26 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         if (!conn) return;
 
         const current = this.buildSpectatorState();
-        const payloadBase = {
-            version: this.version,
-            confirmedOp: 0, // 观战者不发 action，confirmedOp 永远 0
-        };
-
-        if (!this.spectatorPrevSentState.has(sid) || forceSnapshot) {
-            try {
-                conn.send({
-                    type: SyncedGameServerEventType.STATE_UPDATE,
-                    payload: {
-                        type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
-                        ...payloadBase,
-                        payload: current
-                    }
-                });
-                this.spectatorPrevSentState.set(sid, structuredClone(current));
-            } catch (e) {
-                console.warn(`[GameInstance] failed to send spectator snapshot to ${sid}`, e);
-            }
-            return;
-        }
-
-        const prev = this.spectatorPrevSentState.get(sid)!;
-        const patches = compare(prev, current);
-        try {
-            if (patches.length > 1000) {
-                conn.send({
-                    type: SyncedGameServerEventType.STATE_UPDATE,
-                    payload: {
-                        type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
-                        ...payloadBase,
-                        payload: current
-                    }
-                });
-            } else {
-                conn.send({
-                    type: SyncedGameServerEventType.STATE_UPDATE,
-                    payload: {
-                        type: SyncedGameServerStateUpdatePayloadType.PATCH,
-                        ...payloadBase,
-                        payload: patches
-                    }
-                });
-            }
-        } catch (e) {
-            console.warn(`[GameInstance] failed to send spectator update to ${sid}`, e);
-        }
-        this.spectatorPrevSentState.set(sid, structuredClone(current));
+        this.spectatorStateSync.send(sid, forceSnapshot, current, this.version, 0,
+            (state, ver, op) => conn.send({
+                type: SyncedGameServerEventType.STATE_UPDATE,
+                payload: {
+                    type: SyncedGameServerStateUpdatePayloadType.SNAPSHOT,
+                    version: ver,
+                    confirmedOp: op,
+                    payload: state,
+                },
+            }),
+            (patches, ver, op) => conn.send({
+                type: SyncedGameServerEventType.STATE_UPDATE,
+                payload: {
+                    type: SyncedGameServerStateUpdatePayloadType.PATCH,
+                    version: ver,
+                    confirmedOp: op,
+                    payload: patches,
+                },
+            }),
+        );
     }
 
     /**
@@ -556,21 +494,11 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
         }
 
         // 替换旧的（重连 / 同 user 另一个 tab）
-        const existing = this.spectatorConnectors.get(sid);
         // 先入 map 再 close 旧，让旧 sub 的 onClose source guard 短路
-        this.spectatorConnectors.set(sid, connector);
-        this.spectatorPrevSentState.delete(sid);
+        this.spectatorStateSync.clear(sid);
         this.spectatorDisconnected.delete(sid);
-        if (existing && existing !== connector) {
-            // 通知旧观战 sub 它被替换；前端会显示"被另一个标签页/设备接管"
-            try {
-                existing.send({
-                    type: SyncedGameServerEventType.CUSTOM,
-                    payload: { type: SyncedPreGameServerEventPayloadType.DISPLACED },
-                });
-            } catch { /* ignore */ }
-            try { existing.close(); } catch { /* ignore */ }
-        }
+        displace(sid, connector, this.spectatorConnectors, this.spectatorStateSync, new Map(),
+          SyncedGameServerEventType.CUSTOM, SyncedPreGameServerEventPayloadType.DISPLACED);
 
         connector.onOpen(() => {
             try {
@@ -615,7 +543,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
             try { conn.close(); } catch { }
         }
         this.spectatorConnectors.delete(sid);
-        this.spectatorPrevSentState.delete(sid);
+        this.spectatorStateSync.clear(sid);
         this.spectatorDisconnected.delete(sid);
     }
 

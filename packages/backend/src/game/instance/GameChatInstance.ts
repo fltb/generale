@@ -55,14 +55,13 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
       return { success: false, message: msg };
     }
 
-    if (this._activeStageInstance) {
-      const res = this._activeStageInstance.canJoin(id);
-      if (res.success) return { success: true };
-      if (res.success === false) {
-        return { success: false, message: `[GameChatInstance] Refused by active stage: ${res.message}` };
-      }
-    }
-    return { success: false, message: '[GameChatInstance] No active stage instance, cannot join chat.' };
+    // RoomInstance 尚未创建时（GameService 构造完成后、首个玩家触发 initializeRoom 前），
+    // 放行任意玩家 —— 此时只能是在同一请求链路中打开 chat domain 的首个玩家。
+    if (!this._activeStageInstance) return { success: true };
+
+    const res = this._activeStageInstance.canJoin(id);
+    if (res.success) return { success: true };
+    return { success: false, message: `[GameChatInstance] Refused by room roster: ${res.message}` };
   }
 
   /** 玩家加入 */
@@ -72,10 +71,7 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
     const name = user.name;
     const canJoin = this.canJoin(pid);
 
-    // TODO::HACK:: host 或 stage 未 ready 时允许加入，因为房主进入聊天的时候 pregame 可能没有生成好，后续后端会进行重构，重新管理这几个 Instance 的生命周期
-    const isHostLike = !this._activeStageInstance;
-
-    if (canJoin.success === false && !isHostLike) {
+    if (canJoin.success === false) {
       const msg = canJoin.message || `[GameChatInstance] Player ${pid} not allowed to join`;
       console.warn(msg);
       return { success: false, message: msg };
