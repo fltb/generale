@@ -60,7 +60,7 @@ beforeEach(() => {
 
 describe("ClientConnectionManager basic flows (fake ws)", () => {
   it("receives connection_ack and stores connectionId", async () => {
-    const manager = new ClientConnectionManager("ws://localhost/ws", () => "token_for_user1");
+    const manager = new ClientConnectionManager("ws://localhost/ws");
     manager.connect(true);
 
     // wait for FakeWebSocket creation + open tick
@@ -76,13 +76,13 @@ describe("ClientConnectionManager basic flows (fake ws)", () => {
   });
 
   it("opens domain and routes server 'open' -> onOpen callback", async () => {
-    const manager = new ClientConnectionManager("ws://localhost/ws", () => "token_for_user2");
+    const manager = new ClientConnectionManager("ws://localhost/ws");
     manager.connect(true);
     await new Promise((r) => setTimeout(r, 5));
     const ws = FakeWebSocket.lastInstance!;
 
     // create sub and register onOpen
-    const sub = manager.getOrCreateSub("game", {});
+    const sub = manager.getOrCreateSub("game");
 
     let opened = false;
     sub.onOpen(() => { opened = true; });
@@ -103,12 +103,12 @@ describe("ClientConnectionManager basic flows (fake ws)", () => {
   });
 
   it("routes server 'message' to sub.onMessage and client send produces JSON message", async () => {
-    const manager = new ClientConnectionManager("ws://localhost/ws", () => "token_for_user3");
+    const manager = new ClientConnectionManager("ws://localhost/ws");
     manager.connect(true);
     await new Promise((r) => setTimeout(r, 5));
     const ws = FakeWebSocket.lastInstance!;
 
-    const sub = manager.getOrCreateSub<{ action: string }, { event: string }>("lobby", {});
+    const sub = manager.getOrCreateSub<{ action: string }, { event: string }>("lobby");
     let recv: any = null;
     sub.onMessage((p) => { recv = p; });
 
@@ -130,12 +130,12 @@ describe("ClientConnectionManager basic flows (fake ws)", () => {
   });
 
   it("close via sub.close sends close message", async () => {
-    const manager = new ClientConnectionManager("ws://localhost/ws", () => "token_for_user4");
+    const manager = new ClientConnectionManager("ws://localhost/ws");
     manager.connect(true);
     await new Promise((r) => setTimeout(r, 5));
     const ws = FakeWebSocket.lastInstance!;
 
-    const sub = manager.getOrCreateSub("room", {});
+    const sub = manager.getOrCreateSub("room");
     // simulate server open
     ws._emitObj({ domain: "room", type: "open", payload: { userid: "u" } });
     await new Promise((r) => setTimeout(r, 1));

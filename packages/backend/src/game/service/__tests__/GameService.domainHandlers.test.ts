@@ -15,7 +15,9 @@ const createMockSubConnector = (context: any = {}) => ({
   domain: 'mock-domain',
   ready: true,
   onDisconnect: vi.fn(),
-  onReconnect: vi.fn()
+  onReconnect: vi.fn(),
+  getConnectionId: vi.fn(() => 'mock-conn-id'),
+  getContext: vi.fn(function() { return this.context; }),
 });
 
 // Mock dependencies
@@ -24,13 +26,13 @@ vi.mock('../../plugins/websocket', () => ({
   unregisterDomainHandler: vi.fn(),
 }));
 
-vi.mock('../../instance/PreGameInstance', () => ({
-  PreGameInstance: vi.fn().mockImplementation(() => ({
+vi.mock('../../instance/RoomInstance', () => ({
+  RoomInstance: vi.fn().mockImplementation(() => ({
     getState: vi.fn().mockReturnValue({
       players: [],
       playerLimit: 8
     }),
-    destroy: vi.fn(),
+    destroy: vi.fn(), onStateChange: vi.fn(function() { return function() {} }), onDisband: vi.fn(function() { return function() {} }), broadcastGameEnded: vi.fn(), resume: vi.fn(), suspend: vi.fn(),
     addPlayer: vi.fn().mockReturnValue({ success: true }),
     onStartGame: vi.fn()
   }))
@@ -44,7 +46,7 @@ vi.mock('../../instance/GameInstance', () => ({
     }),
     destroy: vi.fn(),
     addPlayer: vi.fn().mockReturnValue({ success: true }),
-    advance: vi.fn(),
+    advance: vi.fn(), startTicking: vi.fn(), stopTicking: vi.fn(),
     onStartGame: vi.fn()
   }))
 }));
@@ -65,7 +67,8 @@ describe('GameService Domain Handlers', () => {
   beforeEach(() => {
     config = {
       gameId: 'test-game-123' as GameId,
-      maxPlayers: 4
+      maxPlayers: 4,
+      roomName: 'test'
     };
     gameService = new GameService(config);
   });
@@ -78,56 +81,52 @@ describe('GameService Domain Handlers', () => {
   describe('Pregame Domain Handler', () => {
     it('应该接受有效的 pregame 连接', () => {
       const connector = createMockSubConnector();
-      const handler = gameService['createPregameDomainHandler']();
+      const handler = gameService['createRoomDomainHandler']();
       
       handler(connector);
       
       expect(connector.close).not.toHaveBeenCalled();
-      expect(gameService['preGameInstance']).toBeTruthy();
+      expect(gameService['roomInstance']).toBeTruthy();
     });
 
     it('应该拒绝缺少 userid 的连接', () => {
       const connector = createMockSubConnector({ userid: null });
-      const handler = gameService['createPregameDomainHandler']();
+      const handler = gameService['createRoomDomainHandler']();
       
       handler(connector);
       
-      expect(connector.close).toHaveBeenCalledWith(4001, 'Missing userid or username');
+      expect(connector.close).toHaveBeenCalledWith(4001, 'Missing userid');
     });
 
     it('应该拒绝缺少 username 的连接', () => {
       const connector = createMockSubConnector({ username: null });
-      const handler = gameService['createPregameDomainHandler']();
-      
+      const handler = gameService['createRoomDomainHandler']();
       handler(connector);
-      
-      expect(connector.close).toHaveBeenCalledWith(4001, 'Missing userid or username');
+      expect(connector.close).toHaveBeenCalledWith(4001, 'Missing username');
     });
 
-    it('应该拒绝非 PREGAME 阶段的连接', () => {
+    it('应该在 INGAME 阶段允许 room 连接', () => {
       gameService['phase'] = GamePhase.INGAME;
       const connector = createMockSubConnector();
-      const handler = gameService['createPregameDomainHandler']();
-      
+      const handler = gameService['createRoomDomainHandler']();
       handler(connector);
-      
-      expect(connector.close).toHaveBeenCalledWith(4002, 'Invalid phase for pregame');
+      expect(connector.close).not.toHaveBeenCalled();
     });
 
-    it('应该处理 PreGameInstance 添加玩家失败', () => {
+    it('应该处理 RoomInstance 添加玩家失败', () => {
       const connector = createMockSubConnector();
-      const handler = gameService['createPregameDomainHandler']();
+      const handler = gameService['createRoomDomainHandler']();
       
-      // Mock PreGameInstance.addPlayer 返回失败
-      const mockPreGameInstance = {
+      // Mock RoomInstance.addPlayer 返回失败
+      const mockRoomInstance = {
         addPlayer: vi.fn().mockReturnValue({ success: false }),
         destroy: vi.fn()
       };
-      gameService['preGameInstance'] = mockPreGameInstance as any;
+      gameService['roomInstance'] = mockRoomInstance as any;
       
       handler(connector);
       
-      expect(connector.close).toHaveBeenCalledWith(4003, 'Failed to add to pregame');
+      expect(connector.close).toHaveBeenCalledWith(4003, 'Failed to add to room');
     });
   });
 
@@ -152,7 +151,7 @@ describe('GameService Domain Handlers', () => {
       
       handler(connector);
       
-      expect(connector.close).toHaveBeenCalledWith(4001, 'Missing userid or username');
+      expect(connector.close).toHaveBeenCalledWith(4001, 'Missing userid');
     });
 
     it('应该拒绝非 INGAME 阶段的连接', () => {
@@ -227,7 +226,7 @@ describe('GameService Domain Handlers', () => {
       
       handler(connector);
       
-      expect(connector.close).toHaveBeenCalledWith(4001, 'Missing userid or username');
+      expect(connector.close).toHaveBeenCalledWith(4001, 'Missing userid');
     });
 
     it('应该处理 ChatInstance 添加玩家失败', () => {
@@ -246,35 +245,4 @@ describe('GameService Domain Handlers', () => {
     });
   });
 
-  describe('Connector 适配', () => {
-    it('应该正确适配 PreGame connector', () => {
-      const mockSubConnector = createMockSubConnector();
-      const adapted = gameService['adaptToPregameConnector'](mockSubConnector);
-      
-      expect(adapted).toHaveProperty('send');
-      expect(adapted).toHaveProperty('onClientMessage');
-      expect(adapted).toHaveProperty('onOpen');
-      expect(adapted).toHaveProperty('onClose');
-    });
-
-    it('应该正确适配 Game connector', () => {
-      const mockSubConnector = createMockSubConnector();
-      const adapted = gameService['adaptToGameConnector'](mockSubConnector);
-      
-      expect(adapted).toHaveProperty('send');
-      expect(adapted).toHaveProperty('onClientMessage');
-      expect(adapted).toHaveProperty('onOpen');
-      expect(adapted).toHaveProperty('onClose');
-    });
-
-    it('应该正确适配 Chat connector', () => {
-      const mockSubConnector = createMockSubConnector();
-      const adapted = gameService['adaptToChatConnector'](mockSubConnector);
-      
-      expect(adapted).toHaveProperty('send');
-      expect(adapted).toHaveProperty('onClientMessage');
-      expect(adapted).toHaveProperty('onOpen');
-      expect(adapted).toHaveProperty('onClose');
-    });
-  });
 });

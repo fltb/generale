@@ -4,7 +4,7 @@ import {
   integer 
 } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
-import { randomUUID } from 'crypto'
+import { randomUUID } from 'node:crypto'
 
 export const users = sqliteTable('users', {
   // Store UUIDs as TEXT; generate by default in JS

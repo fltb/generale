@@ -10,6 +10,10 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     exclude: ['node_modules', 'dist'],
     reporters: ['verbose'],
+    env: {
+      DB_FILE_NAME: ':memory:',
+    },
+    setupFiles: ['./vitest.setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

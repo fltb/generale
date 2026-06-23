@@ -4,12 +4,12 @@ import { PreGameMapType, TileType } from '@generale/types';
 
 describe('Map Generator', () => {
   it('should generate a valid map for 2 players', () => {
-    const players = [
-      { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true },
-      { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true }
+    const players: any = [
+      { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
+      { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const }
     ];
     const mapSetting = {
-      type: PreGameMapType.Random,
+      type: PreGameMapType.Random as const,
       width: 10,
       height: 10,
       tileFrequency: {
@@ -19,7 +19,7 @@ describe('Map Generator', () => {
         [TileType.Barracks]: 0.2,
       }
     };
-    const map = generateMap(mapSetting, players);
+    const map = generateMap(mapSetting, players as any);
     expect(map.width).toBe(10);
     expect(map.height).toBe(10);
     // 检查王座数量
@@ -28,7 +28,7 @@ describe('Map Generator', () => {
     const tileStats: Record<string, number> = {};
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        const tile = map.tiles[y][x];
+        const tile = map.tiles[y]!![x]!;
         tileStats[tile.type] = (tileStats[tile.type] || 0) + 1;
         if (tile.type === TileType.Throne) throneCount++;
         if (tile.ownerId) playerTiles++;
@@ -42,14 +42,14 @@ describe('Map Generator', () => {
   });
 
   it('should generate a valid map for 4 players with correct distribution', () => {
-    const players = [
-      { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true },
-      { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true },
-      { id: 'player3', name: 'Player 3', teamId: 'team3', isHost: false, isReady: true },
-      { id: 'player4', name: 'Player 4', teamId: 'team4', isHost: false, isReady: true }
+    const players: any = [
+      { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
+      { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
+      { id: 'player3', name: 'Player 3', teamId: 'team3', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
+      { id: 'player4', name: 'Player 4', teamId: 'team4', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const }
     ];
     const mapSetting = {
-      type: PreGameMapType.Random,
+      type: PreGameMapType.Random as const,
       width: 12,
       height: 12,
       tileFrequency: {
@@ -59,7 +59,7 @@ describe('Map Generator', () => {
         [TileType.Barracks]: 0.2,
       }
     };
-    const map = generateMap(mapSetting, players);
+    const map = generateMap(mapSetting, players as any);
     expect(map.width).toBe(12);
     expect(map.height).toBe(12);
     // 检查王座数量
@@ -69,7 +69,7 @@ describe('Map Generator', () => {
     const tileStats: Record<string, number> = {};
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        const tile = map.tiles[y][x];
+        const tile = map.tiles[y]!![x]!;
         tileStats[tile.type] = (tileStats[tile.type] || 0) + 1;
         if (tile.type === TileType.Throne) throneCount++;
         if (tile.ownerId) {
@@ -93,14 +93,14 @@ describe('Map Generator', () => {
 
   it('visualize a 4-player map (console debug)', () => {
     // 可选：仅用于调试
-    const players = [
-      { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true },
-      { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true },
-      { id: 'player3', name: 'Player 3', teamId: 'team3', isHost: false, isReady: true },
-      { id: 'player4', name: 'Player 4', teamId: 'team4', isHost: false, isReady: true }
+    const players: any = [
+      { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
+      { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
+      { id: 'player3', name: 'Player 3', teamId: 'team3', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
+      { id: 'player4', name: 'Player 4', teamId: 'team4', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const }
     ];
     const mapSetting = {
-      type: PreGameMapType.Random,
+      type: PreGameMapType.Random as const,
       width: 12,
       height: 12,
       tileFrequency: {
@@ -110,7 +110,7 @@ describe('Map Generator', () => {
         [TileType.Barracks]: 0.2,
       }
     };
-    const map = generateMap(mapSetting, players);
+    const map = generateMap(mapSetting, players as any);
     const tileSymbols: Record<string, string> = {
       [TileType.Plain]: '.',
       [TileType.Mountain]: '^',
@@ -135,7 +135,7 @@ describe('Map Generator', () => {
     for (let y = 0; y < map.height; y++) {
       let row = y.toString().padStart(2) + ' ';
       for (let x = 0; x < map.width; x++) {
-        const tile = map.tiles[y][x];
+        const tile = map.tiles[y]!![x]!;
         let symbol = tileSymbols[tile.type] || '?';
         if (tile.ownerId) {
           symbol = playerColors[tile.ownerId] || 'X';
@@ -151,7 +151,7 @@ describe('Map Generator', () => {
     let totalPlayerTiles = 0;
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        const tile = map.tiles[y][x];
+        const tile = map.tiles[y]!![x]!;
         tileStats[tile.type] = (tileStats[tile.type] || 0) + 1;
         if (tile.ownerId) {
           playerStats[tile.ownerId] = (playerStats[tile.ownerId] || 0) + 1;

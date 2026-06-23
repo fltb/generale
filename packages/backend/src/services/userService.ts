@@ -1,8 +1,8 @@
 import { db } from '../db/client'
 import { users, profiles } from '../db/schema'
 import { verificationTokens } from '../db/schema' // 用于删除 token
-import { randomBytes, pbkdf2Sync, timingSafeEqual } from 'crypto'
-import { randomUUID } from 'crypto'
+import { randomBytes, pbkdf2Sync, timingSafeEqual } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { DEFAULT_AVATAR_THUMB_URL, DEFAULT_AVATAR_URL } from './profileService'
 

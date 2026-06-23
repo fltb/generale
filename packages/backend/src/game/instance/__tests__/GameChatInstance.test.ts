@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { GameChatInstance, GameChatConnector } from '../GameChatInstance';
-// 移除未使用的类型导入
+import { GameChatInstance } from '../GameChatInstance';
+import type { GameChatConnector } from '../GameChatInstance';
 
 function createMockConnector() {
   return {

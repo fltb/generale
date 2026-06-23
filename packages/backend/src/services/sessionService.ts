@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { db } from '../db/client';
 import { sessions } from '../db/schema';
 import { eq } from 'drizzle-orm';
