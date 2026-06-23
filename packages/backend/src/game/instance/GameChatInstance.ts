@@ -1,11 +1,11 @@
-import { PlayerId } from '@generale/types/src/game/core-type';
 import {
+  PlayerId,
   ChatMessage,
   ChatClientToServer,
   ChatServerToClient,
   ChatSendMessageReq,
-  ChatSenderMeta
-} from '@generale/types/src/game/chat';
+  ChatSenderMeta,
+} from '@generale/types';
 
 /**
  * 依赖注入：ws sub-connector

@@ -7,7 +7,7 @@ export const gameStatusSchema = t.Union([
     t.Literal("in-progress"),
     t.Literal("finished"),
 ]);
-export type GameStatus = Static<typeof gameStatusSchema>;
+export type HttpGameStatus = Static<typeof gameStatusSchema>;
 
 export const standardMapSizeSchema = t.Union([
   t.Literal("small"),

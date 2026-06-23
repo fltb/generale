@@ -1,5 +1,5 @@
 import { PlayerId, TeamId, ServerSyncConnector } from "@generale/types";
-import type { ChatSenderMeta } from "@generale/types/src/game/chat";
+import type { ChatSenderMeta } from "@generale/types";
 
 export interface IBaseInstance<CEvt, SEvt> {
     destroy(): void;

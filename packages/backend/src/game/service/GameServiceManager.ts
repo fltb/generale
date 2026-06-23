@@ -1,7 +1,7 @@
 import { type GameId, LobbyClientEvent, LobbyMessage, LobbyServerMessageType } from '@generale/types';
 import { GameService, GameServiceConfig } from './GameService';
 import { registerDomainHandler, WSContextBase } from '../../plugins/websocket';
-import { GameInfoRoute, GameInfoSuccessResp, ListGamesQuery } from '@generale/types/dist/api';
+import { GameInfoRoute, GameInfoSuccessResp, ListGamesQuery } from '@generale/types';
 import { applyGameFilters, applyGameSort, paginateGames } from '../../routes/utils/gameListFilter';
 
 let GLOBAL_LOBBY_SEQ = 0;

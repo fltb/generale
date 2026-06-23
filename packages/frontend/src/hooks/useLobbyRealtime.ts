@@ -2,7 +2,7 @@
 import { createEffect, createMemo, on, onCleanup } from "solid-js";
 import { useSubConnector, useWS } from "~/hooks/useWebsocket";
 import { useQueryClient } from "@tanstack/solid-query";
-import type { ListGamesQuery } from "@generale/types/dist/api";
+import type { ListGamesQuery } from "@generale/types";
 import { buildListQueryFromFilters } from "~/hooks/useGameListQuery";
 import {
   LobbyClientEventType,

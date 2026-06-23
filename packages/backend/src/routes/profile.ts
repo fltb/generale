@@ -8,7 +8,7 @@ import {
   avatarUploadRespSchema,
   errorRespSchema,
   messageRespSchema
-} from '@generale/types/dist/api';
+} from '@generale/types';
 
 const cookieScheme = t.Cookie({
   sid: t.Optional(t.String()),

@@ -1,5 +1,5 @@
 import { Elysia } from "elysia"; // FIX: Removed unused 't' import
-import type { ServerSyncConnector } from '@generale/types/src/connection/conn-type';
+import type { ServerSyncConnector } from '@generale/types';
 import { sessionService } from "../services/sessionService";
 import { userService } from "../services/userService";
 import { profileService } from "../services/profileService";

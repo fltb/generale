@@ -4,7 +4,7 @@ import type {
 } from '@generale/types';
 import type { RoomInstance } from '../../instance/RoomInstance';
 import type { GameInstance } from '../../instance/GameInstance';
-import type { GameInfoSuccessResp } from '@generale/types/dist/api';
+import type { GameInfoSuccessResp } from '@generale/types';
 
 export interface GameInfoInput {
   gameId: GameId;

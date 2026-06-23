@@ -15,7 +15,7 @@ import {
   changePasswordReqSchema,
   changeEmailReqSchema,
   confirmEmailChangeReqSchema,
-} from '@generale/types/dist/api'
+} from '@generale/types'
 
 import { verificationTokens, users } from '../db/schema'
 import { userService } from '../services/userService'

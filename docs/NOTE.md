@@ -338,7 +338,7 @@ bug：
 
 这段计划属于重构类型，在开启这段内容的时候需要暂时冻结前后端功能和外观拓展的更新，不引入新的内容，确保新的内容不会和重构的内容杂糅。
 
-##### 后端的结构优化
+##### [X] 后端的结构优化
 
 目前的前后端已经开始出现分层不清晰和蔓延的情况了。因为协议设计很早，但是实际需求已经让前后端不得不拓展很多功能了。前端按照格式需要发送 userid 和 username，但是它在后端被静默丢弃并使用从 session 和 db 中读取的真实环境变量作为替代。
 
@@ -356,7 +356,7 @@ bug：
 - [X] ChatInstance 获取外部状态的逻辑混乱：现在 ChatInstance 依赖一个 _activeStageInstance（实际上就是 preGameInstance）来获取信息和鉴权判断玩家是否能够连接进游戏，以及获取玩家信息。这里高度依赖了 preGameInstance，但是他们理论上应该是平行的，这样写是因为房间的管理逻辑（鉴权，玩家信息）实际上都在 preGameInstance，导致其不得不依赖 preGameInstance 进行鉴权和实时获取用于 chat 的信息，否则就会 copy-paste 导致更难维护。这里应该仔细斟酌 GameService 目前的 Service - Instance 的分层逻辑，是否可以考虑进一步的拆分，因为 Instance 之间不得不相互依赖了，甚至需要 Service 来手动给它挂载 _activeStageInstance。**DONE: 新建 IRoomRoster 接口，ChatInstance 改为依赖 IRoomRoster（仅暴露 canJoin / getPlayerChatMeta / getPlayersForTeamChat），不再依赖具体 Instance 类型。**
 - [X] 还有一个逻辑是 pregame 一直挂载，game 随时卸载和挂载，这样的 instance 逻辑也是很复杂的，不够平滑，不好理解。理论上可以随时挂载卸载的 instance 实际上不能卸载了，直接变成了 service 的一部分，承担了 service 的管理职能，这里很反直觉。这里是因为设计中让 instance 管理 connection 的加入和离开，然后 connection 又会提供游戏的房间状态的交互。但是本身 Service 也依赖这些状态，导致这部分状态必须向上同步到 Service 中。如果做不到优化，至少也要把 preagameInstance 的名字改掉，变成更能反应实际功能的名字方便理解。**DONE: PreGameInstance 重命名为 RoomInstance；域名 pregame- 重命名为 room-；ChatInstance.activeStageInstance 类型收窄为 IRoomRoster。**
 
-##### 过时的测试逻辑的清理
+##### [X] 过时的测试逻辑的清理
 
 随着项目的大改和重构，很多旧的测试代码已经不再适用，而我们并没有更新这些测试逻辑。
 

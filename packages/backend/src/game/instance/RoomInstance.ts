@@ -18,7 +18,7 @@ import {
   PreGameTeamMode,
   PreGamePlayerStatus,
 } from '@generale/types';
-import type { ChatSenderMeta } from '@generale/types/src/game/chat';
+import type { ChatSenderMeta } from '@generale/types';
 import { StateSyncState } from './state-sync';
 import { displaceConnector as displace } from './connector-manager';
 

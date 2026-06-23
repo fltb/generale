@@ -24,7 +24,7 @@ import { RoomUpdateFilter } from './units/RoomUpdateFilter';
 import { buildGameInfo } from './units/GameInfoPresenter';
 import { registerDomainHandler, unregisterDomainHandler, DomainHandler, SubConnector } from '../../plugins/websocket';
 import { generateMap } from '../core/map-gen';
-import { GameInfoSuccessResp } from '@generale/types/dist/api';
+import { GameInfoSuccessResp } from '@generale/types';
 
 
 
