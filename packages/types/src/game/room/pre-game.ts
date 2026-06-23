@@ -1,4 +1,4 @@
-// 游戏房间阶段（PreGameInstance）核心类型定义，最大程度复用 core-type
+// 游戏房间阶段（RoomInstance）核心类型定义，最大程度复用 core-type
 import type { PlayerId, TeamId, GameId, TileType } from '../core-type';
 import { PlayerColor } from './player-colors';
 

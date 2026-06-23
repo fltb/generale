@@ -476,7 +476,7 @@ export const websocketPlugin = new Elysia()
  *
  * 返回被关掉的连接数。
  *
- * 注意：这里只关 WS（连带各 sub-connector 的 onClose 链路触发 PreGameInstance /
+ * 注意：这里只关 WS（连带各 sub-connector 的 onClose 链路触发 RoomInstance /
  * GameInstance 的清理）。session 表的删除由 sessionService 单独处理，两者解耦。
  */
 export function closeAllConnectionsForUser(userId: string, code = 4001, reason = 'session-revoked'): number {

@@ -85,9 +85,9 @@ const RoomRoute: Component = () => {
           RoomWithSync：**只挂载一次**，通过 visible 控制显示（避免反复 mount/unmount）
           保持连接在 INGAME 期间也不关闭（hidden but still mounted）
          --------------------------------------------------------- */}
-      <Show when={session.pregameDomain() && session.playerId()}>
+      <Show when={session.roomDomain() && session.playerId()}>
         <RoomWithSync
-          domain={session.pregameDomain()!}
+          domain={session.roomDomain()!}
           gameId={params.id!}
           playerId={session.playerId()!}
           autoOpen

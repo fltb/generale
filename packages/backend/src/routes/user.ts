@@ -271,7 +271,7 @@ export const userRoutes = new Elysia()
       }
       // 反重复登录：清旧 session + 立刻关掉旧端的所有 WS 连接
       //   - 旧端 HTTP 端点拿 401 → 前端 useAuth 自动清空 user
-      //   - 旧端 WS 各 sub-connector 触发 onClose → PreGameInstance/GameInstance
+      //   - 旧端 WS 各 sub-connector 触发 onClose → RoomInstance/GameInstance
       //     的 handleDisconnect 正常清理（Playing → Disconnected 等）
       // 顺序：先删 session，再关 WS。这样 WS 关闭如果触发重连，新连接的 auth
       // 校验已经失败，不会留下漏网的旧权限。

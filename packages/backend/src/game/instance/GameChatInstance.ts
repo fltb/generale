@@ -12,10 +12,8 @@ import {
  */
 export type GameChatConnector = ServerSyncConnector<ChatClientToServer, ChatServerToClient>
 
-import { IBaseInstance } from './interface';
+import { IBaseInstance, IRoomRoster } from './interface';
 import { ServerSyncConnector } from '@generale/types';
-import { GameInstance } from './GameInstance';
-import { PreGameInstance } from './PreGameInstance';
 
 export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatServerToClient> {
   private messages: ChatMessage[] = [];
@@ -24,9 +22,9 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
   private maxMessages = 100;
   private messageIdCounter = 0;
 
-  private _activeStageInstance: GameInstance | PreGameInstance | null = null;
+  private _activeStageInstance: IRoomRoster | null = null;
 
-  public set activeStageInstance(instance: GameInstance | PreGameInstance | null) {
+  public set activeStageInstance(instance: IRoomRoster | null) {
     this._activeStageInstance = instance;
   }
 
@@ -225,8 +223,7 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
   }
 
   private getSenderMeta(pid: PlayerId): ChatSenderMeta | undefined {
-    const provider = this._activeStageInstance as PreGameInstance;
-    return provider.getPlayerChatMeta(pid) as any;
+    return this._activeStageInstance?.getPlayerChatMeta(pid) ?? undefined;
   }
 
   private canSendTeamMessage(pid: PlayerId, meta?: ChatSenderMeta): boolean {
@@ -247,11 +244,8 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
   }
 
   private getTeamRecipientIds(teamId: string): PlayerId[] {
-    const stateProvider = this._activeStageInstance as unknown as {
-      getState?: () => { players?: Array<{ id: PlayerId; teamId?: string; status?: string }> };
-    } | null;
-    const players = stateProvider?.getState?.()?.players;
-    if (!Array.isArray(players)) {
+    const players = this._activeStageInstance?.getPlayersForTeamChat();
+    if (!players || !Array.isArray(players)) {
       return Array.from(this.connectors.keys()).filter(pid => this.getSenderMeta(pid)?.teamId === teamId);
     }
     return players

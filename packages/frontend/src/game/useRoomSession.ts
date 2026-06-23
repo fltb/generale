@@ -21,7 +21,7 @@ export function useRoomSession(gameId: () => string | undefined) {
   const [playerId, setPlayerId] = createSignal<string | null>(null);
 
   // 分离的 domain signals，避免互相覆盖导致重复 mount
-  const [pregameDomain, setPregameDomain] = createSignal<string | null>(null);
+  const [roomDomain, setRoomDomain] = createSignal<string | null>(null);
   const [gameDomain, setGameDomain] = createSignal<string | null>(null);
   const [chatDomain, setChatDomain] = createSignal<string | null>(null);
 
@@ -83,16 +83,16 @@ export function useRoomSession(gameId: () => string | undefined) {
       setPhase(prev => (prev !== data.phase ? data.phase : prev));
 
       // domains: prefer explicit fields if provided
-      const dPregame = data.domains?.pregame ?? null;
+      const dRoom = data.domains?.room ?? null;
       const dPrimary = data.domains?.primary ?? null;
       const dChat = data.domains?.chat ?? null;
 
-      // Update pregame domain if provided; if not provided but primary is pregame-*,
+      // Update room domain if provided; if not provided but primary is room-*,
       // fall back to primary.
-      if (dPregame) {
-        if (pregameDomain() !== dPregame) setPregameDomain(dPregame);
-      } else if (dPrimary && dPrimary.startsWith('pregame-')) {
-        if (pregameDomain() !== dPrimary) setPregameDomain(dPrimary);
+      if (dRoom) {
+        if (roomDomain() !== dRoom) setRoomDomain(dRoom);
+      } else if (dPrimary && dPrimary.startsWith('room-')) {
+        if (roomDomain() !== dPrimary) setRoomDomain(dPrimary);
       }
 
       // Update game domain only if primary is actually a game-* domain
@@ -103,7 +103,7 @@ export function useRoomSession(gameId: () => string | undefined) {
       // chat domain update
       if (dChat && chatDomain() !== dChat) setChatDomain(dChat);
 
-      // IMPORTANT: do not clear pregameDomain when entering INGAME.
+      // IMPORTANT: do not clear roomDomain when entering INGAME.
       // We intentionally keep it so RoomWithSync can remain connected.
     } catch (err: any) {
       setError(err?.message ?? String(err));
@@ -205,7 +205,7 @@ export function useRoomSession(gameId: () => string | undefined) {
   return {
     // signals / accessors
     playerId,
-    pregameDomain,
+    roomDomain,
     gameDomain,
     chatDomain,
     phase,
