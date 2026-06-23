@@ -37,7 +37,7 @@ export type GameServiceConfig = {
   chatMaxMessages?: number;
   gameTimeout?: number;
   heartbeatInterval?: number;
-  /** 队伍模式：ffa（默认）/ team。在 initializePreGame 时写入 initialState */
+  /** 队伍模式：ffa（默认）/ team。在 initializeRoom 时写入 initialState */
   teamMode?: PreGameTeamMode;
   // optional: raw incoming gameSettings (from create request). Prefer normalized mapSize in gameConfig.mapSizeNormalized below
   gameSettings?: Partial<GameInstanceSettings>;
@@ -89,9 +89,9 @@ export class GameService {
   private onDisbandCallback?: () => void;
 
   private roomUpdateEmitter?: (gameId: GameId) => void;
-  private pregameUpdateFilters: Array<(prev?: PreGameRoomState, curr?: PreGameRoomState) => boolean> = [];
-  // 保存从 pregame 启动游戏前的快照（用于游戏结束后恢复房间）
-  private lastPreGameSnapshot?: PreGameRoomState;
+  private roomUpdateFilters: Array<(prev?: PreGameRoomState, curr?: PreGameRoomState) => boolean> = [];
+  // 保存从 room 启动游戏前的快照（用于游戏结束后恢复房间）
+  private lastRoomSnapshot?: PreGameRoomState;
 
   constructor(config: GameServiceConfig) {
     this.config = config;
@@ -108,8 +108,8 @@ export class GameService {
    * 注册 WebSocket 域名处理器
    */
   private registerDomainHandlers(): void {
-    // 注册 pregame 域名处理器
-    registerDomainHandler('room-' + this.gameId, this.createPregameDomainHandler());
+    // 注册 room 域名处理器
+    registerDomainHandler('room-' + this.gameId, this.createRoomDomainHandler());
 
     // 注册 game 域名处理器
     registerDomainHandler('game-' + this.gameId, this.createGameDomainHandler());
@@ -132,7 +132,7 @@ export class GameService {
   /**
    * 创建 Room 域名处理器
    */
-  private createPregameDomainHandler(): DomainHandler<SyncedPreGameClientActions, SyncedPreGameServerEvent> {
+  private createRoomDomainHandler(): DomainHandler<SyncedPreGameClientActions, SyncedPreGameServerEvent> {
     return (connector: SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>) => {
       const ctx = connector.context;
       const { userid, username } = ctx;
@@ -148,13 +148,13 @@ export class GameService {
       }
 
 
-      // 检查阶段是否允许 pregame 连接
+      // 检查阶段是否允许 room 连接
       // if (this.phase !== GamePhase.PREGAME) {
-      //   connector.close(4002, 'Invalid phase for pregame');
+      //   connector.close(4002, 'Invalid phase for room');
       //   return;
       // }
 
-      // pregame domain 在 PREGAME 与 INGAME 期间都允许连接，为了方便恢复房间
+      // room domain 在 PREGAME 与 INGAME 期间都允许连接，为了方便恢复房间
       if (this.phase === GamePhase.DISBANDED) {
         connector.close(4004, 'Game disbanded');
         return;
@@ -162,7 +162,7 @@ export class GameService {
 
       // 初始化 RoomInstance（如果不存在）
       if (!this.roomInstance) {
-        this.initializePreGame();
+        this.initializeRoom();
       }
 
       // 将玩家添加到 RoomInstance
@@ -175,10 +175,10 @@ export class GameService {
             ...(ctx.displayName ? { displayName: ctx.displayName } : {}),
             ...(ctx.avatarThumbUrl ? { avatarThumbUrl: ctx.avatarThumbUrl } : {}),
           },
-          this.adaptToPregameConnector(connector),
+          this.adaptToRoomConnector(connector),
         );
         if (!result.success) {
-          connector.close(4003, result.message || 'Failed to add to pregame');
+          connector.close(4003, result.message || 'Failed to add to room');
           return;
         }
       }
@@ -188,10 +188,10 @@ export class GameService {
   /**
    * 创建 Game 域名处理器
    *
-   * 玩家在 PreGame 状态决定连接形式：
+   * 玩家在 Room 状态决定连接形式：
    *   - Playing  -> 正常作为对局参与者接入（addPlayer）
    *   - Spectating -> 作为观战者接入（addSpectator，只读不发 action）
-   *   - 其它（包括 PreGame 实例不存在或玩家不在状态里）-> 4003 拒绝
+   *   - 其它（包括 Room 实例不存在或玩家不在状态里）-> 4003 拒绝
    */
   private createGameDomainHandler(): DomainHandler<SyncedGameClientActions, SyncedGameServerEvent> {
     return (connector: SubConnector<SyncedGameClientActions, SyncedGameServerEvent>) => {
@@ -220,8 +220,8 @@ export class GameService {
       }
 
       // 区分玩家 / 观战者：以 RoomInstance 中的 status 为准
-      const pregameState = this.roomInstance?.getState();
-      const playerEntry = pregameState?.players.find(p => p.id === userid);
+      const roomState = this.roomInstance?.getState();
+      const playerEntry = roomState?.players.find(p => p.id === userid);
       const isSpectator = playerEntry?.status === PreGamePlayerStatus.Spectating;
 
       if (isSpectator) {
@@ -280,7 +280,7 @@ export class GameService {
   /**
    * 将 SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent, { playerId: PlayerId; playerName: string }> 适配为 RoomServerConnector
    */
-  private adaptToPregameConnector(connector: SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>): RoomServerConnector {
+  private adaptToRoomConnector(connector: SubConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>): RoomServerConnector {
     return connector;
   }
 
@@ -298,21 +298,21 @@ export class GameService {
     return connector;
   }
 
-  private addPreGameUpdateFilter(
+  private addRoomUpdateFilter(
     fn: (prev?: PreGameRoomState, curr?: PreGameRoomState) => boolean
   ): () => void {
-    this.pregameUpdateFilters.push(fn);
+    this.roomUpdateFilters.push(fn);
     return () => {
-      const i = this.pregameUpdateFilters.indexOf(fn);
-      if (i >= 0) this.pregameUpdateFilters.splice(i, 1);
+      const i = this.roomUpdateFilters.indexOf(fn);
+      if (i >= 0) this.roomUpdateFilters.splice(i, 1);
     };
   }
   // ============ 游戏阶段管理 ============
 
   /**
-   * 初始化 PreGame 阶段
+   * 初始化 Room 阶段
    */
-  private initializePreGame(): void {
+  private initializeRoom(): void {
     // determine default map width/height from config
     let defaultWidth = 20;
     let defaultHeight = 20;
@@ -377,7 +377,7 @@ export class GameService {
 
     this.roomInstance.onStartGame(this.startGame.bind(this));
 
-    this.lastPreGameSnapshot = structuredClone(this.roomInstance.getState());
+    this.lastRoomSnapshot = structuredClone(this.roomInstance.getState());
 
     // 过滤器：只在影响房间列表展示的字段变化时上报。
     // 房间列表展示的来源是 getGameInfo()：包含 hostId、players(id/name/isHost)、
@@ -404,26 +404,26 @@ export class GameService {
       return false;
     };
 
-    this.addPreGameUpdateFilter(significantChange);
+    this.addRoomUpdateFilter(significantChange);
 
     this.roomInstance.onStateChange((newState) => {
-      const prev = this.lastPreGameSnapshot;
-      this.lastPreGameSnapshot = structuredClone(newState);
+      const prev = this.lastRoomSnapshot;
+      this.lastRoomSnapshot = structuredClone(newState);
 
       let shouldEmit = false;
 
       // 如果没有任何过滤器，默认上报（往 manager 发送）
-      if (this.pregameUpdateFilters.length === 0) {
+      if (this.roomUpdateFilters.length === 0) {
         shouldEmit = true;
       } else {
-        for (const filter of this.pregameUpdateFilters) {
+        for (const filter of this.roomUpdateFilters) {
           try {
             if (filter(prev, newState)) {
               shouldEmit = true;
               break;
             }
           } catch (err) {
-            console.error('[GameService] pregame update filter error', err);
+            console.error('[GameService] room update filter error', err);
           }
         }
       }
@@ -432,7 +432,7 @@ export class GameService {
         this.emitRoomUpdatedToManager();
       }
     });
-    console.log(`[GameService ${this.gameId}] PreGame initialized`);
+    console.log(`[GameService ${this.gameId}] Room initialized`);
   }
 
   private emitRoomUpdatedToManager() {
@@ -444,7 +444,7 @@ export class GameService {
   }
 
   /**
-   * 从 PreGame 转换到 Game 阶段
+   * 从 Room 转换到 Game 阶段
    */
   public startGame(state: PreGameRoomState): void {
     if (this.phase !== GamePhase.PREGAME || !this.roomInstance) {
@@ -454,16 +454,16 @@ export class GameService {
 
     console.log(`[GameService ${this.gameId}] Starting game...`);
 
-    // 直接使用传入的 PreGame 状态
-    const preGameState = structuredClone(state);
-    this.lastPreGameSnapshot = structuredClone(preGameState);
+    // 直接使用传入的 Room 状态
+    const roomState = structuredClone(state);
+    this.lastRoomSnapshot = structuredClone(roomState);
 
     // 创建初始游戏状态
     const nowTick = 0;
 
     // 构建 players
     const players: Record<PlayerId, PlayerCore> = {};
-    for (const p of preGameState.players) {
+    for (const p of roomState.players) {
       players[p.id] = {
         id: p.id,
         status: PlayerStatus.Playing,
@@ -476,7 +476,7 @@ export class GameService {
 
     // 构建 teams
     const teams: Record<TeamId, TeamCore> = {};
-    for (const p of preGameState.players) {
+    for (const p of roomState.players) {
       if (!teams[p.teamId]) {
         teams[p.teamId] = {
           id: p.teamId,
@@ -487,11 +487,11 @@ export class GameService {
       teams[p.teamId]!.memberIds.push(p.id);
     }
 
-    // 直接透传 PreGameGameSetting（已兼容 GameSettings）
-    const settings: GameSettings = preGameState.gameSetting;
+    // 直接透传 RoomGameSetting（已兼容 GameSettings）
+    const settings: GameSettings = roomState.gameSetting;
 
     // 构建 map（根据 mapSetting 生成地图）
-    const map: GameMap = generateMap(preGameState.mapSetting, preGameState.players);
+    const map: GameMap = generateMap(roomState.mapSetting, roomState.players);
 
     const initialGameState: GameState = {
       status: GameStatus.Playing,
@@ -504,7 +504,7 @@ export class GameService {
 
     // 分配专属颜色：假设玩家都有合法的颜色
     const gameInstanceSettings: GameInstanceSettings = {
-      playerDisplay: preGameState.players.reduce(
+      playerDisplay: roomState.players.reduce(
         (acc, p) => {
           acc[p.id] = {
             tileColor: p.tileColor,
@@ -519,7 +519,7 @@ export class GameService {
     }
 
     // 创建 GameInstance
-    const playerIds = Array.from(preGameState.players.map(p => p.id));
+    const playerIds = Array.from(roomState.players.map(p => p.id));
     this.gameInstance = new GameInstance(initialGameState, gameInstanceSettings, playerIds);
     this.phase = GamePhase.INGAME;
     // Chat permissions/display use RoomInstance as the room roster source even during INGAME:
@@ -573,16 +573,16 @@ export class GameService {
       this.gameInstance = null;
     }
 
-    // 先在 pregame 域广播一次 GAME_ENDED，再 resume()。
+    // 先在 room 域广播一次 GAME_ENDED，再 resume()。
     // 顺序很关键：客户端的 RoomWithSync 必须先收到 GAME_ENDED（让路由记下"刚结束"标记，
-    // 维持游戏结算 UI），再收到 resume 后的 pregame state（status: Playing/Spectating -> Lobby）。
+    // 维持游戏结算 UI），再收到 resume 后的 room state（status: Playing/Spectating -> Lobby）。
     // 否则 selfStatus 翻位会让 Match 立刻 unmount GameWithSync，玩家来不及看输赢。
     if (this.roomInstance) {
       this.roomInstance.broadcastGameEnded(Date.now());
       this.roomInstance.resume();
     } else {
       // 解散房间（降级方案）
-      console.error(`[GameService ${this.gameId}] Failed to build fallback pregame state, disbanding game`);
+      console.error(`[GameService ${this.gameId}] Failed to build fallback room state, disbanding game`);
       this.disbandGame();
       return;
     }
@@ -601,7 +601,7 @@ export class GameService {
     // 通知 manager 房间已变更（从 INGAME -> PREGAME）
     this.emitRoomUpdatedToManager();
 
-    console.log(`[GameService ${this.gameId}] Game ended and room restored to pregame with ${this.roomInstance.getState().players.length} players`);
+    console.log(`[GameService ${this.gameId}] Game ended and room restored to room with ${this.roomInstance.getState().players.length} players`);
   }
 
   public forceDispose(): void {
@@ -738,44 +738,24 @@ export class GameService {
 
   /**
    * 获取玩家数量
-   */
-  /**
-   * 获取玩家数量（自动根据阶段判断）
+   * RoomInstance 全程存活，始终是玩家名册的权威数据源。
    */
   public getPlayerCount(): number {
-    if (this.phase === GamePhase.PREGAME && this.roomInstance) {
-      return this.roomInstance.getState().players.length;
-    }
-    if (this.phase === GamePhase.INGAME && this.gameInstance) {
-      return Object.keys(this.gameInstance.getState().players).length;
-    }
-    return 0;
+    return this.roomInstance?.getState().players.length ?? 0;
   }
 
   /**
-   * 获取玩家列表（自动根据阶段判断）
+   * 获取玩家列表
    */
   public getPlayers(): PlayerId[] {
-    if (this.phase === GamePhase.PREGAME && this.roomInstance) {
-      return this.roomInstance.getState().players.map(p => p.id);
-    }
-    if (this.phase === GamePhase.INGAME && this.gameInstance) {
-      return Object.keys(this.gameInstance.getState().players);
-    }
-    return [];
+    return this.roomInstance?.getState().players.map(p => p.id) ?? [];
   }
 
   /**
-   * 检查玩家是否在游戏中（自动根据阶段判断）
+   * 检查玩家是否在房间中
    */
   public hasPlayer(playerId: PlayerId): boolean {
-    if (this.phase === GamePhase.PREGAME && this.roomInstance) {
-      return this.roomInstance.getState().players.some(p => p.id === playerId);
-    }
-    if (this.phase === GamePhase.INGAME && this.gameInstance) {
-      return !!this.gameInstance.getState().players[playerId];
-    }
-    return false;
+    return this.roomInstance?.getState().players.some(p => p.id === playerId) ?? false;
   }
 
   /**
@@ -787,7 +767,7 @@ export class GameService {
       phase: this.phase,
       playerCount: this.getPlayerCount(),
       players: this.getPlayers(),
-      preGameState: this.roomInstance?.getState(),
+      roomState: this.roomInstance?.getState(),
       gameState: this.gameInstance?.getState(),
     };
   }
@@ -837,14 +817,14 @@ export class GameService {
 
       case GamePhase.INGAME: {
         // 1) 已在游戏中的玩家 -> game 域（作为对局参与者）
-        // 2) PreGame state 里标为 Spectating 的玩家 -> game 域（作为观战者，addSpectator）
-        // 3) 其它（Lobby / 未在房间里）-> pregame 域，作为 Lobby 进房间
+        // 2) Room state 里标为 Spectating 的玩家 -> game 域（作为观战者，addSpectator）
+        // 3) 其它（Lobby / 未在房间里）-> room 域，作为 Lobby 进房间
         if (this.hasPlayer(playerId)) {
           primary = `game-${this.gameId}`;
           break;
         }
-        const pregameSelf = this.roomInstance?.getState().players.find(p => p.id === playerId);
-        if (pregameSelf?.status === PreGamePlayerStatus.Spectating) {
+        const roomSelf = this.roomInstance?.getState().players.find(p => p.id === playerId);
+        if (roomSelf?.status === PreGamePlayerStatus.Spectating) {
           primary = `game-${this.gameId}`;
         } else {
           primary = `room-${this.gameId}`;
