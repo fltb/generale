@@ -1,4 +1,4 @@
-import { For, Index, createMemo, createSignal, createEffect, onCleanup, type Component } from "solid-js";
+import { For, Index, createMemo, createSignal, createEffect, onCleanup, onMount, type Component } from "solid-js";
 import * as P from "solid-pixi";
 import * as PIXI from "pixi.js";
 
@@ -10,14 +10,18 @@ import { type FaIconKey, createScaledFaIcon, destroyGcCache } from "~/utils/faIc
 import { DEFAULT_TILE_THEME, DIRECTION_ICON } from "~/game/render/tileTheme";
 import { useMapInput } from "~/game/render/useMapInput";
 
+export interface ViewportApi {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  zoomReset: () => void;
+}
+
 export interface MapRenderProps {
   state: SyncedGameState;
-  // 可选回调：若宿主想收到新增指令可以传入（非必须）
   onOperationQueued?: (op: PlayerOperation) => void;
-  /** 当前客户端玩家 id，用于首帧把 cursor 自动放到自己的 throne 上 */
   selfId?: string;
-  /** 按 'c' 键时调用：清空操作队列 */
   onClearQueue?: () => void;
+  onViewportReady?: (api: ViewportApi) => void;
 }
 
 type DirectionKey = keyof typeof DIRECTION_ICON;
@@ -90,18 +94,158 @@ const OperationArrow: Component<{
 };
 
 export const MapRender: Component<MapRenderProps> = (props) => {
-  // 关键：每次地图视图挂载（= 进入一局对局）前清空 FA 图标的 GraphicsContext 缓存。
-  // gcCache 是模块级、跨对局存活的；其中的 GraphicsContext 绑定在上一局 pixi 渲染器上，
-  // 再次进入游戏时是新的渲染器，复用这些旧 context 会导致 faicon 画不出来
-  // （"首次进入正常、再次进入出问题，刷新就好"正是这个症状——刷新清掉了整个模块缓存）。
-  // 在组件体顶部同步清空，保证早于下面任何 MapTile 的图标 effect 构建图标。
   destroyGcCache();
-  // 离开对局时也清一次，及时释放并让下一局从干净状态开始。
   onCleanup(() => destroyGcCache());
 
   const TILE_SIZE = DEFAULT_TILE_THEME.tileSize;
   const map = createMemo(() => props.state?.map ?? { width: 0, height: 0, tiles: [] });
   const iconTextures = createMemo<Record<TileType, FaIconKey | null>>(() => DEFAULT_TILE_THEME.tileIcon);
+
+  // ---- viewport: drag + zoom ----
+  const [viewX, setViewX] = createSignal(0);
+  const [viewY, setViewY] = createSignal(0);
+  const [viewScale, setViewScale] = createSignal(1);
+  const MIN_ZOOM = 0.2;
+  const MAX_ZOOM = 5.0;
+  const DRAG_THRESHOLD = 3;
+
+  function clampView() {
+    const s = viewScale();
+    const m = map();
+    const mapW = m.width * TILE_SIZE * s;
+    const mapH = m.height * TILE_SIZE * s;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const MARGIN = 200;
+
+    let nx = viewX();
+    let ny = viewY();
+
+    nx = Math.max(-MARGIN, Math.min(vw - mapW + MARGIN, nx));
+    ny = Math.max(-MARGIN, Math.min(vh - mapH + MARGIN, ny));
+
+    if (nx !== viewX()) setViewX(nx);
+    if (ny !== viewY()) setViewY(ny);
+  }
+
+  function centerMap() {
+    const m = map();
+    const mapW = m.width * TILE_SIZE;
+    const mapH = m.height * TILE_SIZE;
+    if (mapW === 0 || mapH === 0) return;
+    const s = viewScale();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    setViewX((vw - mapW * s) / 2);
+    setViewY((vh - mapH * s) / 2);
+  }
+
+  // ---- zoom towards viewport center (keyboard / HUD buttons) ----
+  function zoomTowardsCenter(factor: number) {
+    const oldScale = viewScale();
+    const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, oldScale * factor));
+    if (newScale === oldScale) return;
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const worldX = (cx - viewX()) / oldScale;
+    const worldY = (cy - viewY()) / oldScale;
+    setViewScale(newScale);
+    setViewX(cx - worldX * newScale);
+    setViewY(cy - worldY * newScale);
+  }
+
+  const viewportApi: ViewportApi = {
+    zoomIn: () => zoomTowardsCenter(1.25),
+    zoomOut: () => zoomTowardsCenter(1 / 1.25),
+    zoomReset: () => { setViewScale(1); centerMap(); },
+  };
+
+  // ---- drag state (PixiJS events) ----
+  let dragActive = false;
+  let dragMoved = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragStartViewX = 0;
+  let dragStartViewY = 0;
+
+  function handleDragStart(e: PIXI.FederatedPointerEvent) {
+    if (e.button !== 0) return;
+    dragActive = true;
+    dragMoved = false;
+    dragStartX = e.globalX;
+    dragStartY = e.globalY;
+    dragStartViewX = viewX();
+    dragStartViewY = viewY();
+  }
+
+  function handleDragMove(e: PIXI.FederatedPointerEvent) {
+    if (!dragActive) return;
+    const dx = e.globalX - dragStartX;
+    const dy = e.globalY - dragStartY;
+    if (!dragMoved && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
+      dragMoved = true;
+    }
+    if (!dragMoved) return;
+    setViewX(dragStartViewX + dx);
+    setViewY(dragStartViewY + dy);
+  }
+
+  function handleDragEnd() {
+    dragActive = false;
+  }
+
+  const STAGE_HIT_AREA = new PIXI.Rectangle(-5000, -5000, 10000, 10000);
+
+  onMount(() => {
+    props.onViewportReady?.(viewportApi);
+
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas");
+
+    const onWheel = (e: WheelEvent) => {
+      if (!canvas) return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      const oldScale = viewScale();
+      const factor = 1 - e.deltaY * 0.001 * (e.deltaMode === 1 ? 40 : 1);
+      const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, oldScale * factor));
+      if (newScale === oldScale) return;
+
+      const worldX = (mx - viewX()) / oldScale;
+      const worldY = (my - viewY()) / oldScale;
+      setViewScale(newScale);
+      setViewX(mx - worldX * newScale);
+      setViewY(my - worldY * newScale);
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "=" || e.key === "+") { e.preventDefault(); viewportApi.zoomIn(); }
+      else if (e.key === "-") { e.preventDefault(); viewportApi.zoomOut(); }
+      else if (e.key === "0") { e.preventDefault(); viewportApi.zoomReset(); }
+    };
+
+    canvas?.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", clampView);
+
+    centerMap();
+
+    onCleanup(() => {
+      canvas?.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", clampView);
+    });
+  });
+
+  createEffect(() => {
+    viewX();
+    viewY();
+    viewScale();
+    queueMicrotask(() => clampView());
+  });
 
   // 输入逻辑（cursor active、点击选格、键盘移动）下沉到 useMapInput
   const input = useMapInput({
@@ -144,58 +288,58 @@ export const MapRender: Component<MapRenderProps> = (props) => {
       .stroke({ width: 6, color: DEFAULT_TILE_THEME.colors.cursor, alpha: 0.12 });
   });
 
-  const offsetX = 0;
-  const offsetY = 0;
-
   return (
-    // world container：所有地图内容都在这里（由外层的 Application 决定缩放/分辨率）
-    <P.Container x={offsetX} y={offsetY} name="world" sortableChildren>
-      {/* ===== map layer: tiles =====
-          用 <Index> 而非 <For>：地图尺寸在一局内固定，按"格子位置"复用节点、只更新数据，
-          避免 mergedState 每 tick structuredClone 出新数组导致 <For>（按引用 key）
-          每 tick 销毁+重建全部 MapTile —— 那种churn会和 createScaledFaIcon 抢跑，
-          造成"有概率图标/箭头画不出来"。 */}
-      <P.Container name="mapLayer">
-        <Index each={map().tiles}>
-          {(row, yIdx) => (
-            <Index each={row() ?? []}>
-              {(tile, xIdx) => {
-                const coord: Coordinates = { x: xIdx, y: yIdx };
-                return (
-                  <MapTile
-                    coord={coord}
-                    tile={tile()}
-                    size={TILE_SIZE}
-                    playerDisplay={props.state.playerDisplay}
-                    iconTextures={iconTextures()}
-                    onClick={input.handleTileClick}
-                  />
-                );
-              }}
-            </Index>
-          )}
-        </Index>
-      </P.Container>
+    // stage：固定屏幕空间，捕获拖拽事件；world 在其内部作平移/缩放变换
+    <P.Container
+      name="stage"
+      interactive
+      hitArea={STAGE_HIT_AREA}
+      onpointerdown={handleDragStart}
+      onpointermove={handleDragMove}
+      onpointerup={handleDragEnd}
+      onpointerupoutside={handleDragEnd}
+    >
+      <P.Container x={viewX()} y={viewY()} scale={viewScale()} name="world" sortableChildren>
+        {/* ===== map layer: tiles ===== */}
+        <P.Container name="mapLayer">
+          <Index each={map().tiles}>
+            {(row, yIdx) => (
+              <Index each={row() ?? []}>
+                {(tile, xIdx) => {
+                  const coord: Coordinates = { x: xIdx, y: yIdx };
+                  return (
+                    <MapTile
+                      coord={coord}
+                      tile={tile()}
+                      size={TILE_SIZE}
+                      playerDisplay={props.state.playerDisplay}
+                      iconTextures={iconTextures()}
+                      onClick={input.handleTileClick}
+                    />
+                  );
+                }}
+              </Index>
+            )}
+          </Index>
+        </P.Container>
 
-      {/* ===== entity layer: (units / players) - keep separate in case you add sprites later ===== */}
-      <P.Container name="entityLayer" />
+        {/* ===== entity layer ===== */}
+        <P.Container name="entityLayer" />
 
-      {/* ===== overlay layer: arrows / cursor / highlights - still in world space ===== */}
-      <P.Container name="overlayLayer">
-        {/* operation arrows (world-space coordinates inside OperationArrow) */}
-        <For each={props.state.playerOperationQueue ?? []}>
-          {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} />}
-        </For>
+        {/* ===== overlay layer: arrows / cursor / highlights ===== */}
+        <P.Container name="overlayLayer">
+          <For each={props.state.playerOperationQueue ?? []}>
+            {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} />}
+          </For>
 
-        {/* single cursor graphics (we reuse and update it via gCursor signal + createEffect above) */}
-        <P.Graphics
-          ref={(inst) => {
-            // 必须返回 cleanup 函数或 undefined
-            setGCursor(inst);
-            return () => setGCursor(undefined);
-          }}
-          zIndex={999}
-        />
+          <P.Graphics
+            ref={(inst) => {
+              setGCursor(inst);
+              return () => setGCursor(undefined);
+            }}
+            zIndex={999}
+          />
+        </P.Container>
       </P.Container>
     </P.Container>
   );

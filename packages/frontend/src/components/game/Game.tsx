@@ -4,37 +4,20 @@ import {
   type PlayerId,
   type GameId,
 } from "@generale/types";
-import { MapRender } from "../MapRender";
+import { MapRender, type ViewportApi } from "../MapRender";
 import { Application } from "solid-pixi";
 import PlayerList from "./PlayerList";
 import { useNavigate } from "@solidjs/router";
 import { useGameSession } from "~/game/useGameSession";
 import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
-import { Button, Card, Badge, Overlay, TakeoverOverlay, uiTheme, Countdown, Confetti, sfx } from "~/ui";
+import { Button, Badge, Overlay, TakeoverOverlay, uiTheme, Countdown, Confetti, sfx } from "~/ui";
 
-/**
- * Props:
- * - domain, gameId, playerId, ...
- * - onDismissGameEnd: 用户在结算 overlay 上点"回到房间" / 5s 计时器 / "返回大厅" 时调用。
- * - onStateUpdate: 把 server 自定义事件发给父层（用于展示/调试）
- */
 export interface GameWithSyncProps {
   domain: string;
   gameId: GameId;
   playerId: PlayerId;
   autoOpen?: boolean;
-  /**
-   * 观战模式：connector 走的是同一个 game-* 域，但服务端会把这个连接接到
-   * GameInstance.addSpectator 而非 addPlayer。客户端在这个模式下：
-   * - 不发 PUSH / CLEAN_ALL / SURRENDER
-   * - 隐藏操作按钮，"离开游戏" 替换成 "退出观战"（dispatch 到 pregame 域的 LEAVE_SPECTATE）
-   * - MapRender 收到的 state 是未 mask 的完整地图
-   *
-   * 注意：LEAVE_SPECTATE 必须通过 pregame 域 dispatch。Game.tsx 自己不连 pregame，
-   * 所以这里通过 onLeaveSpectate 回调把意图上报给父级（routes/room.tsx）路由处理。
-   */
   spectate?: boolean;
-  /** 是否为全新开局（经 GAME_STARTED 进入）。仅全新开局放开局倒计时；重连/刷新/观战进来不放。 */
   freshStart?: boolean;
   onStateUpdate?: (payload: { event?: SyncedPreGameServerEventPayload }) => void;
   onDismissGameEnd?: () => void;
@@ -62,15 +45,13 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
   const mergedState = ctrl.mergedState;
   const endgameResult = ctrl.endgameResult;
 
-  // 地图是否已同步到（width>0）。pixi Application 只在地图就绪后挂载，
-  // 避免在空地图(0x0)上初始化画布导致"只剩蓝底没有地图、刷新才好"的进场竞态。
   const mapReady = () => ((mergedState()?.map?.width ?? 0) > 0);
 
-  // 开局倒计时：进入对局 UI 时播一次
   const [showCountdown, setShowCountdown] = createSignal(true);
 
-  // 结算音效 + 胜利纸屑：selfOutcome 落定时各播一次
   const [celebrate, setCelebrate] = createSignal(false);
+  const [viewportApi, setViewportApi] = createSignal<ViewportApi | null>(null);
+  const [playerPanelOpen, setPlayerPanelOpen] = createSignal(true);
   let outcomePlayed = false;
   createEffect(() => {
     const outcome = endgameResult()?.selfOutcome;
@@ -85,73 +66,93 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
   });
 
   return (
-    <div class="p-4">
-      {/* 倒计时只在"全新开局"且战场就绪后播放；重连/刷新/观战进入进行中的对局不播 */}
+    <div class="fixed inset-0 overflow-hidden select-none">
+      {/* ---- 全屏地图背景 ---- */}
+      <Show
+        when={mapReady()}
+        fallback={
+          <div class="flex h-full w-full flex-col items-center justify-center gap-3 bg-base-300 text-base-content">
+            <div class="font-display text-2xl text-primary animate-pulse">召集军队中…</div>
+            <div class="text-sm opacity-60">正在与战场同步</div>
+          </div>
+        }
+      >
+        <Application
+          background={DEFAULT_TILE_THEME.colors.appBackground}
+          resizeTo={window}
+          resolution={window.devicePixelRatio}
+          autoDensity={true}
+          antialias={true}
+        >
+          <MapRender
+            state={mergedState()}
+            onOperationQueued={ctrl.handleOperationQueued}
+            selfId={props.spectate ? undefined : props.playerId}
+            onClearQueue={props.spectate ? undefined : ctrl.handleClearQueue}
+            onViewportReady={setViewportApi}
+          />
+        </Application>
+      </Show>
+
+      {/* ---- HUD: 顶部信息栏 ---- */}
+      <div class="absolute top-0 left-0 right-0 flex items-center justify-between bg-base-200/70 backdrop-blur-sm px-3 py-2">
+        <div class="flex items-center gap-3 text-sm">
+          <span class="font-semibold tracking-wide">{props.gameId}</span>
+          <span class="opacity-60">Tick <span class="font-mono">{mergedState()?.tick}</span></span>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <Show when={!props.spectate} fallback={
+            <>
+              <Badge variant="info" class="badge-xs">观战中</Badge>
+              <Button size="xs" variant="ghost" onClick={() => props.onLeaveSpectate?.()}>退出观战</Button>
+            </>
+          }>
+            <Button size="xs" variant="ghost" onClick={ctrl.handleClearQueue}>清空队列</Button>
+            <Button size="xs" variant="warning" onClick={ctrl.handleSurrender}>投降</Button>
+            <Button size="xs" variant="ghost" onClick={ctrl.handleLeave}>离开</Button>
+          </Show>
+        </div>
+      </div>
+
+      {/* ---- HUD: 右侧玩家面板 ---- */}
+      <div class="absolute right-0 top-10 max-h-[calc(100vh-8rem)] flex flex-col gap-0">
+        <button
+          class="self-end mr-2 bg-base-200/70 backdrop-blur-sm px-2 py-0.5 text-xs pixel-border"
+          onClick={() => setPlayerPanelOpen((v) => !v)}
+        >
+          {playerPanelOpen() ? "▶ 收起" : "◀ 玩家"}
+        </button>
+        <Show when={playerPanelOpen()}>
+          <div class="w-44 max-h-full bg-base-200/70 backdrop-blur-sm overflow-auto mr-2">
+            <PlayerList state={ctrl.state} compact />
+          </div>
+        </Show>
+      </div>
+
+      {/* ---- HUD: 底部缩放控制 ---- */}
+      <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-base-200/80 backdrop-blur-sm pixel-border rounded px-3 py-1.5">
+        <Button size="xs" variant="ghost" onClick={() => viewportApi()?.zoomOut()} title="缩小 (−)">−</Button>
+        <Button size="xs" variant="ghost" onClick={() => viewportApi()?.zoomReset()} title="重置缩放 (0)">⊙</Button>
+        <Button size="xs" variant="ghost" onClick={() => viewportApi()?.zoomIn()} title="放大 (=)">+</Button>
+      </div>
+
+      {/* ---- 开局倒计时 ---- */}
       <Show when={props.freshStart && mapReady() && showCountdown()}>
         <Countdown from={3} onDone={() => setShowCountdown(false)} />
       </Show>
 
-      <Card class="bg-base-200 p-3 mb-3 flex items-center justify-between">
-        <div>
-          <div class="text-lg font-semibold">游戏中 — {props.gameId}</div>
-          <div class="text-sm opacity-70">Tick: {mergedState()?.tick}</div>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <Show when={!props.spectate} fallback={
-            <>
-              <Badge variant="info">观战中</Badge>
-              <Button size="sm" variant="ghost" onClick={() => props.onLeaveSpectate?.()}>退出观战</Button>
-            </>
-          }>
-            <Button size="sm" onClick={ctrl.handleClearQueue}>清空操作队列</Button>
-            <Button size="sm" variant="warning" onClick={ctrl.handleSurrender}>投降</Button>
-            <Button size="sm" variant="ghost" onClick={ctrl.handleLeave}>离开游戏</Button>
-          </Show>
-        </div>
-      </Card>
-
-      <PlayerList state={ctrl.state} />
-
-      <Card class="bg-base-200 p-3">
-        {/* 地图就绪后才挂载 pixi 画布；未就绪时显示"召集军队中"占位，
-            避免 pixi 在空地图上初始化引发的蓝屏进场竞态 */}
-        <Show
-          when={mapReady()}
-          fallback={
-            <div class="flex flex-col items-center justify-center gap-3 py-24 text-base-content">
-              <div class="font-display text-2xl text-primary animate-pulse">召集军队中…</div>
-              <div class="text-sm opacity-60">正在与战场同步</div>
-            </div>
-          }
-        >
-          <Application
-            background={DEFAULT_TILE_THEME.colors.appBackground}
-            resizeTo={window}
-            resolution={window.devicePixelRatio}
-            autoDensity={true}
-            antialias={true}
-          >
-            <MapRender
-              state={mergedState()}
-              onOperationQueued={ctrl.handleOperationQueued}
-              selfId={props.spectate ? undefined : props.playerId}
-              onClearQueue={props.spectate ? undefined : ctrl.handleClearQueue}
-            />
-          </Application>
-        </Show>
-      </Card>
-
-      {/* Displaced overlay：被同 user 另一个 sub 接管，盖整屏，不可关。
-          优先级高于 end-game overlay（虽然两者一般不会同时出现）。 */}
+      {/* ---- Displaced overlay ---- */}
       <Show when={ctrl.displaced()}>
         <TakeoverOverlay scope="游戏" dim={70} />
       </Show>
 
+      {/* ---- 胜利纸屑 ---- */}
       <Show when={celebrate()}>
         <Confetti />
       </Show>
 
+      {/* ---- 结算 overlay ---- */}
       <Show when={ctrl.gameEndedInfo()}>
         <Overlay dim={70}>
           <Show

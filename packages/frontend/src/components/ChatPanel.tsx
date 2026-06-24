@@ -20,6 +20,7 @@ export interface ChatPanelProps {
   class?: string;
   listClass?: string;
   placeholder?: string;
+  transparent?: boolean;
 }
 
 export const ChatPanel: Component<ChatPanelProps> = (props) => {
@@ -121,7 +122,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
   return (
     <Panel
       tone="base-100"
-      class={`flex h-full min-h-0 flex-col gap-3 ${props.class ?? ""}`}
+      class={`flex h-full min-h-0 flex-col gap-3 ${props.transparent ? "!bg-transparent !shadow-none !border-0" : ""} ${props.class ?? ""}`}
       title={
         <div class="flex items-center justify-between gap-3">
           <div>
@@ -155,7 +156,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
 
       <div
         ref={listEl}
-        class={`min-h-0 flex-1 overflow-auto bg-base-200 p-2 pixel-border ${props.listClass ?? ""}`}
+        class={`min-h-0 flex-1 overflow-auto ${props.transparent ? "bg-base-300/20" : "bg-base-200"} p-2 pixel-border ${props.listClass ?? ""}`}
         style={{ height: "260px" }}
       >
         <Show

@@ -202,12 +202,34 @@ export class ProfileService {
       if (await Bun.file(path).exists()) continue;
 
       const s = v.size;
-      // 灰底 + 简化人头剪影；尺寸跟变体一致避免后续再 resize
+      // 像素风默认头像：16x16 网格的 RPG 角色（战士），sharp 用 crispEdges 保持块状像素感
       const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 ${s} ${s}">
-  <rect width="100%" height="100%" fill="#cbd5e1"/>
-  <circle cx="${s / 2}" cy="${s * 0.4}" r="${s * 0.18}" fill="#94a3b8"/>
-  <path d="M ${s * 0.18} ${s * 0.95} Q ${s / 2} ${s * 0.55} ${s * 0.82} ${s * 0.95} L ${s * 0.82} ${s} L ${s * 0.18} ${s} Z" fill="#94a3b8"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <!-- background -->
+  <rect width="16" height="16" fill="#1a1a2e"/>
+  <!-- hair top -->
+  <rect x="4" y="0" width="8" height="2" fill="#e94560"/>
+  <rect x="3" y="1" width="2" height="1" fill="#e94560"/>
+  <rect x="11" y="1" width="2" height="1" fill="#e94560"/>
+  <rect x="2" y="2" width="1" height="1" fill="#e94560"/>
+  <rect x="13" y="2" width="1" height="1" fill="#e94560"/>
+  <!-- face -->
+  <rect x="4" y="3" width="8" height="8" fill="#f5d6c6"/>
+  <!-- eyes -->
+  <rect x="6" y="5" width="2" height="2" fill="#0a0a1a"/>
+  <rect x="10" y="5" width="2" height="2" fill="#0a0a1a"/>
+  <!-- eye highlights -->
+  <rect x="7" y="5" width="1" height="1" fill="#ffffff"/>
+  <rect x="11" y="5" width="1" height="1" fill="#ffffff"/>
+  <!-- mouth -->
+  <rect x="8" y="8" width="2" height="1" fill="#c0392b"/>
+  <!-- body armor -->
+  <rect x="3" y="11" width="10" height="1" fill="#16213e"/>
+  <rect x="2" y="12" width="3" height="3" fill="#533483"/>
+  <rect x="5" y="12" width="6" height="3" fill="#533483"/>
+  <rect x="11" y="12" width="3" height="3" fill="#533483"/>
+  <!-- belt -->
+  <rect x="4" y="13" width="8" height="1" fill="#ffd34d"/>
 </svg>`;
       const buf = await sharp(Buffer.from(svg))
         .webp({ quality: v.quality })

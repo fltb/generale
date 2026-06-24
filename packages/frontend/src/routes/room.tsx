@@ -101,16 +101,17 @@ const RoomRoute: Component = () => {
         />
       </Show>
 
-      {/* ---------- Chat floating window (bottom-right) ----------
-          战局聊天跟 route 同级挂载，pregame / ingame 共享 chat-* domain。 */}
+      {/* ---------- Chat floating window (bottom-left) ----------
+          战局聊天跟 route 同级挂载，pregame / ingame 共享 chat-* domain。
+          玻璃态半透明设计：不影响地图等游戏画面的可见性。 */}
       <Show when={session.chatDomain() && session.playerId()}>
-        <div class="fixed bottom-4 left-4 z-50 max-w-[calc(100vw-2rem)]">
+        <div class="fixed bottom-4 right-4 z-50 max-w-[calc(100vw-2rem)]">
           {/* Minimized button */}
           <Show when={!chatVisible()}>
             <Button
               circle
               variant="primary"
-              class="shadow-lg"
+              class="shadow-lg bg-primary/80 backdrop-blur-sm"
               aria-label="打开聊天"
               onClick={() => setChatVisible(true)}
               title="打开聊天"
@@ -121,32 +122,22 @@ const RoomRoute: Component = () => {
 
           {/* Expanded panel */}
           <Show when={chatVisible()}>
-            <div class="w-[min(24rem,calc(100vw-2rem))] overflow-hidden bg-base-100 shadow-lg pixel-border">
-              <div class="flex items-center justify-between gap-3 border-b border-base-300 p-2">
+            <div class="w-[min(24rem,calc(100vw-2rem))] overflow-hidden bg-base-100/75 backdrop-blur-sm shadow-lg pixel-border">
+              <div class="flex items-center justify-between gap-3 border-b border-base-300/50 p-2">
                 <div class="min-w-0">
                   <div class="truncate text-sm font-medium">聊天</div>
                   <div class="truncate text-xs opacity-60">
                     {session.phase() === GamePhase.INGAME ? "游戏中" : "准备阶段"}
                   </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => setChatVisible(false)}
-                    title="收起"
-                  >
-                    收起
-                  </Button>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => setChatVisible(false)}
-                    title="关闭"
-                  >
-                    X
-                  </Button>
-                </div>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setChatVisible(false)}
+                  title="收起"
+                >
+                  收起
+                </Button>
               </div>
 
               <div class="p-2">
@@ -157,6 +148,7 @@ const RoomRoute: Component = () => {
                   selfStatus={session.selfStatus()}
                   room={session.roomState()}
                   autoOpen
+                  transparent
                 />
               </div>
             </div>
