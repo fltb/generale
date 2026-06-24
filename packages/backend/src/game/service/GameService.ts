@@ -313,7 +313,7 @@ export type ConnectionResult =
       gameSetting: {
         speed: 1.0,
         tileGrow: {
-          PLAIN: { duration: 40, growth: 1 },
+          PLAIN: { duration: 10, growth: 1 },
           THRONE: { duration: 1, growth: 1 },
           BARRACKS: { duration: 1, growth: 1 },
           MOUNTAIN: { duration: 1e10, growth: 0 },

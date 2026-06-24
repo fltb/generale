@@ -697,6 +697,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     if (!newHost) return;
     this.state.players.forEach(p => (p.isHost = false));
     newHost.isHost = true;
+    newHost.ready = 1;
     this.state.hostId = newHostId;
   }
 
@@ -712,6 +713,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
     if (candidate) {
       candidate.isHost = true;
+      candidate.ready = 1;
       this.state.hostId = candidate.id;
     } else {
       this.state.hostId = '';
@@ -1160,7 +1162,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
         p.status === PreGamePlayerStatus.Spectating
       ) {
         p.status = PreGamePlayerStatus.Lobby;
-        p.ready = 0;
+        if (!p.isHost) p.ready = 0;
       }
     }
 
