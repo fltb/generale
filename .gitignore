@@ -27,6 +27,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .cache
 *.tsbuildinfo
 
+# OpenCode / AI agent instruction files (local-only)
+AGENTS.md
+
 # IntelliJ based IDEs
 .idea
 .vscode

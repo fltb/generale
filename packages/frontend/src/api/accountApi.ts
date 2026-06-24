@@ -1,4 +1,4 @@
-// 账号管理：忘记密码 / 改密码 / 改邮箱 / 确认改邮箱
+// 账号管理：忘记密码 / 改密码 / 改邮箱 / 改用户名 / 确认改邮箱
 import { api } from "./base";
 import type {
   RequestPasswordResetReqBody,
@@ -6,6 +6,8 @@ import type {
   ChangePasswordReqBody,
   ChangeEmailReqBody,
   ConfirmEmailChangeReqBody,
+  ChangeUsernameReqBody,
+  ChangeUsernameRespBody,
   MessageResp,
   PasswordResetTokenRespBody,
   ErrorResp,
@@ -42,6 +44,13 @@ export function changeEmailApi(body: ChangeEmailReqBody): Promise<MessageResp> {
 export function confirmEmailChangeApi(body: ConfirmEmailChangeReqBody): Promise<MessageResp> {
   return api<MessageResp, ErrorResp>("/api/confirm-email-change", {
     method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function changeUsernameApi(body: ChangeUsernameReqBody): Promise<ChangeUsernameRespBody> {
+  return api<ChangeUsernameRespBody, ErrorResp>("/api/me/username", {
+    method: "PATCH",
     body: JSON.stringify(body),
   });
 }

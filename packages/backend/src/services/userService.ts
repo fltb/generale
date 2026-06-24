@@ -14,7 +14,14 @@ export interface User {
   verified: boolean
   createdAt: Date
   updatedAt: Date
+  usernameChangedAt: Date | null
 }
+
+/** username 允许的字符集 + 频率限制 */
+export const USERNAME_MIN_LEN = 3;
+export const USERNAME_MAX_LEN = 50;
+export const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+export const USERNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
 
 export class UserService {
   /**
@@ -69,7 +76,7 @@ export class UserService {
       updatedAt: now,
     }).run()
 
-    return { id, username, email, password: hashedPassword, verified: false, createdAt: now, updatedAt: now }
+    return { id, username, email, password: hashedPassword, verified: false, createdAt: now, updatedAt: now, usernameChangedAt: null }
   }
 
   /**
@@ -152,6 +159,48 @@ export class UserService {
   }
 
   /**
+   * 修改 username（受频率限制 + 防重名）。
+   * 返回 nextAvailableAt：下一次可以修改的时间，供前端展示"X 天后可改"。
+   */
+  async updateUsername(userId: string, newUsername: string): Promise<{ username: string; usernameChangedAt: Date }> {
+    const user = await this.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    if (typeof newUsername !== 'string' || newUsername.trim().length < USERNAME_MIN_LEN) {
+      throw new Error(`用户名至少 ${USERNAME_MIN_LEN} 个字符`);
+    }
+    if (newUsername.trim().length > USERNAME_MAX_LEN) {
+      throw new Error(`用户名最多 ${USERNAME_MAX_LEN} 个字符`);
+    }
+    if (!USERNAME_PATTERN.test(newUsername.trim())) {
+      throw new Error('用户名只允许字母、数字、点号和短杠');
+    }
+
+    // 频率检查
+    if (user.usernameChangedAt) {
+      const elapsed = Date.now() - user.usernameChangedAt.getTime();
+      if (elapsed < USERNAME_CHANGE_COOLDOWN_MS) {
+        const waitDays = Math.ceil((USERNAME_CHANGE_COOLDOWN_MS - elapsed) / (24 * 60 * 60 * 1000));
+        throw new Error(`${waitDays} 天后才能再次修改用户名`);
+      }
+    }
+
+    // 重名检查
+    const existing = await this.findByUsername(newUsername.trim());
+    if (existing && existing.id !== userId) {
+      throw new Error('该用户名已被使用');
+    }
+
+    const now = new Date();
+    await db.update(users)
+      .set({ username: newUsername.trim(), usernameChangedAt: now, updatedAt: now })
+      .where(eq(users.id, userId))
+      .run();
+
+    return { username: newUsername.trim(), usernameChangedAt: now };
+  }
+
+  /**
    * Map raw DB row to User.
    */
   private map(row: any): User {
@@ -162,7 +211,12 @@ export class UserService {
       password: row.password,
       verified: Boolean(row.verified),
       createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
-      updatedAt: row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt)
+      updatedAt: row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt),
+      usernameChangedAt: row.usernameChangedAt instanceof Date
+        ? row.usernameChangedAt
+        : row.usernameChangedAt != null
+        ? new Date(row.usernameChangedAt)
+        : null,
     }
   }
 }

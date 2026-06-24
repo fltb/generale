@@ -10,10 +10,11 @@ import { registerDomainHandler, websocketPlugin } from "./plugins/websocket";
 import { initEmailServiceWithEnv } from "./services/emailService";
 import { ProfileService } from "./services/profileService";
 import { sessionService } from "./services/sessionService";
+import { runMigrations } from "./db/migrate";
 
 await initEmailServiceWithEnv();
-// 启动期确保默认头像存在，避免新用户首次访问时拿不到图
 await ProfileService.ensureDefaultAvatars();
+await runMigrations();
 
 // session 维护：
 //  - 启动期跑一次 prune，清掉上次运行期间堆积的过期记录

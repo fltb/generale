@@ -93,7 +93,26 @@ export const confirmEmailChangeReqSchema = t.Object({
 });
 export type ConfirmEmailChangeReqBody = Static<typeof confirmEmailChangeReqSchema>;
 
-// --- Responses ---
+/**
+ * 登录态下改用户名：需要新用户名。受频率限制（默认每 7 天一改）+ 防重名。
+ */
+export const changeUsernameReqSchema = t.Object({
+    username: t.String({
+        minLength: 3,
+        maxLength: 50,
+        error: "Username must be between 3 and 50 characters."
+    }),
+});
+export type ChangeUsernameReqBody = Static<typeof changeUsernameReqSchema>;
+
+/**
+ * 改用户名响应：返回新 username 和修改时间（前端据此算下次可改时间）。
+ */
+export const changeUsernameRespSchema = t.Object({
+    username: t.String(),
+    usernameChangedAt: t.String({ format: 'date-time' }),
+});
+export type ChangeUsernameRespBody = Static<typeof changeUsernameRespSchema>;
 
 /**
  * Schema representing the public-facing user profile object.
@@ -110,6 +129,8 @@ export const userProfileSchemaResp = t.Object({
     /** 缩略图 URL，Nav / PlayerList 等小尺寸场景用 */
     avatarThumbUrl: t.Optional(t.String()),
     bio: t.Optional(t.String()),
+    /** 上次修改 username 的时间（null 表示从未改过）。前端据此计算下次可改时间。 */
+    usernameChangedAt: t.Optional(t.String({ format: 'date-time' })),
 });
 
 /**

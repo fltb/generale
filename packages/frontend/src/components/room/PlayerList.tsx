@@ -3,6 +3,7 @@ import { type Component, For, Show, createMemo, createSignal } from "solid-js";
 import { A } from "@solidjs/router";
 import Avatar from "~/components/Avatar";
 import { playerColorCss } from "~/utils/playerColor";
+import { resolveDisplayNames } from "~/utils/playerDisplay";
 import { Button, Badge, confirmDialog, alertDialog } from "~/ui";
 
 /**
@@ -44,6 +45,8 @@ const PlayerCard: Component<{
   hostId: string;
   teams: TeamInfo[];
   hideTeamPicker?: boolean;
+  /** 去重后的展示名（由外部 PlayList 传入，避免同名 displayName 混淆） */
+  resolvedDisplayName?: string;
 
   onToggleReady: (playerId: string, ready: boolean) => void;
   onKick?: (playerId: string) => void;
@@ -51,6 +54,7 @@ const PlayerCard: Component<{
   onChangeTeam?: (playerId: string | undefined, teamId: string) => void;
 }> = (props) => {
   const p = () => props.player;
+  const display = () => props.resolvedDisplayName ?? p().displayName ?? p().name;
 
   const isSelf = () => p().id === props.selfId;
   const isRoomHost = () => props.selfId === props.hostId;
@@ -62,20 +66,20 @@ const PlayerCard: Component<{
         {/* 头像点开可查看该玩家公开 profile。颜色识别交给右侧独立色块。 */}
         <A
           href={`/profile/${p().id}`}
-          title={`查看 ${p().displayName ?? p().name} 的资料`}
+          title={`查看 ${display()} 的资料`}
           class="shrink-0"
         >
           <Avatar
             src={p().avatarThumbUrl ?? "/api/avatars/default/thumb.webp"}
             size={40}
-            alt={p().displayName ?? p().name}
+            alt={display()}
           />
         </A>
 
         <div class="flex flex-col min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <A href={`/profile/${p().id}`} class="truncate font-medium hover:underline">
-              {p().displayName ?? p().name}
+              {display()}
             </A>
             <Show when={p().isHost}>
               <Badge class="text-xs ml-1">Host</Badge>
@@ -178,6 +182,7 @@ const TeamGroup: Component<{
   team: TeamInfo | { id: string; name?: string } | null;
   members: PreGamePlayerInfo[];
   props: PlayerListProps;
+  resolvedNames: Map<string, string>;
 }> = (gp) => {
   const [editing, setEditing] = createSignal(false);
   const [editName, setEditName] = createSignal(gp.team?.name ?? "");
@@ -266,6 +271,7 @@ const TeamGroup: Component<{
               selfId={gp.props.selfId}
               hostId={gp.props.hostId}
               teams={gp.props.teams}
+              resolvedDisplayName={gp.resolvedNames.get(player.id)}
               onToggleReady={gp.props.onToggleReady}
               onKick={gp.props.onKick}
               onTransferHost={gp.props.onTransferHost}
@@ -280,6 +286,12 @@ const TeamGroup: Component<{
 
 /* ---------------------- Main PlayerList ---------------------- */
 export const PlayerList: Component<PlayerListProps> = (props) => {
+  const resolvedNames = createMemo(() =>
+    resolveDisplayNames(
+      props.players.map((p) => ({ id: p.id, name: p.name, displayName: p.displayName })),
+    ),
+  );
+
   /**
    * 按 teamId 分组：key = teamId | "no team"
    * 使用 props.teams 保持 server 顺序和名字
@@ -354,6 +366,7 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
                   hostId={props.hostId}
                   teams={props.teams}
                   hideTeamPicker
+                  resolvedDisplayName={resolvedNames().get(player.id)}
                   onToggleReady={props.onToggleReady}
                   onKick={props.onKick}
                   onTransferHost={props.onTransferHost}
@@ -367,7 +380,7 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
         <For each={grouped()}>
           {([teamId, members]) => {
             const team = props.teams?.find(t => t.id === teamId) ?? (teamId === "no team" ? null : { id: teamId, name: teamId });
-            return <TeamGroup team={team} members={members} props={props} />;
+            return <TeamGroup team={team} members={members} props={props} resolvedNames={resolvedNames()} />;
           }}
         </For>
       </Show>

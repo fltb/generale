@@ -42,7 +42,6 @@ package-lock.json
 **/*.bun
 
 /.drizzle/
-/drizzle/
 /.db/
 
 # 运行期生成的静态资源：

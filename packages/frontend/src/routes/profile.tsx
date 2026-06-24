@@ -6,13 +6,15 @@ import { useAuth } from "~/hooks/useAuth";
 import { ProtectedRoute } from "~/components/ProtectedRoute";
 import Avatar from "~/components/Avatar";
 import { patchMyProfileApi, uploadMyAvatarApi } from "~/api/profileApi";
-import { changePasswordApi, changeEmailApi } from "~/api/accountApi";
+import { changePasswordApi, changeEmailApi, changeUsernameApi } from "~/api/accountApi";
 import { ApiError } from "~/api/base";
 import type {
   ProfileUpdateReqBody,
   AvatarUploadRespBody,
   ChangePasswordReqBody,
   ChangeEmailReqBody,
+  ChangeUsernameReqBody,
+  ChangeUsernameRespBody,
   ErrorResp,
   MessageResp,
 } from "@generale/types/dist/api";
@@ -142,6 +144,39 @@ export default function ProfilePage() {
     emMutation.mutate({ currentPassword: emCurrent(), newEmail: emNew().trim() });
   }
 
+  // ===================== 改用户名 =====================
+  const [unInput, setUnInput] = createSignal("");
+  const [unLocalErr, setUnLocalErr] = createSignal<string | null>(null);
+
+  const unMutation = useMutation<ChangeUsernameRespBody, ApiError<ErrorResp>, ChangeUsernameReqBody>(() => ({
+    mutationFn: (body) => changeUsernameApi(body),
+    onSuccess: async () => {
+      await auth.refresh();
+      setUnInput("");
+      setUnLocalErr(null);
+    },
+  }));
+
+  const usernameCanChange = createMemo(() => {
+    const at = auth.user?.usernameChangedAt;
+    if (!at) return { can: true, daysLeft: 0 };
+    const elapsed = Date.now() - new Date(at).getTime();
+    const cooldown = 7 * 24 * 60 * 60 * 1000;
+    if (elapsed >= cooldown) return { can: true, daysLeft: 0 };
+    const left = Math.ceil((cooldown - elapsed) / (24 * 60 * 60 * 1000));
+    return { can: false, daysLeft: left };
+  });
+
+  function submitUsername() {
+    setUnLocalErr(null);
+    const val = unInput().trim();
+    if (val.length < 3) { setUnLocalErr("用户名至少 3 个字符"); return; }
+    if (val.length > 50) { setUnLocalErr("用户名最多 50 个字符"); return; }
+    if (!/^[a-zA-Z0-9._-]+$/.test(val)) { setUnLocalErr("只允许字母、数字和 . _ -"); return; }
+    if (val === auth.user?.username) { setUnLocalErr("新用户名与当前相同"); return; }
+    unMutation.mutate({ username: val });
+  }
+
   return (
     <ProtectedRoute>
       <Show
@@ -200,13 +235,54 @@ export default function ProfilePage() {
               </div>
             </section>
 
-            {/* ---------- 基本信息（只读） ---------- */}
-            <section class="card bg-base-200 p-4 space-y-2">
+            {/* ---------- 账号信息 + 改用户名 ---------- */}
+            <section class="card bg-base-200 p-4 space-y-3">
               <h2 class="text-lg font-semibold">账号</h2>
-              <p class="text-sm">
-                <span class="opacity-60 mr-2">用户名</span>
-                <span class="font-mono">{auth.user?.username}</span>
-              </p>
+
+              <div class="flex items-end gap-3 flex-wrap">
+                <label class="flex-1 min-w-0">
+                  <span class="label-text">
+                    用户名
+                    <Show when={auth.user?.usernameChangedAt}>
+                      <span class="text-xs opacity-60 ml-1">
+                        （上次修改：{new Date(auth.user!.usernameChangedAt!).toLocaleDateString()}）
+                      </span>
+                    </Show>
+                  </span>
+                  <input
+                    class="input input-bordered w-full"
+                    maxLength={50}
+                    placeholder={auth.user?.username}
+                    value={unInput()}
+                    onInput={(e) => setUnInput((e.target as HTMLInputElement).value)}
+                    disabled={!usernameCanChange().can}
+                  />
+                  <Show when={!usernameCanChange().can}>
+                    <span class="label-text-alt text-warning">
+                      {usernameCanChange().daysLeft} 天后可再次修改
+                    </span>
+                  </Show>
+                </label>
+                <button
+                  class="btn btn-sm btn-primary shrink-0"
+                  disabled={!usernameCanChange().can || unMutation.isPending || !unInput().trim()}
+                  onClick={submitUsername}
+                >
+                  {unMutation.isPending ? "提交中..." : "修改"}
+                </button>
+              </div>
+              <Show when={unMutation.isSuccess}>
+                <span class="text-success text-sm">用户名已修改</span>
+              </Show>
+              <Show when={unLocalErr()}>
+                <span class="text-error text-sm">{unLocalErr()}</span>
+              </Show>
+              <Show when={unMutation.isError}>
+                <span class="text-error text-sm">
+                  {unMutation.error?.message ?? "修改失败"}
+                </span>
+              </Show>
+
               <p class="text-sm">
                 <span class="opacity-60 mr-2">邮箱</span>
                 <span>{auth.user?.email}</span>

@@ -14,7 +14,8 @@ export const users = sqliteTable('users', {
     .$defaultFn(() => randomUUID()),
 
   username: text('username')
-    .notNull(),
+    .notNull()
+    .unique(),
 
   email: text('email')
     .notNull(),
@@ -26,6 +27,9 @@ export const users = sqliteTable('users', {
   verified: integer('verified', { mode: 'boolean' })
     .notNull()
     .default(false),
+
+  /** 上次修改 username 的时间，null 表示从未修改。用于限制修改频率（如每 7 天一改） */
+  usernameChangedAt: integer('username_changed_at', { mode: 'timestamp' }),
 
   // Timestamps stored as integer (ms since epoch) or use CURRENT_TIMESTAMP
   createdAt: integer('created_at', { mode: 'timestamp' })

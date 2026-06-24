@@ -3,6 +3,7 @@ import { A } from "@solidjs/router";
 import { type SyncedGameState, type PlayerId } from "@generale/types";
 import Avatar from "~/components/Avatar";
 import { playerSummaries } from "~/game/selectors";
+import { resolveDisplayNames } from "~/utils/playerDisplay";
 
 type Props = {
   state: () => SyncedGameState;
@@ -19,6 +20,13 @@ export const PlayerList: Component<Props> = (props) => {
       limit: props.limit,
     })
   );
+
+  const names = createMemo(() => {
+    const s = summaries();
+    return resolveDisplayNames(
+      s.map((p) => ({ id: p.id, name: p.name ?? p.id, displayName: p.displayName })),
+    );
+  });
 
   return (
     <div class={props.compact ? "p-1.5" : "p-2 w-full max-w-sm"}>
@@ -57,7 +65,7 @@ export const PlayerList: Component<Props> = (props) => {
                   </A>
                 </Show>
                 <div class="min-w-0">
-                  <div class={`${props.compact ? "text-xs" : "text-sm"} font-medium truncate`}>{p.displayName ?? p.name}</div>
+                  <div class={`${props.compact ? "text-xs" : "text-sm"} font-medium truncate`}>{names().get(p.id) ?? p.displayName ?? p.name}</div>
                   <div class={`${props.compact ? "text-[10px]" : "text-xs"} opacity-60`}>
                     {props.compact ? `${p.land}L·${p.army}A` : `land: ${p.land} · army: ${p.army}`}
                   </div>

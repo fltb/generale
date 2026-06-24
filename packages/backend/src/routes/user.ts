@@ -15,6 +15,8 @@ import {
   changePasswordReqSchema,
   changeEmailReqSchema,
   confirmEmailChangeReqSchema,
+  changeUsernameReqSchema,
+  changeUsernameRespSchema,
 } from '@generale/types'
 
 import { verificationTokens, users } from '../db/schema'
@@ -48,6 +50,7 @@ async function buildSelfUserView(user: {
   id: string
   username: string
   email: string
+  usernameChangedAt: Date | null
 }) {
   const profile = await profileService.getProfile(user.id)
   const defaults = ProfileService.defaultAvatarUrls()
@@ -59,6 +62,7 @@ async function buildSelfUserView(user: {
     avatarUrl: profile?.avatarUrl || defaults.avatarUrl,
     avatarThumbUrl: profile?.avatarThumbUrl || defaults.avatarThumbUrl,
     ...(profile?.bio ? { bio: profile.bio } : {}),
+    ...(user.usernameChangedAt ? { usernameChangedAt: user.usernameChangedAt.toISOString() } : {}),
   }
 }
 
@@ -294,6 +298,29 @@ export const userRoutes = new Elysia()
         200: userSuccessRespSchema,
         401: errorRespSchema
       }
+    }
+  )
+  .patch(
+    '/me/username',
+    async ({ body, cookie: { sid }, set }) => {
+      const session = sid?.value ? sessionService.get(sid.value) : undefined
+      if (!session) { set.status = 401; return { error: '未登录' } }
+      try {
+        const result = await userService.updateUsername(session.userId, body.username)
+        return { username: result.username, usernameChangedAt: result.usernameChangedAt.toISOString() }
+      } catch (err: any) {
+        set.status = 400
+        return { error: err?.message ?? '修改失败' }
+      }
+    },
+    {
+      body: changeUsernameReqSchema,
+      response: {
+        200: changeUsernameRespSchema,
+        400: errorRespSchema,
+        401: errorRespSchema,
+      },
+      cookie: cookieScheme,
     }
   )
   .post(

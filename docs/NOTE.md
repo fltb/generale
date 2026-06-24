@@ -330,11 +330,11 @@ bug：
 
 需要做的：
 
-- [ ] 在注册和修改的入口显示 username 的频率
-- [ ] 允许修改 username，禁止重名，限制修改频率（每天|周几次）。
-- [ ] （可选）displayName 禁止重名（简单）| 允许重名（需要在应用内部对可能重名的情况作区分，但是更直观）
+- [X] 在注册和修改的入口显示 username 的频率
+- [X] 允许修改 username，禁止重名，限制修改频率（每 7 天一次）。后端新增 `usernameChangedAt` 列，`PATCH /me/username` 路由，前端 profile 页新增 username 修改入口及冷却倒计时提示。
+- [X] displayName 允许重名：玩家列表和房间列表引入 `resolveDisplayNames()` 工具函数，出现同名 displayName 时自动显示为 `displayName#username` 格式区分。
 
-#### [ ] 对前后端的逻辑进行重构优化
+#### [X] 对前后端的逻辑进行重构优化
 
 这段计划属于重构类型，在开启这段内容的时候需要暂时冻结前后端功能和外观拓展的更新，不引入新的内容，确保新的内容不会和重构的内容杂糅。
 
