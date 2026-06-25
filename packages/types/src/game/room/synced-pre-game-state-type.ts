@@ -1,6 +1,7 @@
 import type { SyncedStateClientGenericSyncAction, SyncedStateServerEvent } from '../../connection/sync-store-type';
 import type { PreGameRoomState, PreGamePlayerInfo, PreGameRoomType, PreGameTeamMode } from './pre-game';
 import type { PlayerId, TeamId } from '../core-type';
+import { PlayerColor } from './player-colors';
 
 /**
  * 用于前端同步的房间状态（全量同步，类似于 SyncedGameState）
@@ -33,6 +34,7 @@ export enum SyncedPreGameClientActionTypes {
   DELETE_TEAM = 'delete-team',
   ENTER_SPECTATE = 'enter-spectate', // Lobby -> Spectating（仅 INGAME 期间）
   LEAVE_SPECTATE = 'leave-spectate', // Spectating -> Lobby
+  CHANGE_COLOR = 'change-player-color', // 玩家选择地块颜色
 }
 
 export type SyncedPreGameClientReadyAction = SyncedStateClientGenericSyncAction<
@@ -113,6 +115,11 @@ export type SyncedPreGameLeaveSpectateAction = SyncedStateClientGenericSyncActio
   SyncedPreGameClientActionTypes.LEAVE_SPECTATE
 >;
 
+export type SyncedPreGameChangeColorAction = SyncedStateClientGenericSyncAction<
+  SyncedPreGameClientActionTypes.CHANGE_COLOR,
+  { tileColor: PlayerColor }
+>;
+
 
 export type SyncedPreGameClientActions =
   | SyncedPreGameClientReadyAction
@@ -131,7 +138,8 @@ export type SyncedPreGameClientActions =
   | SyncedPreGameRenameTeamAction
   | SyncedPreGameDeleteTeamAction
   | SyncedPreGameEnterSpectateAction
-  | SyncedPreGameLeaveSpectateAction;
+  | SyncedPreGameLeaveSpectateAction
+  | SyncedPreGameChangeColorAction;
 
 export enum SyncedPreGameServerEventPayloadType {
   KICKED = "kicked",

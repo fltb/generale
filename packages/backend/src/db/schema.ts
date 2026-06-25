@@ -31,7 +31,6 @@ export const users = sqliteTable('users', {
   /** 上次修改 username 的时间，null 表示从未修改。用于限制修改频率（如每 7 天一改） */
   usernameChangedAt: integer('username_changed_at', { mode: 'timestamp' }),
 
-  // Timestamps stored as integer (ms since epoch) or use CURRENT_TIMESTAMP
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .default(sql`(CURRENT_TIMESTAMP)`),

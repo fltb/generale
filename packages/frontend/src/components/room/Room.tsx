@@ -157,6 +157,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           onCreateTeam={isHost() ? ctrl.onCreateTeam : undefined}
           onRenameTeam={isHost() ? ctrl.onRenameTeam : undefined}
           onDeleteTeam={isHost() ? ctrl.onDeleteTeam : undefined}
+          onChangeColor={ctrl.onChangeColor}
         />
       </Panel>
 

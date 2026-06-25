@@ -327,6 +327,8 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
         this.enterSpectate(pid); break;
       case SyncedPreGameClientActionTypes.LEAVE_SPECTATE:
         this.leaveSpectate(pid); break;
+      case SyncedPreGameClientActionTypes.CHANGE_COLOR:
+        this.changeColor(pid, evt.payload.tileColor); break;
       default:
         // ignore
         break;
@@ -344,6 +346,18 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     console.log("set ready to", ready)
     const p = this.state.players.find(p => p.id === pid);
     if (p && !p.isHost) p.ready = ready ? 1 : 0;
+  }
+
+  /** 玩家选择自己的地块颜色（不能和已有玩家重复） */
+  private changeColor(pid: PlayerId, tileColor: PlayerColor) {
+    const p = this.state.players.find(p => p.id === pid);
+    if (!p) return;
+    // 检查颜色是否已被其他人使用
+    const taken = this.state.players.some(
+      other => other.id !== pid && other.tileColor === tileColor,
+    );
+    if (taken) return;
+    p.tileColor = tileColor;
   }
 
   /**

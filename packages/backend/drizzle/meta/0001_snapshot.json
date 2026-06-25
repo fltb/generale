@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f77f1042-1306-4f04-9b43-e65f1b247679",
-  "prevId": "14bf0353-a3e3-40b3-82f5-7749659f0974",
+  "id": "16b49c4d-9db2-43c8-b81a-ffa68593a98c",
+  "prevId": "5dcdbafd-c6f0-4b6b-9263-13f2d5a656f0",
   "tables": {
     "profiles": {
       "name": "profiles",

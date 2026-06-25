@@ -1,4 +1,4 @@
-import { type PreGamePlayerInfo, type TeamInfo, type PreGameTeamMode, PreGamePlayerStatus } from "@generale/types";
+import { type PreGamePlayerInfo, type TeamInfo, type PreGameTeamMode, PreGamePlayerStatus, PlayerColor } from "@generale/types";
 import { type Component, For, Show, createMemo, createSignal } from "solid-js";
 import { A } from "@solidjs/router";
 import Avatar from "~/components/Avatar";
@@ -36,6 +36,7 @@ export interface PlayerListProps {
   onCreateTeam?: (name?: string) => void;
   onRenameTeam?: (teamId: string, name: string) => void;
   onDeleteTeam?: (teamId: string) => void;
+  onChangeColor?: (tileColor: PlayerColor) => void;
 }
 
 /* ---------------------- PlayerCard 子组件 ---------------------- */
@@ -47,17 +48,24 @@ const PlayerCard: Component<{
   hideTeamPicker?: boolean;
   /** 去重后的展示名（由外部 PlayList 传入，避免同名 displayName 混淆） */
   resolvedDisplayName?: string;
+  /** 已被其他玩家占用的颜色（本组件只负责自己，不查其他玩家） */
+  usedColors?: PlayerColor[];
 
   onToggleReady: (playerId: string, ready: boolean) => void;
   onKick?: (playerId: string) => void;
   onTransferHost?: (playerId: string) => void;
   onChangeTeam?: (playerId: string | undefined, teamId: string) => void;
+  onChangeColor?: (tileColor: PlayerColor) => void;
 }> = (props) => {
   const p = () => props.player;
   const display = () => props.resolvedDisplayName ?? p().displayName ?? p().name;
 
   const isSelf = () => p().id === props.selfId;
   const isRoomHost = () => props.selfId === props.hostId;
+  const [colorPickerOpen, setColorPickerOpen] = createSignal(false);
+
+  const allColors = () =>
+    Object.values(PlayerColor).filter((v) => typeof v === "number") as PlayerColor[];
 
   return (
     <div class="flex items-center justify-between p-3 bg-base-200 rounded shadow-sm w-full sm:w-1/2 md:w-1/3 lg:w-1/4">
@@ -100,10 +108,55 @@ const PlayerCard: Component<{
           </div>
         </div>
 
-        <div
-          class="w-5 h-5 rounded ml-2 border shrink-0"
-          style={{ "background-color": playerColorCss(p().tileColor as any) }}
-        />
+        <div class="relative">
+          {/* color swatch — clickable for self to open color picker */}
+          <div
+            class={`w-5 h-5 rounded ml-2 border shrink-0 ${isSelf() && props.onChangeColor ? "cursor-pointer hover:scale-110 transition-transform" : ""}`}
+            style={{ "background-color": playerColorCss(p().tileColor as any) }}
+            title={isSelf() ? "选择颜色" : undefined}
+            onClick={() => {
+              if (isSelf() && props.onChangeColor) {
+                setColorPickerOpen((v) => !v);
+              }
+            }}
+          />
+          {/* color picker popup */}
+          <Show when={colorPickerOpen()}>
+            <div
+              class="absolute top-6 left-0 z-20 p-1.5 bg-base-200 pixel-border rounded shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                class="grid gap-1"
+                style={{ "grid-template-columns": "repeat(4, 1.25rem)" }}
+              >
+                <For each={allColors()}>
+                  {(c) => {
+                    const isUsed = (props.usedColors ?? []).includes(c);
+                    const isCurrent = c === p().tileColor;
+                    return (
+                      <div
+                        class="w-5 h-5 rounded border transition-transform"
+                        classList={{
+                          "cursor-pointer hover:scale-110": !isUsed || isCurrent,
+                          "cursor-not-allowed opacity-30": isUsed && !isCurrent,
+                          "ring-1 ring-white": isCurrent,
+                        }}
+                        style={{ "background-color": playerColorCss(c as any) }}
+                        title={isCurrent ? "当前颜色" : isUsed ? "已被使用" : undefined}
+                        onClick={() => {
+                          if (isUsed && !isCurrent) return;
+                          props.onChangeColor?.(c);
+                          setColorPickerOpen(false);
+                        }}
+                      />
+                    );
+                  }}
+                </For>
+              </div>
+            </div>
+          </Show>
+        </div>
       </div>
 
       {/* Right: controls */}
@@ -183,6 +236,7 @@ const TeamGroup: Component<{
   members: PreGamePlayerInfo[];
   props: PlayerListProps;
   resolvedNames: Map<string, string>;
+  usedColors: PlayerColor[];
 }> = (gp) => {
   const [editing, setEditing] = createSignal(false);
   const [editName, setEditName] = createSignal(gp.team?.name ?? "");
@@ -272,6 +326,8 @@ const TeamGroup: Component<{
               hostId={gp.props.hostId}
               teams={gp.props.teams}
               resolvedDisplayName={gp.resolvedNames.get(player.id)}
+              usedColors={gp.usedColors}
+              onChangeColor={gp.props.onChangeColor}
               onToggleReady={gp.props.onToggleReady}
               onKick={gp.props.onKick}
               onTransferHost={gp.props.onTransferHost}
@@ -339,6 +395,10 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
 
   const isFfa = () => (props.teamMode ?? "ffa") === "ffa";
 
+  const usedColors = createMemo(() =>
+    props.players.map((x) => x.tileColor),
+  );
+
   return (
     <div class="space-y-5">
       <Show when={!isFfa() && props.selfId === props.hostId}>
@@ -367,6 +427,8 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
                   teams={props.teams}
                   hideTeamPicker
                   resolvedDisplayName={resolvedNames().get(player.id)}
+                  usedColors={usedColors()}
+                  onChangeColor={props.onChangeColor}
                   onToggleReady={props.onToggleReady}
                   onKick={props.onKick}
                   onTransferHost={props.onTransferHost}
@@ -380,7 +442,7 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
         <For each={grouped()}>
           {([teamId, members]) => {
             const team = props.teams?.find(t => t.id === teamId) ?? (teamId === "no team" ? null : { id: teamId, name: teamId });
-            return <TeamGroup team={team} members={members} props={props} resolvedNames={resolvedNames()} />;
+            return <TeamGroup team={team} members={members} props={props} resolvedNames={resolvedNames()} usedColors={usedColors()} />;
           }}
         </For>
       </Show>

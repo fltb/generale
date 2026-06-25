@@ -9,6 +9,7 @@ import {
   SyncedPreGameServerEventPayloadType,
   type GameId,
   type PlayerId,
+  type PlayerColor,
 } from "@generale/types";
 import { useSyncedState } from "~/hooks/useSyncedState";
 import { makeEmptyRoom } from "./defaults";
@@ -238,6 +239,15 @@ export function usePreGameRoom(params: UsePreGameRoomParams) {
     params.onExposeApi?.(null);
   });
 
+  // ---------------- color handler ----------------
+
+  const onChangeColor = (tileColor: PlayerColor) => {
+    synced.dispatch({
+      type: SyncedPreGameClientActionTypes.CHANGE_COLOR,
+      payload: { tileColor },
+    } as any);
+  };
+
   // ---------------- team related handlers ----------------
 
   // join/move to team (playerId optional - if undefined, server should interpret as self)
@@ -301,5 +311,6 @@ export function usePreGameRoom(params: UsePreGameRoomParams) {
     onCreateTeam,
     onRenameTeam,
     onDeleteTeam,
+    onChangeColor,
   };
 }
