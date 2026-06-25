@@ -71,10 +71,10 @@ const PlayerCard: Component<{
     <div class="flex items-center justify-between p-3 bg-base-200 rounded shadow-sm w-full sm:w-1/2 md:w-1/3 lg:w-1/4">
       {/* Left: avatar + info */}
       <div class="flex items-center gap-3 overflow-hidden">
-        {/* 头像点开可查看该玩家公开 profile。颜色识别交给右侧独立色块。 */}
         <A
           href={`/profile/${p().id}`}
           title={`查看 ${display()} 的资料`}
+          target="_blank" rel="noopener"
           class="shrink-0"
         >
           <Avatar
@@ -86,7 +86,7 @@ const PlayerCard: Component<{
 
         <div class="flex flex-col min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
-            <A href={`/profile/${p().id}`} class="truncate font-medium hover:underline">
+            <A href={`/profile/${p().id}`} class="truncate font-medium hover:underline" target="_blank" rel="noopener">
               {display()}
             </A>
             <Show when={p().isHost}>
@@ -100,75 +100,79 @@ const PlayerCard: Component<{
             </Show>
           </div>
 
-          {/* displayName 存在时把 username 也露一下，否则显示 id 兜底 */}
           <div class="text-xs opacity-60 truncate">
             <Show when={p().displayName} fallback={<>id: {p().id}</>}>
               @{p().name}
             </Show>
           </div>
         </div>
+      </div>
 
-        <div class="relative">
-          {/* color swatch — clickable for self to open color picker */}
+      {/* Middle: color swatch + picker（放在 overflow-hidden 之外防止弹出框被裁） */}
+      <div class="relative shrink-0">
+        <div
+          class={`w-5 h-5 rounded border shrink-0 ${isSelf() && props.onChangeColor ? "cursor-pointer hover:ring-1 hover:ring-primary" : ""}`}
+          style={{ "background-color": playerColorCss(p().tileColor as any), "border-color": "rgba(0,0,0,0.2)" }}
+          title={isSelf() ? "点击选择颜色" : undefined}
+          onClick={() => {
+            if (isSelf() && props.onChangeColor) {
+              setColorPickerOpen((v) => !v);
+            }
+          }}
+        />
+        <Show when={colorPickerOpen()}>
           <div
-            class={`w-5 h-5 rounded ml-2 border shrink-0 ${isSelf() && props.onChangeColor ? "cursor-pointer hover:scale-110 transition-transform" : ""}`}
-            style={{ "background-color": playerColorCss(p().tileColor as any) }}
-            title={isSelf() ? "选择颜色" : undefined}
-            onClick={() => {
-              if (isSelf() && props.onChangeColor) {
-                setColorPickerOpen((v) => !v);
-              }
-            }}
-          />
-          {/* color picker popup */}
-          <Show when={colorPickerOpen()}>
+            class="absolute right-0 top-6 z-50 p-1.5 bg-base-200 pixel-border rounded shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div class="text-xs font-medium mb-1 opacity-70">选择颜色</div>
             <div
-              class="absolute top-6 left-0 z-20 p-1.5 bg-base-200 pixel-border rounded shadow-lg"
-              onClick={(e) => e.stopPropagation()}
+              class="grid gap-1"
+              style={{ "grid-template-columns": "repeat(4, 1.25rem)" }}
             >
-              <div
-                class="grid gap-1"
-                style={{ "grid-template-columns": "repeat(4, 1.25rem)" }}
-              >
-                <For each={allColors()}>
-                  {(c) => {
-                    const isUsed = (props.usedColors ?? []).includes(c);
-                    const isCurrent = c === p().tileColor;
-                    return (
-                      <div
-                        class="w-5 h-5 rounded border transition-transform"
-                        classList={{
-                          "cursor-pointer hover:scale-110": !isUsed || isCurrent,
-                          "cursor-not-allowed opacity-30": isUsed && !isCurrent,
-                          "ring-1 ring-white": isCurrent,
-                        }}
-                        style={{ "background-color": playerColorCss(c as any) }}
-                        title={isCurrent ? "当前颜色" : isUsed ? "已被使用" : undefined}
-                        onClick={() => {
-                          if (isUsed && !isCurrent) return;
-                          props.onChangeColor?.(c);
-                          setColorPickerOpen(false);
-                        }}
-                      />
-                    );
-                  }}
-                </For>
-              </div>
+              <For each={allColors()}>
+                {(c) => {
+                  const isUsed = (props.usedColors ?? []).includes(c);
+                  const isCurrent = c === p().tileColor;
+                  return (
+                    <div
+                      class="w-5 h-5 rounded border transition-all"
+                      classList={{
+                        "cursor-pointer hover:ring-1 hover:ring-primary": !isUsed || isCurrent,
+                        "cursor-not-allowed opacity-20": isUsed && !isCurrent,
+                        "ring-1 ring-white": isCurrent,
+                      }}
+                      style={{
+                        "background-color": playerColorCss(c as any),
+                        "border-color": isCurrent ? "white" : "rgba(0,0,0,0.2)",
+                      }}
+                      title={isCurrent ? "当前颜色" : isUsed ? "已被占用" : "选择此颜色"}
+                      onClick={() => {
+                        if (isUsed && !isCurrent) return;
+                        props.onChangeColor?.(c);
+                        setColorPickerOpen(false);
+                      }}
+                    />
+                  );
+                }}
+              </For>
             </div>
-          </Show>
-        </div>
+          </div>
+        </Show>
       </div>
 
       {/* Right: controls */}
       <div class="flex items-center gap-2 ml-2">
         <div class="flex flex-col items-end">
-          <div
-            class={`text-sm font-medium ${p().ready === 1 ? "text-success" : "text-error"}`}
-          >
-            {p().ready === 1 ? "Ready" : "Not Ready"}
-          </div>
+          <Show when={!p().isHost}>
+            <div
+              class={`text-sm font-medium ${p().ready === 1 ? "text-success" : "text-error"}`}
+            >
+              {p().ready === 1 ? "Ready" : "Not Ready"}
+            </div>
+          </Show>
 
-          <Show when={isSelf()}>
+          <Show when={isSelf() && !p().isHost}>
             <Button
               size="xs"
               class="mt-1"

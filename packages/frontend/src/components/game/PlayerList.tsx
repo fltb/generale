@@ -54,6 +54,7 @@ export const PlayerList: Component<Props> = (props) => {
                 <Show when={!props.compact}>
                   <A
                     href={`/profile/${p.id}`}
+                    target="_blank" rel="noopener"
                     class="shrink-0"
                     title={p.displayName ?? p.name}
                   >
