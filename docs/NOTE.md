@@ -283,7 +283,6 @@ bug：
 - [X] 房间列表的页面需要加上筛选，需要根据房间的条件来筛选房间，这个需要配合后端实现，可能还要和上面的 websocket 连接联动。
 - [X] 需要改进游戏 UI, 让 UI 更加好看。包括房间的 UI, 以及游戏内部的 UI。
 - [X] 需要加入倍速游戏模式
-- [ ] 需要允许加入自定义地图
 - [X] 需要防止玩家重复登陆，给 user 加上反重复登陆机制。登陆 session 目前是 in-memory 的，改成更好的机制
 - [X] 需要实现 profile 页面，允许玩家上传头像，更改自己的信息。
 - [X] 需要完整的账号管理系统，玩家可以找回账号，也可以修改密码，邮箱等操作。
@@ -304,7 +303,7 @@ bug：
 - [X] 进入游戏之后蓝底的 bug 修复了，但是仍然有概率 faicon 不显示+移动指令没反应
 - [X] 房间的 password 还没有测试过，需要测试
 
-#### [ ] 游戏的外观优化
+#### [ ] 游戏的外观与功能优化
 
 ##### 需要让游戏更具有游戏感
 
@@ -321,6 +320,279 @@ bug：
 - [X] 聊天栏的行为模式优化：聊天栏虽然是在各个阶段都可用的，但是作为一个独立组建，他可能需要进行半透明底部等 UX 优化来确保跨阶段的时候不影响可用性和 UI 完整性。最终采用半透明玻璃态 + 右下角 floating 的独立面板方案，ChatPanel 新增 `transparent` prop 支持跨阶段复用。
 - [ ] 游戏资源替换：修改默认头像的风格为像素风。调研了 DiceBear Pixel Art（https://api.dicebear.com/10.x/pixel-art/svg?seed=default，CC0），风格合适。后续可替换 profileService.ts 中的 SVG，或者引入 @dicebear 库直接生成。也需检查其他游戏资源（音效、图标等）是否需要统一到像素/复古风格。
 - [X] 地图目前是固定大小的画布，应该改成可以在一块画布上拖动和缩放，方便大地图。已实现：PixiJS stage 容器捕获鼠标拖拽（含水平/垂直双向），滚轮缩放（以光标为中心），键盘 `=`/`-`/`0` 快捷键缩放，底部 HUD 缩放按钮。地图全屏铺满 viewport，顶部栏和玩家列表改为半透明 HUD 覆盖层。
+- [ ] 地图画布中 icon 全变成红色了：应该是黑色，因为是基底
+
+##### - [ ] 需要允许加入自定义地图
+
+自定义地图：玩家自己画地图，按照现在已经有的地图元素（空白块，兵营等）直接画地图，不仅可以表明元素还可以预填数值（不只是正数还可以是复数比如-100 的兵营进去加兵力加快节奏，或者 100 的地块让 100 兵力才能占领）还可以有：预留王座位置。
+
+为此我们需要三个部分：编辑器、地图展示页面、地图导入逻辑。
+
+---
+
+#### 自定义地图设计计划
+
+##### 一、地图数据格式
+
+定义 `CustomMapData` 类型，存储于 DB（新增 `custom_maps` 表或存为 JSON 文件）：
+
+```ts
+interface CustomMapTile {
+  type: TileType;        // PLAIN | BARRACKS | MOUNTAIN | SWAMP | FOG | THRONE
+  army?: number;         // 初始兵力，默认 0。负数表示占领需要减法（加速节奏）
+  ownerId?: PlayerId;    // 预分配的 throne 所属（不填则顺序分配）
+  isThrone?: boolean;    // 标记 tiles 中哪些是 throne
+}
+
+interface CustomMapData {
+  id: string;            // UUID
+  name: string;          // 地图名称
+  description?: string;
+  authorId: string;
+  authorName: string;
+  width: number;
+  height: number;
+  tiles: CustomMapTile[][];  // [y][x] 二维数组
+  minPlayers: number;    // 最少需要多少玩家（= throne 数量）
+  maxPlayers: number;
+  createdAt: number;
+  updatedAt: number;
+  isPublic: boolean;     // 是否公开到地图库
+  tags?: string[];       // 方便搜索
+}
+```
+
+##### 二、地图编辑器 (`packages/frontend/src/components/map-editor/`)
+
+基于 PixiJS（复用 MapRender 和 MapTile 核心渲染），纯前端编辑。
+
+| 功能 | 描述 |
+|------|------|
+| 画布 | 可缩放/拖动的网格画布，默认 20×20，可调大 |
+| 调色板 | 左侧面板：Plain / Barracks / Mountain / Swamp / Fog / Throne |
+| 画笔模式 | 点击单个 tile 绘制；按住拖拽连续绘制 |
+| 橡皮擦 | 还原为 Plain |
+| 数值编辑 | 选中 tile 后输入 army 数值（可为负数：-100 加速节奏，正大数：100 需要更多兵力占领）|
+| 王座分配 | 放置 throne 后自动分配 owner 编号；可手动换序 |
+| 缩放/平移 | 复用 MapRender 的 viewport 逻辑 |
+| 保存/加载 | 保存到 localStorage 草稿；上传到服务器；从服务器加载继续编辑 |
+| 导出/导入 | JSON 导出下载；JSON 导入上传 |
+| 预览 | 实时平铺预览（CSS grid 缩略图） |
+| 撤销/重做 | Ctrl+Z / Ctrl+Shift+Z |
+
+**技术要点：**
+- 复用 `MapTile` 和 `tileTheme` 渲染，编辑器模式增加 hover/选中态
+- 数值编辑用浮动 input 或键盘输入
+- 地图尺寸限制 10~200
+
+##### 三、后端地图存储
+
+**DB schema（`custom_maps` 表）：**
+
+```ts
+export const customMaps = sqliteTable('custom_maps', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  authorId: text('author_id').notNull().references(() => users.id),
+  authorName: text('author_name').notNull(),
+  width: integer('width').notNull(),
+  height: integer('height').notNull(),
+  tileCount: integer('tile_count').notNull(),   // width × height，方便查询
+  minPlayers: integer('min_players').default(2),
+  maxPlayers: integer('max_players').default(8),
+  isPublic: integer('is_public', { mode: 'boolean' }).default(false),
+  isDraft: integer('is_draft', { mode: 'boolean' }).default(false),
+  usageCount: integer('usage_count').default(0),  // 用于"最热"排序
+  tags: text('tags'),                       // JSON array string
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+```
+
+**Tiles 不存 DB**。地图瓦片数据以 JSON 文件存储在 `./public/maps/<id>.json`（和头像 `./public/avatars/<id>/` 同模式）。DB 只存元数据，路径由 `id` 推导。
+
+**Storage 抽象层（`services/mapService.ts`）：** 和 `ProfileService` 同模式——
+
+```ts
+class MapService {
+  saveMapTiles(id: string, tiles: CustomMapTile[][]): Promise<void>;
+  loadMapTiles(id: string): Promise<CustomMapTile[][]>;
+  /** 发布地图时调用：生成 PNG 缩略图到 ./public/maps/<id>.png（用 sharp） */
+  generateThumbnail(id: string, tiles: CustomMapTile[][]): Promise<void>;
+  /** 返回缩略图 URL，不存在则返回 null（画廊降级到 canvas 渲染） */
+  thumbnailUrl(id: string): string | null;
+}
+```
+
+`generateThumbnail()` 使用 `sharp` 从 tiles 数据生成单像素 PNG（200×200 地图 → 200×200px 图片，~2KB）。未来换 S3/R2 只改内部实现。
+
+**文件大小预估：** 200×200 地图 gzip 后约 100KB，20×20 约 2KB，完全可接受。
+
+**API 路由（`routes/map.ts` + `services/mapService.ts`）：**
+
+| 方法 | 路径 | 功能 |
+|------|------|------|
+| `POST` | `/api/map/create` | 上传/保存地图（需登录） |
+| `PATCH` | `/api/map/:id` | 更新地图（仅作者） |
+| `DELETE` | `/api/map/:id` | 删除地图（仅作者） |
+| `GET` | `/api/map/:id` | 获取地图详情（含完整 tiles） |
+| `GET` | `/api/map/list` | 公开地图列表（分页+搜索+标签排序） |
+| `GET` | `/api/map/my` | 我的地图列表（需登录） |
+| `GET` | `/api/map/:id/thumb` | 缩略图 PNG。不存在则 404 → 前端 canvas 降级渲染 + 自动触发后台生成 |
+| `POST` | `/api/map/:id/fork` | 复制公开地图到自己的地图库 |
+
+**发布流程（`isDraft: false` → 保存时触发）：**
+1. 校验通过
+2. `saveMapTiles(id, tiles)` — 写 tiles JSON
+3. `generateThumbnail(id, tiles)` — 生成缩略图 PNG（同步或后台）
+4. 更新 DB 元数据
+
+**缩略图存储：** `./public/maps/<id>.png`，由 Elysia `staticPlugin` 直接托管（`/api/maps/<id>.png`），零服务端开销。
+
+**地图校验规则（仅 `isDraft: false` 时生效）：**
+- 王座数量：可 0（随机分配），可 ≥ 2（手动指定）。若手动指定，必须 ≤ maxPlayers 且每个王座 ownerId 不同
+- 尺寸 range：10 ≤ width/height ≤ 200
+- tile 总数 ≤ 200×200 = 40,000
+- army 值 range：-999 ~ 999
+
+##### 五、API 健壮性分析（各 UI 调用场景）
+
+**1. `POST /api/map/create` — 上传/保存**
+
+| 调用方 | 场景 | 潜在问题 | 措施 |
+|--------|------|----------|------|
+| 编辑器 | 保存完整地图 | tiles JSON 可达 ~1MB（200×200）POST body | 前端做进度指示；后端校验 body size ≤ 2MB |
+| 编辑器 | 保存草稿（无王座/不完整） | 草稿不需要校验王座 | `isDraft: true` 跳过所有校验规则；发布时需要满足校验 |
+| 编辑器 | 重复保存（id 已存在） | 幂等性问题 | 首次 POST 生成 id；再次编辑用 PATCH；或 POST 做 upsert |
+
+**2. `PATCH /api/map/:id` — 更新地图**
+
+| 调用方 | 场景 | 潜在问题 | 措施 |
+|--------|------|----------|------|
+| 编辑器 | 改 tiles | 旧 tiles 文件需原子替换 | `mapService.saveMapTiles()` 内部 `fs.writeFile` 原子写 |
+| 编辑器 | 只改 name/tags | 不需要重写 tiles 文件 | PATCH body 只更新提供字段，不传 tiles 则不写文件 |
+| 编辑器 | 非作者试图改 | 需鉴权 | `authorId !== session.userId → 403` |
+| 房间创建 | 不会调 PATCH | — | — |
+
+**3. `DELETE /api/map/:id` — 删除地图**
+
+| 调用方 | 场景 | 潜在问题 | 措施 |
+|--------|------|----------|------|
+| 我的地图 | 删除自己的地图 | 如果地图正被某房间使用，游戏开始时找不到 tiles | 删除前检查是否有活跃房间引用；或软删除（`deletedAt` 列），房间引用时只标记不实删 |
+| 管理员 | 删除违规地图 | 同上 | 同上，admin 可强制删除 |
+
+**4. `GET /api/map/:id` — 获取地图详情（含 tiles）**
+
+| 调用方 | 场景 | 潜在问题 | 措施 |
+|--------|------|----------|------|
+| 画廊详情页 | 预览完整地图 | 200×200 tiles JSON ~1MB，首次加载慢 | 客户端缓存；考虑 gzip（Bun 默认支持） |
+| 房间创建 | 预填地图信息 | 同上 | 同上 |
+| 游戏开始 | 加载 tiles 进游戏 | 同时启动多个房间会并发读同一文件 | 文件只读无害；但可加内存缓存 `mapService.loadMapTiles()` 内做 LRU |
+| 游戏开始 | 地图已删除 | 房间引用的 mapId 找不到 tiles | 启动时 `mapSetting.customMapId` 若 map 不存在 → 降级到随机生成地图 + 通知玩家（`GAME_STARTED` 附 warning） |
+
+**5. `GET /api/map/list` — 公开地图列表**
+
+| 调用方 | 场景 | 潜在问题 | 措施 |
+|--------|------|----------|------|
+| 画廊 | 浏览公开地图 | 大量地图时分页必要 | `?offset=0&limit=20`，默认 20 条 |
+| 画廊 | 按"最热"排序 | DB 无使用次数统计 | 新增 `usageCount` 列，房间 startGame 时 +1 |
+| 画廊 | 搜索标签/名称 | 模糊搜索 SQLite `LIKE` | `tags` 存 JSON array，搜索用 `tags LIKE '%keyword%'`；名称用 `name LIKE '%kw%'` |
+| 画廊 | 按尺寸筛选 | 需区间查询 | `?minWidth=10&maxWidth=50` → WHERE width BETWEEN |
+| 房间创建 | 选择地图列表 | 同上，但用户可能只想要自己能用的地图 | 过滤 `minPlayers ≤ currentRoom.playerCount ≤ maxPlayers` ？不一定，可以先展示全部，选不合适的校验时提示 |
+
+**6. `GET /api/map/my` — 我的地图列表**
+
+| 调用方 | 场景 | 潜在问题 | 措施 |
+|--------|------|----------|------|
+| 编辑器 | 继续编辑已有地图 | 需要知道哪些是草稿 | 列表返回 `isDraft` 标记 |
+| 我的地图页 | 管理自己的地图 | 需分页 | 同上 `offset/limit` |
+| 房间创建 | 快速选自己的地图 | 同上 | 同上 |
+
+**发现的缺失项：**
+
+| # | 缺失点 | 严重度 | 建议 |
+|---|--------|--------|------|
+| 1 | 无 `isDraft` 字段 | 中 | 草稿跳过校验，编辑器可中途保存 |
+| 2 | 无 `usageCount` 排序依据 | 低 | 加列，startGame 时递增 |
+| 3 | 删除地图无活跃房间检查 | 高 | 软删除或引用计数检查 |
+| 4 | tiles 加载无缓存 | 低 | 游戏开始时地图 tiles 只读，加内存 LRU |
+| 5 | 无分页默认 limit | 中 | `GET /list` 和 `/my` 默认 20，上限 100 |
+| 6 | 地图被房间引用后不能删 | 高 | `DELETE` 检查是否有活跃房间使用；或 UI 提示"已被 X 个房间使用" |
+| 7 | POST body 大小无限制 | 低 | 服务端限制 2MB |
+| 8 | 无 fork/duplicate 功能 | 低 | 后期可加 `POST /api/map/:id/fork` |
+
+##### 四、地图展示页面（`routes/map-gallery.tsx` 或嵌入 roomlist）
+
+| 功能 | 描述 |
+|------|------|
+| 网格/列表展示 | 公开地图的卡片视图 |
+| 缩略图 | 前端实时渲染：读取 tiles 数据，CSS grid 按比例缩放绘制小地图（免存图片） |
+| 搜索 | 按名称、标签、尺寸范围、作者 |
+| 排序 | 最新、最热（被使用次数）、最多玩家 |
+| 详情页 | 点击卡片 → 预览完整地图 + "创建房间" / "编辑"入口 |
+| 一键创建房间 | "用此地图创建房间" → 预填 create room 表单 |
+| 按地图筛选房间 | 房间列表 `mapId=` 参数筛选用该地图的游戏 |
+
+**最终方案：服务端生成缩略图 + 客户端 Canvas 降级**
+
+| 路径 | 行为 |
+|------|------|
+| 地图发布时 | `MapService.generateThumbnail()` 用 sharp 生成像素级 PNG（1px/tile）到 `./public/maps/<id>.png` |
+| 画廊加载 | `<img src="/api/maps/<id>.png">` 直接加载（~2KB，瞬间） |
+| 缩略图不存在 | 404 → 前端 Canvas 降级渲染 → 后台触发生成 |
+
+**稳定性总结：**
+
+| 场景 | 行为 | 性能 |
+|------|------|------|
+| 画廊首页 20 张任意尺寸地图 | `<img>` 标签加载 PNG | 每张 ~2KB，瞬间 |
+| 新发布地图（thumb 未生成完） | Canvas 降级渲染 | 首次慢（~50ms），后续命中 |
+| 移动端 | `<img>` 加载 | 零 DOM 开销 |
+| 缩略图更新（地图编辑后重发布） | 覆盖 PNG 文件，URL 不变 | 即时生效 |
+
+不再需要 CSS grid 渲染。缩略图文件极小（单像素颜色块，sharp 压缩后 1-3KB），存储成本可忽略。
+
+##### 五、地图导入游戏逻辑
+
+**创建房间时选择地图：**
+- `createGameReqSchema` 新增 `mapId?: string`
+- 指定 `mapId` → 后端加载该地图的 tiles → 跳过 `generateMap()`
+- `PreGameRoomState.mapSetting` 新增 `customMapId?: string`
+
+**游戏开始时应用地图：**
+- `GameService.startGame()` 检查 `mapSetting.customMapId`
+- 存在 → `loadCustomMap(mapId)` → 返回 tiles
+- 不存在 → 现有 `generateMap()` 逻辑
+- 王座数 vs 玩家数校验：不够则降级到实际玩家数
+
+**特殊数值处理：**
+- `army: 100` → 地块初始 100 兵力，玩家需攒够 100 才能占领
+- `army: -50` → 地块初始 -50，占领后倒减再涨正（加速节奏）
+- `army: 0` 或无 army → 标准中立地块
+
+**房间内切换地图：**
+房主在 `PreGameMapSettingForm` 中可以从已发布的地图库选取替换。和切换 roomType/size 等同层级的 setting action。
+- 新增 `SyncedPreGameClientActionTypes.CHANGE_MAP_ID`
+- `RoomInstance` 新增 `changeMapId(pid, mapId)` — 校验地图存在且可用
+- `PreGameRoomState.mapSetting.customMapId` 更新 → `broadcastState()`
+- 房主独有权限（`isHost` 检查），非 `suspended` 期间可用
+- 前端 `PreGameMapSettingForm` 增加地图选择下拉/搜索（从 `/api/map/list` 加载）
+- 切换地图时地图尺寸变更 → 同步更新 `mapSetting.width/height`
+
+##### 六、开发顺序
+
+| 优先级 | 任务 | 依赖 |
+|--------|------|------|
+| 1 | `CustomMapData` 类型 + DB schema（含 `isDraft`, `usageCount`）+ drizzle-kit push | 无 |
+| 2 | 后端 CRUD API + `MapService`（含 `generateThumbnail()`） | 1 |
+| 3 | 地图编辑器 MVP（画布 + 调色板 + 保存/发布） | 1 |
+| 4 | 编辑器增强（数值编辑、王座分配、撤销重做） | 3 |
+| 5 | 地图库页面（缩略图 `<img>` + Canvas 降级 + 搜索） | 2 |
+| 6 | 导入游戏（创建房间选地图 + GameService 加载） | 2, 3 |
+| 7 | 房间内切换地图（CHANGE_MAP_ID action + PreGameMapSettingForm 选择器） | 6 |
+| 8 | 房间列表按地图筛选 | 6 |
+| 9 | Fork/duplicate + 草稿管理 | 2 |
 
 ##### 用户名称展示优化
 
