@@ -43,9 +43,11 @@ export const gameCreationSettingsRouteSchema = t.Union([
     // custom variant
     t.Object({
         maxPlayers: t.Optional(t.Number({ minimum: 2, maximum: 8 })),
-        // numeric width/height required for custom
-        mapSize: customMapSizeSchema,
+        // numeric width/height for custom (optional when customMapId is set)
+        mapSize: t.Optional(customMapSizeSchema),
         teamMode: t.Optional(t.Union([t.Literal("ffa"), t.Literal("team")])),
+        /** 可选：自定义地图 ID（从地图工坊选取） */
+        customMapId: t.Optional(t.String()),
         type: t.Literal("custom")
     })
 ]);

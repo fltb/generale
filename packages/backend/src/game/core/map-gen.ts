@@ -1,19 +1,21 @@
 import { GameMap, TileType, PreGameMapType, PreGameRoomState } from '@generale/types';
+import { mapService } from '../../services/mapService';
 
 /**
- * 生成游戏地图
- * @param mapSetting 地图设置（可选字段：width, height, tileFrequency, targetBarracksArmy）
+ * 生成游戏地图（异步，支持从地图工坊加载自定义地图）
+ * @param mapSetting 地图设置（可选字段：width, height, tileFrequency, customMapId）
  * @param players 玩家列表
  * @returns 生成的游戏地图
  */
-export function generateMap(
+export async function generateMap(
   mapSetting: PreGameRoomState['mapSetting'],
   players: PreGameRoomState['players']
-): GameMap {
+): Promise<GameMap> {
   const width = (mapSetting as any).width || 20;
   const height = (mapSetting as any).height || 20;
   const type = mapSetting.type;
   const tileFrequency = (mapSetting as any).tileFrequency || {};
+  const customMapId = (mapSetting as any).customMapId as string | undefined;
 
   const tiles: GameMap['tiles'] = Array.from({ length: height }, () =>
     Array.from({ length: width }, () => ({
@@ -23,7 +25,39 @@ export function generateMap(
     }))
   );
 
-  if (type === PreGameMapType.Random || type === PreGameMapType.Custom) {
+  let actualWidth = width;
+  let actualHeight = height;
+
+  if (customMapId) {
+    const customData = await mapService.loadTiles(customMapId);
+    if (customData) {
+      actualWidth = Math.max(1, customData[0]?.length ?? width);
+      actualHeight = Math.max(1, customData.length);
+      // rebuild tiles array with actual dimensions
+      tiles.length = 0;
+      for (let y = 0; y < actualHeight; y++) {
+        tiles[y] = [];
+        for (let x = 0; x < actualWidth; x++) {
+          tiles[y]![x] = { type: TileType.Plain, ownerId: null, army: 0 };
+        }
+      }
+      for (let y = 0; y < Math.min(actualHeight, customData.length); y++) {
+        for (let x = 0; x < Math.min(actualWidth, customData[y]!.length); x++) {
+          const ct = customData[y]![x]!;
+          tiles[y]![x]! = {
+            type: (ct.type as TileType) || TileType.Plain,
+            ownerId: ct.ownerId || null,
+            army: ct.army ?? 0,
+          };
+        }
+      }
+      console.log(`[map-gen] Loaded custom map ${customMapId} (${actualWidth}x${actualHeight})`);
+    } else {
+      console.warn(`[map-gen] Custom map ${customMapId} not found, falling back to random`);
+      generateRandomMap(tiles, width, height, tileFrequency);
+      adjustBarracksArmies(tiles, width, height);
+    }
+  } else if (type === PreGameMapType.Random || type === PreGameMapType.Custom) {
     do {
       generateRandomMap(tiles, width, height, tileFrequency);
       // 在随机生成后调整兵营总兵力到目标（尽量接近）
@@ -31,11 +65,57 @@ export function generateMap(
     } while (!isAllLandConnected(tiles, width, height));
   }
 
-  assignPlayerStartingPositions(tiles, width, height, players);
+  // 自定义地图已预置王座：按顺序映射 ownerId → 实际 playerId，不再随机分配
+  if (customMapId) {
+    const preplacedThrones: { x: number; y: number; ownerId: string }[] = [];
+    for (let y = 0; y < actualHeight; y++) {
+      for (let x = 0; x < actualWidth; x++) {
+        const tile = tiles[y]![x]!;
+        if (tile.type === TileType.Throne && tile.ownerId) {
+          preplacedThrones.push({ x, y, ownerId: tile.ownerId });
+        }
+      }
+    }
+
+    if (preplacedThrones.length > 0) {
+      // 按玩家列表顺序分配：p1 → players[0], p2 → players[1], ...
+      const sortedThrones = [...preplacedThrones].sort((a, b) => {
+        const na = parseInt(a.ownerId.replace(/\D/g, '')) || 0;
+        const nb = parseInt(b.ownerId.replace(/\D/g, '')) || 0;
+        return na - nb;
+      });
+
+      const remaining: typeof players = [];
+      players.forEach((player, i) => {
+        const throne = sortedThrones[i];
+        if (throne) {
+          tiles[throne.y]![throne.x]! = {
+            type: TileType.Throne,
+            ownerId: player.id,
+            army: 1,
+          };
+        } else {
+          remaining.push(player);
+        }
+      });
+
+      // 预置王座不够时，对剩余玩家用随机算法补位
+      if (remaining.length > 0) {
+        assignPlayerStartingPositions(tiles, actualWidth, actualHeight, remaining);
+      }
+
+      console.log(`[map-gen] Custom map ${customMapId}: ${sortedThrones.length} pre-placed thrones, ${remaining.length} random fallback`);
+    } else {
+      // 自定义地图没有预置王座：随机分配
+      assignPlayerStartingPositions(tiles, actualWidth, actualHeight, players);
+    }
+  } else {
+    assignPlayerStartingPositions(tiles, width, height, players);
+  }
 
   return {
-    width,
-    height,
+    width: actualWidth,
+    height: actualHeight,
     tiles
   };
 }

@@ -86,6 +86,11 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
         console.debug(`[RoomInstance] Host ${pid} reclaim timeout, auto-transferring`);
         this.autoTransferHost();
         this.state.players = this.state.players.filter(p => p.id !== pid);
+        if (this.state.players.length === 0) {
+          console.debug("[RoomInstance] last player (host) removed after reclaim, auto destroy");
+          this.destroy();
+          return;
+        }
         this.broadcastState();
       }
     }, this.HOST_RECLAIM_MS);
@@ -462,12 +467,13 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       const w = typeof ms?.width === "number" ? ms.width : 20;
       const h = typeof ms?.height === "number" ? ms.height : 20;
       this.state.mapSetting = {
-        type: PreGameMapType.Custom,
+        type: ms?.customMapId ? PreGameMapType.Imported : PreGameMapType.Custom,
         width: w,
         height: h,
         tileFrequency: {},
         customData: "",
-      };
+        ...(ms?.customMapId ? { customMapId: ms.customMapId } : {}),
+      } as PreGameRoomState['mapSetting'];
     }
     this.state.roomType = next;
   }
@@ -529,6 +535,10 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
     if (this.state.roomType === "standard") {
       const incoming: any = mapSetting;
+      if (incoming?.customMapId) {
+        console.warn(`[RoomInstance] standard room rejects CHANGE_MAP with customMapId`);
+        return;
+      }
       const label = incoming?.sizeLabel as PreGameStandardSizeLabel | undefined;
       if (!label || !(label in PRESET_SIZES)) {
         console.warn(`[RoomInstance] standard room rejects CHANGE_MAP without valid sizeLabel:`, mapSetting);
@@ -799,14 +809,14 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     this.destroy();
   }
 
-  private onStartGameCallbacks: Array<(state: PreGameRoomState) => void> = [];
+  private onStartGameCallbacks: Array<(state: PreGameRoomState) => void | Promise<void>> = [];
   /** 注册游戏开始回调 */
-  public onStartGame(callback: (state: PreGameRoomState) => void) {
+  public onStartGame(callback: (state: PreGameRoomState) => void | Promise<void>) {
     this.onStartGameCallbacks.push(callback);
   }
 
   /** 检查是否可开始游戏并广播 */
-  private tryStartGame(pid: PlayerId) {
+  private async tryStartGame(pid: PlayerId) {
     if (pid !== this.state.hostId) return;
 
     // 在真正开始游戏之前，清理空队伍，保证开始时 teams 数量和非空队伍一致
@@ -831,7 +841,36 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       }
     }
     this.state.started = true;
-    // 广播游戏开始事件
+
+    // 先触发回调（GameService 加载地图、创建 GameInstance、开始 tick）
+    try {
+      for (const callback of this.onStartGameCallbacks) {
+        await callback(this.state);
+      }
+    } catch (err) {
+      console.error(`[RoomInstance ${this.state.gameId}] startGame callback failed, rollback:`, err);
+      // 回滚：恢复玩家状态，避免房间卡在 started 状态
+      for (const p of this.state.players) {
+        if (p.status === PreGamePlayerStatus.Playing) {
+          p.status = PreGamePlayerStatus.Lobby;
+        }
+      }
+      this.state.started = false;
+      const hostConn = this.connectors.get(pid);
+      hostConn?.send({
+        type: SyncedPreGameServerEventType.CUSTOM,
+        payload: {
+          type: SyncedPreGameServerEventPayloadType.START_REJECTED,
+          reason: '游戏启动失败，请重试'
+        }
+      });
+      return;
+    }
+
+    // 游戏启动成功，锁定房间
+    this.suspend();
+
+    // 回调完成后再广播 GAME_STARTED，确保 GameInstance 已就绪
     const startedAt = Date.now();
     for (const conn of this.connectors.values()) {
       conn.send({
@@ -841,10 +880,6 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
           startedAt
         }
       });
-    }
-    // 触发回调（GameService 会基于此时 status===Playing 的玩家构建 GameInstance）
-    for (const callback of this.onStartGameCallbacks) {
-      callback(this.state);
     }
   }
 

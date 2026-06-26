@@ -59,12 +59,19 @@ export default function Nav(): JSX.Element {
           {/* 音效开关 */}
           <MuteToggle />
 
-          {/* 右侧导航（已移动） */}
+          {/* 右侧导航 */}
           <A
             href="/about"
             class="border-b-2 border-transparent hover:border-sky-400 px-2 py-1"
           >
             About
+          </A>
+
+          <A
+            href="/maps"
+            class="border-b-2 border-transparent hover:border-sky-400 px-2 py-1"
+          >
+            地图工坊
           </A>
 
           {/* 右：用户区 —— 原 user dropdown 直接保持不动 */}

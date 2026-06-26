@@ -44,6 +44,8 @@ export type GameServiceConfig = {
   password?: string;
   /** 创建者 userId，用于确保第一个加入的就是房主 */
   creatorId?: PlayerId;
+  /** 可选：自定义地图 ID（从地图工坊选取），游戏开始时加载此地图 */
+  customMapId?: string;
   // optional: raw incoming gameSettings (from create request). Prefer normalized mapSize in gameConfig.mapSizeNormalized below
   gameSettings?: Partial<GameInstanceSettings>;
 } & ({
@@ -311,6 +313,7 @@ export type ConnectionResult =
     const { width, height, sizeLabel } = this.resolveMapDimensions();
     const isStandard = this.config.type === 'standard';
     const teamMode: PreGameTeamMode = this.config.teamMode ?? 'ffa';
+    const hasCustomMap = !isStandard && !!this.config.customMapId;
 
     return {
       gameId: this.gameId,
@@ -331,11 +334,12 @@ export type ConnectionResult =
         afkThreshold: 30,
       },
       mapSetting: {
-        type: (isStandard ? PreGameMapType.Random : PreGameMapType.Custom),
+        type: hasCustomMap ? PreGameMapType.Imported : (isStandard ? PreGameMapType.Random : PreGameMapType.Custom),
         width,
         height,
         tileFrequency: {},
         ...(isStandard && sizeLabel ? { sizeLabel } : {}),
+        ...(hasCustomMap ? { customMapId: this.config.customMapId } : {}),
       } as PreGameRoomState['mapSetting'],
       teams: [],
       teamCount: 0,
@@ -360,7 +364,7 @@ export type ConnectionResult =
   /**
    * 从 Room 转换到 Game 阶段
    */
-  public startGame(state: PreGameRoomState): void {
+  public async startGame(state: PreGameRoomState): Promise<void> {
     if (this.phase !== GamePhase.PREGAME || !this.roomInstance) {
       console.error(`[GameService ${this.gameId}] Cannot start game from phase: ${this.phase}`);
       return;
@@ -404,7 +408,7 @@ export type ConnectionResult =
     const settings: GameSettings = roomState.gameSetting;
 
     // 构建 map（根据 mapSetting 生成地图）
-    const map: GameMap = generateMap(roomState.mapSetting, roomState.players);
+    const map: GameMap = await generateMap(roomState.mapSetting, roomState.players);
 
     const initialGameState: GameState = {
       status: GameStatus.Playing,
@@ -435,24 +439,8 @@ export type ConnectionResult =
     const playerIds = Array.from(roomState.players.map(p => p.id));
     this.gameInstance = new GameInstance(initialGameState, gameInstanceSettings, playerIds);
     this.phase = GamePhase.INGAME;
-    // Chat permissions/display use RoomInstance as the room roster source even during INGAME:
-    // it keeps late Lobby users, spectators, and locked Playing users in one place.
-    this.chatInstance.activeStageInstance = this.roomInstance;
     this.gameInstance.onEndGame(this.endGame.bind(this));
-
-    // 开始调度 Tick
     this.gameInstance.startTicking(state.gameSetting?.speed ?? 1.0);
-
-    // 清理 RoomInstance
-    // this.roomInstance.destroy();
-    // this.roomInstance = null;
-
-    try {
-      this.roomInstance.suspend();
-    } catch (err) {
-      // ignore if not implemented
-    }
-    // 触发游戏开始回调
     this.onGameStartCallback?.();
     this.emitRoomUpdated();
 
@@ -501,7 +489,6 @@ export type ConnectionResult =
     }
 
     this.phase = GamePhase.PREGAME;
-    this.chatInstance.activeStageInstance = this.roomInstance;
 
     // 因为是 resume，所以无需处理
     // this.roomInstance.onStartGame(this.startGame.bind(this));

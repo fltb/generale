@@ -3,6 +3,7 @@ import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import { staticPlugin } from "@elysiajs/static";
 import { gameRoutes } from "./routes/game";
+import { mapRoutes } from "./routes/map";
 import { userRoutes } from "./routes/user";
 import { profileRoutes } from "./routes/profile";
 import { authPlugin } from "./middleware/authPlugin";
@@ -50,6 +51,7 @@ const app = new Elysia()
       .use(userRoutes)
       .use(profileRoutes)
       .use(gameRoutes)
+      .use(mapRoutes)
       .use(swagger({
         documentation: {
           info: {

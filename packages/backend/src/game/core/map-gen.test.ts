@@ -3,7 +3,7 @@ import { generateMap } from './map-gen';
 import { PreGameMapType, TileType } from '@generale/types';
 
 describe('Map Generator', () => {
-  it('should generate a valid map for 2 players', () => {
+  it('should generate a valid map for 2 players', async () => {
     const players: any = [
       { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
       { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const }
@@ -19,7 +19,7 @@ describe('Map Generator', () => {
         [TileType.Barracks]: 0.2,
       }
     };
-    const map = generateMap(mapSetting, players as any);
+    const map = await generateMap(mapSetting, players as any);
     expect(map.width).toBe(10);
     expect(map.height).toBe(10);
     // 检查王座数量
@@ -41,7 +41,7 @@ describe('Map Generator', () => {
     expect(map.height).toBe(mapSetting.height);
   });
 
-  it('should generate a valid map for 4 players with correct distribution', () => {
+  it('should generate a valid map for 4 players with correct distribution', async () => {
     const players: any = [
       { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
       { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
@@ -59,7 +59,7 @@ describe('Map Generator', () => {
         [TileType.Barracks]: 0.2,
       }
     };
-    const map = generateMap(mapSetting, players as any);
+    const map = await generateMap(mapSetting, players as any);
     expect(map.width).toBe(12);
     expect(map.height).toBe(12);
     // 检查王座数量
@@ -91,7 +91,7 @@ describe('Map Generator', () => {
     // console.log('Player territories:', playerStats);
   });
 
-  it('visualize a 4-player map (console debug)', () => {
+  it('visualize a 4-player map (console debug)', async () => {
     // 可选：仅用于调试
     const players: any = [
       { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
@@ -110,7 +110,7 @@ describe('Map Generator', () => {
         [TileType.Barracks]: 0.2,
       }
     };
-    const map = generateMap(mapSetting, players as any);
+    const map = await generateMap(mapSetting, players as any);
     const tileSymbols: Record<string, string> = {
       [TileType.Plain]: '.',
       [TileType.Mountain]: '^',

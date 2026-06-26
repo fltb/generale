@@ -85,6 +85,26 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
 });
 
+// Custom maps: DB stores metadata only; tiles are in ./public/maps/<id>.json
+export const customMaps = sqliteTable('custom_maps', {
+  id: text('id').primaryKey().notNull(),
+  name: text('name').notNull(),
+  description: text('description').default(''),
+  authorId: text('author_id').notNull().references(() => users.id),
+  authorName: text('author_name').notNull(),
+  width: integer('width').notNull(),
+  height: integer('height').notNull(),
+  tileCount: integer('tile_count').notNull(),
+  minPlayers: integer('min_players').default(2).notNull(),
+  maxPlayers: integer('max_players').default(8).notNull(),
+  isPublic: integer('is_public', { mode: 'boolean' }).default(false).notNull(),
+  isDraft: integer('is_draft', { mode: 'boolean' }).default(true).notNull(),
+  usageCount: integer('usage_count').default(0).notNull(),
+  tags: text('tags'), // JSON array
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(CURRENT_TIMESTAMP)`),
+});
+
 // User profiles
 export const profiles = sqliteTable('profiles', {
   userId: text('user_id').primaryKey().references(() => users.id),

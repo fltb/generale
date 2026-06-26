@@ -18,6 +18,8 @@ import ForgotPasswordPage from "./routes/forgot-password";
 import ResetPasswordPage from "./routes/reset-password";
 import ConfirmEmailChangePage from "./routes/confirm-email-change";
 import VerifyEmailPage from "./routes/verify-email";
+import MapsPage from "./routes/maps";
+import MapEditorPage from "./routes/map-editor";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +52,9 @@ export default function App() {
               <Route path="/verify-email" component={VerifyEmailPage} />
               <Route path="/confirm-email-change" component={ConfirmEmailChangePage} />
               <Route path="/game/:id" component={RoomRoute} />
+              <Route path="/maps" component={MapsPage} />
+              <Route path="/maps/editor" component={MapEditorPage} />
+              <Route path="/maps/editor/:id" component={MapEditorPage} />
             </Router>
           </WebSocketProvider>
         </AuthProvider>

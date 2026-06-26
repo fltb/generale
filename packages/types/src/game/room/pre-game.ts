@@ -46,10 +46,11 @@ export interface PreGameCustomMapSetting {
   customData?: any; // 可进一步细化
 }
 
-// 导入地图参数
+// 导入地图参数（从地图工坊选取）
 export interface PreGameImportedMapSetting {
   type: PreGameMapType.Imported;
-  mapName: string; // 数据库中已存在的地图名
+  /** 自定义地图 ID（从地图工坊选取），游戏开始时根据此 ID 加载地图 tiles */
+  customMapId: string;
 }
 
 export type PreGameMapSetting =

@@ -3,6 +3,7 @@ import {
     type Component,
     For,
     Show,
+    createSignal,
 } from "solid-js";
 import { Button, Input, Range } from "~/ui";
 
@@ -17,6 +18,7 @@ export interface PreGameRoomStateFromProps {
  * 基本表单：编辑 speed, afkThreshold, 以及 tileGrow 下每个 tile 的 duration/growth
  */
 export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props) => {
+    const [tileGrowOpen, setTileGrowOpen] = createSignal(false);
     // 将更新立即回传给父组件（并更新本地）
     const commit = (next: PreGameRoomState["gameSetting"]) => {
         props.onChange(next);
@@ -132,12 +134,14 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
 
             <Show when={Object.keys(props.state.tileGrow ?? {}).length > 0 && props.map.type != PreGameMapType.Random}>
                 <div>
-                    <label class="label">
-                        <span class="label-text">地块增长规则 (tileGrow)</span>
-                        <span class="label-text-alt">对每种地形设置 duration 和 growth</span>
-                    </label>
+                    <button type="button" class="flex items-center gap-1 text-sm w-full mb-1" onClick={() => setTileGrowOpen(o => !o)}>
+                        <span class={tileGrowOpen() ? 'rotate-90' : ''} style="transition:transform 0.15s;display:inline-block">▸</span>
+                        地块增长规则 (tileGrow)
+                        <span class="text-xs opacity-50 ml-1">对每种地形设置 duration 和 growth</span>
+                    </button>
 
-                    <div class="grid gap-4">
+                    <Show when={tileGrowOpen()}>
+                    <div class="grid gap-4 mt-2">
                         <For each={(Object.entries(
                             props.state.tileGrow ?? {}) as
                             [TileType, { duration?: number; growth?: number }][])
@@ -194,6 +198,7 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
                             }}
                         </For>
                     </div>
+                    </Show>
                 </div>
             </Show>
 

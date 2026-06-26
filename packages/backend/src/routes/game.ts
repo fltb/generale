@@ -39,12 +39,16 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
 
       // discriminant must be 'type' per new schema
       if (settings.type === "custom") {
-        if (!settings.mapSize || typeof settings.mapSize !== "object") {
+        if (settings.mapSize && typeof settings.mapSize === "object") {
+          const { width, height } = settings.mapSize;
+          finalMapSize = { width: Number(width), height: Number(height) };
+        } else if (settings.customMapId) {
+          // custom map selected, dimensions determined by the map
+          finalMapSize = { width: 20, height: 20 }; // placeholder, GameService will override from map data
+        } else {
           set.status = 400;
-          return { success: false, error: "custom mode requires numeric mapSize {width, height}" };
+          return { success: false, error: "custom mode requires numeric mapSize or customMapId" };
         }
-        const { width, height } = settings.mapSize;
-        finalMapSize = { width: Number(width), height: Number(height) };
       } else {
         finalMapSize = settings.mapSize;
       }
@@ -59,6 +63,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
       teamMode: body.gameSettings?.teamMode ?? "ffa",
       ...(body.password ? { password: body.password } : {}),
       creatorId: session.userId,
+      ...(body.gameSettings?.type === 'custom' && body.gameSettings.customMapId ? { customMapId: body.gameSettings.customMapId } : {}),
     };
 
     // create game
