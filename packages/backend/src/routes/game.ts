@@ -24,7 +24,12 @@ import { applyGameFilters, applyGameSort, paginateGames } from "./utils/gameList
 export const gameRoutes = new Elysia({ prefix: "/game" })
   // Decorate with the actual singleton manager instance
   .decorate("gameServiceManager", gameServiceManager)
-  .post("/create", async ({ body, gameServiceManager, set }) => {
+  .post("/create", async ({ body, gameServiceManager, set, cookie: { sid } }) => {
+    const session = sid?.value ? sessionService.get(sid.value) : undefined;
+    if (!session) {
+      set.status = 401;
+      return { success: false, error: "请先登录" };
+    }
     const gameId = `game_${Date.now()}` as GameId;
 
     let finalMapSize: any = 'medium';
@@ -52,6 +57,8 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
       type: (body.gameSettings?.type as ("custom" | "standard")) ?? "standard",
       maxPlayers: body.gameSettings?.maxPlayers ?? 8,
       teamMode: body.gameSettings?.teamMode ?? "ffa",
+      ...(body.password ? { password: body.password } : {}),
+      creatorId: session.userId,
     };
 
     // create game
@@ -63,6 +70,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
     };
   }, {
     body: createGameReqSchema,
+    cookie: cookieScheme,
     response: { 200: createGameSuccessRespSchema, 400: errorRespSchema },
     detail: { tags: ["Game"], summary: "Create a new game" }
   }).get("/info/:gameId", async ({ params, gameServiceManager, set }) => {
@@ -154,6 +162,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
         playerId, // ok to return if you want but front-end should not rely on it
         phase: result.data.phase,
         domains: result.data.domains,
+        hasPassword: result.data.hasPassword,
         message: "Ready to connect. Please open the provided domains."
       }
     };

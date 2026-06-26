@@ -22,12 +22,16 @@ export interface UsePreGameRoomParams {
   gameId: GameId;
   /** 房间是否可见（用于在可见时清掉过时 notice） */
   visible?: boolean;
+  /** 房间密码（用于加入有密码的房间时传给 WS open payload） */
+  password?: string;
   onStateUpdate?: (payload: { event?: SyncedPreGameServerEventPayload }) => void;
   onSelfStatusChange?: (status: PreGamePlayerStatus) => void;
   onRoomStateChange?: (room: PreGameRoomState) => void;
   onGameEndedReceived?: () => void;
   onExposeApi?: (api: { leaveSpectate: () => void } | null) => void;
 }
+
+export type PregameController = ReturnType<typeof usePreGameRoom>;
 
 /**
  * 房间（pregame 域）的连接 + 状态 + 动作控制器。
@@ -100,10 +104,14 @@ export function usePreGameRoom(params: UsePreGameRoomParams) {
     initialVersion: 0,
     applyEvent: applyPregameEventLocal,
     onCustomEvent: handleCustomEvent,
-    openPayload: { },
-    onConnectionClosed: ({ code, reason }) => {
-      console.warn("connection closed", code, reason);
-      if (code === 4003) {
+      openPayload: params.password ? { password: params.password } : { },
+      onConnectionClosed: ({ code, reason }) => {
+        console.warn("connection closed", code, reason);
+        if (code === 4003 && reason === 'Wrong password') {
+          sessionStorage.removeItem('room-invite-pw');
+          sessionStorage.setItem('room-wrong-pw', '1');
+          window.location.reload();
+        } else if (code === 4003) {
         handleCustomEvent({
           type: SyncedPreGameServerEventPayloadType.KICKED,
           reason: reason || "无法加入房间",

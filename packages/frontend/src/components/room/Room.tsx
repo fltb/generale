@@ -10,61 +10,30 @@ import { PreGameRoomStateFrom } from "./StateForm";
 import { PlayerList } from "./PlayerList";
 import { PreGameControls } from "./PreGameControls";
 import { PreGameMapSettingForm } from "./PreGameMapSettingForm";
-import { usePreGameRoom } from "~/game/usePreGameRoom";
+import type { PregameController } from "~/game/usePreGameRoom";
 import { makeEmptyRoom } from "~/game/defaults";
 import { Button, Card, Panel, Alert, TakeoverOverlay } from "~/ui";
 
 export interface RoomWithSyncProps {
-  domain: string;
+  ctrl: PregameController;
   playerId: PlayerId;
   gameId: GameId;
-  autoOpen?: boolean;
-  /**
-   * visible: 控制 UI 显示（true 或缺省 显示；false 隐藏但保持挂载）。
-   * 隐藏而非 unmount 是为了避免 websocket 重连 / pregame instance 被误销毁。
-   */
   visible?: boolean;
-  /**
-   * 父级回调：RoomWithSync 会在本地 state 更新 / server custom event 等场景调用此回调。
-   * 注意 GAME_ENDED 不再走这里，而是通过专用 onGameEndedReceived。
-   */
+  password?: string;
   onStateUpdate?: (payload: {
     event?: SyncedPreGameServerEventPayload;
   }) => void;
-  /**
-   * 当 self.status 变化时上报给父级——父级用这个决定显示房间还是游戏。
-   * 缺省视为 Lobby（与服务端 enum 默认一致）。
-   */
   onSelfStatusChange?: (status: PreGamePlayerStatus) => void;
   onRoomStateChange?: (room: PreGameRoomState) => void;
-  /**
-   * 服务端 pregame 域的 GAME_ENDED 到达时调用。父级据此进入"结算窗口"维持
-   * GameWithSync 挂载。和"用户 dismiss 结算 UI"是两条独立信号。
-   */
   onGameEndedReceived?: () => void;
-  /**
-   * 暴露房间内部的几个 dispatcher 给父级，便于 GameWithSync（观战）等其它子组件
-   * 触发 pregame 域的 action。只在挂载/卸载时调用一次。
-   */
   onExposeApi?: (api: { leaveSpectate: () => void } | null) => void;
 }
 
 /**
- * Room 组件：连接 / 状态 / 动作全部委托给 usePreGameRoom 控制器，
- * 这里只负责渲染。
+ * Room 组件：只负责渲染。连接 / 状态 / 动作由外部（ConnectedRoom）注入。
  */
 export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
-  const ctrl = usePreGameRoom({
-    domain: props.domain,
-    playerId: props.playerId,
-    gameId: props.gameId,
-    get visible() { return props.visible; },
-    onStateUpdate: props.onStateUpdate,
-    onSelfStatusChange: props.onSelfStatusChange,
-    onRoomStateChange: props.onRoomStateChange,
-    onGameEndedReceived: props.onGameEndedReceived,
-    onExposeApi: props.onExposeApi,
-  });
+  const ctrl = props.ctrl;
 
   const room = ctrl.room;
   const selfId = ctrl.selfId;
@@ -125,7 +94,22 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
             <div class="text-lg font-semibold">房间信息</div>
             <div class="text-sm opacity-70">Game ID: {room()?.gameId}</div>
           </div>
-          <div>
+          <div class="flex items-center gap-2">
+            <Show when={isHost()}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  const pw = props.password;
+                  const link = `${location.origin}/game/${encodeURIComponent(props.gameId)}${pw ? `?join=${encodeURIComponent(pw)}` : ''}`;
+                  navigator.clipboard.writeText(link).then(() => {
+                    alert('邀请链接已复制到剪贴板');
+                  });
+                }}
+              >
+                复制邀请链接
+              </Button>
+            </Show>
             <div class="opacity-70 text-sm">
               玩家上限 {room()?.playerLimit} · 队伍数 {room()?.teamCount}
             </div>

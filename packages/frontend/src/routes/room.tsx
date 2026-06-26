@@ -7,11 +7,11 @@ import {
 } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 
-import RoomWithSync from "~/components/room/Room";
+import ConnectedRoom from "~/components/room/ConnectedRoom";
 import GameWithSync from "~/components/game/Game";
 import ChatPanel from "~/components/ChatPanel";
 import { useRoomSession } from "~/game/useRoomSession";
-import { Button, Card, Alert } from "~/ui";
+import { Button, Card, Alert, Input } from "~/ui";
 
 import {
   GamePhase,
@@ -21,11 +21,15 @@ import {
 const RoomRoute: Component = () => {
   const params = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
+  const joinPassword = searchParams.get('join');
+  if (joinPassword) {
+    sessionStorage.setItem('room-invite-pw', joinPassword);
+    navigate(location.pathname, { replace: true });
+  }
 
-  // 连接编排 + 阶段状态机全部委托给控制器
   const session = useRoomSession(() => params.id);
 
-  // chat floating visible（纯 UI 开关，留在视图层）
   const [chatVisible, setChatVisible] = createSignal(true);
 
   return (
@@ -49,14 +53,39 @@ const RoomRoute: Component = () => {
           <Card class="p-4 mb-4">Preparing connection…</Card>
         </Match>
 
-        {/* ---------- INGAME (显示 game UI) ----------
-            - Playing 玩家：作为对局参与者打开 GameWithSync
-            - Spectating 玩家：作为观战者打开 GameWithSync（read-only，禁用 surrender/操作）
-            - Lobby 玩家：继续看 RoomWithSync（下面挂载）
-            - gameJustEnded：游戏刚结束，结算 overlay 显示中，维持挂载等用户/计时器 dismiss */}
+        {/* 密码房间入口提示 */}
+        <Match when={session.needsPassword()}>
+          <Card class="p-6 max-w-md mx-auto mt-8">
+            <h2 class="text-lg font-semibold mb-4">此房间为私有房间</h2>
+            <Show
+              when={session.wrongPassword()}
+              fallback={<p class="text-sm opacity-70 mb-4">需要输入密码才能加入</p>}
+            >
+              <p class="text-error text-sm mb-4">密码错误，请重试</p>
+            </Show>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const pw = ((e.target as HTMLFormElement).elements.namedItem('pw') as HTMLInputElement).value.trim();
+              if (pw) session.setPassword(pw);
+            }}>
+              <div class="flex items-center gap-2">
+                <Input
+                  bordered
+                  type="password"
+                  name="pw"
+                  placeholder="请输入房间密码"
+                  class="w-64"
+                />
+                <Button variant="primary" type="submit">加入房间</Button>
+              </div>
+            </form>
+          </Card>
+        </Match>
+
+        {/* ---------- INGAME (显示 game UI) ---------- */}
         <Match when={session.showingGameUI() && session.gameDomain() && session.playerId()}>
           <GameWithSync
-            domain={session.gameDomain()!} // MUST be game-*
+            domain={session.gameDomain()!}
             gameId={params.id!}
             playerId={session.playerId()!}
             spectate={session.selfStatus() === PreGamePlayerStatus.Spectating}
@@ -82,17 +111,16 @@ const RoomRoute: Component = () => {
       </Switch>
 
       {/* ---------------------------------------------------------
-          RoomWithSync：**只挂载一次**，通过 visible 控制显示（避免反复 mount/unmount）
-          保持连接在 INGAME 期间也不关闭（hidden but still mounted）
+          RoomWithSync：**只挂载一次**。
+          密码已输入 或 roomDomain 就绪后才挂载。
          --------------------------------------------------------- */}
-      <Show when={session.roomDomain() && session.playerId()}>
-        <RoomWithSync
+      <Show when={session.roomDomain() && session.playerId() && !session.needsPassword()}>
+        <ConnectedRoom
           domain={session.roomDomain()!}
           gameId={params.id!}
           playerId={session.playerId()!}
-          autoOpen
-          // 房间和游戏 UI 二选一：游戏在屏上时房间隐藏，反之可见。
           visible={!session.showingGameUI()}
+          password={session.roomPassword() ?? undefined}
           onStateUpdate={session.handleStateUpdate}
           onSelfStatusChange={(s) => session.setSelfStatus(s)}
           onRoomStateChange={(room) => session.setRoomState(room)}
@@ -101,12 +129,9 @@ const RoomRoute: Component = () => {
         />
       </Show>
 
-      {/* ---------- Chat floating window (bottom-left) ----------
-          战局聊天跟 route 同级挂载，pregame / ingame 共享 chat-* domain。
-          玻璃态半透明设计：不影响地图等游戏画面的可见性。 */}
+      {/* ---------- Chat floating window (bottom-right) ---------- */}
       <Show when={session.chatDomain() && session.playerId()}>
         <div class="fixed bottom-4 right-4 z-50 max-w-[calc(100vw-2rem)]">
-          {/* Minimized button */}
           <Show when={!chatVisible()}>
             <Button
               circle
@@ -120,7 +145,6 @@ const RoomRoute: Component = () => {
             </Button>
           </Show>
 
-          {/* Expanded panel */}
           <Show when={chatVisible()}>
             <div class="w-[min(24rem,calc(100vw-2rem))] overflow-hidden bg-base-100/75 backdrop-blur-sm shadow-lg pixel-border">
               <div class="flex items-center justify-between gap-3 border-b border-base-300/50 p-2">

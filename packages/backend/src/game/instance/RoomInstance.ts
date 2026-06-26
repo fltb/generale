@@ -55,9 +55,41 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
   private nextTeamSeq = 1; // 用于自动生成 team id
   private readonly MIN_TEAMS = 2;
+  private readonly HOST_RECLAIM_MS = 5_000; // 房主断线 5s 内重连保留房主
 
   private suspended = false;
 
+  /** 房间密码（私有，不会广播给客户端） */
+  private roomPassword: string | undefined = undefined;
+  /** 创建者 userId，确保第一个加入的就是房主 */
+  private creatorId: PlayerId | undefined = undefined;
+  /** 房主断线计时器：超时后自动转让 */
+  private hostReclaimTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+
+  public getPassword(): string | undefined { return this.roomPassword; }
+  public setPassword(pw?: string): void { this.roomPassword = pw ?? undefined; }
+  public setCreatorId(id: PlayerId): void { this.creatorId = id; }
+
+  private clearHostReclaimTimer() {
+    if (this.hostReclaimTimer) {
+      clearTimeout(this.hostReclaimTimer);
+      this.hostReclaimTimer = undefined;
+    }
+  }
+
+  private startHostReclaimTimer(pid: PlayerId) {
+    this.clearHostReclaimTimer();
+    this.hostReclaimTimer = setTimeout(() => {
+      this.hostReclaimTimer = undefined;
+      const host = this.state.players.find(p => p.isHost);
+      if (host && host.status === PreGamePlayerStatus.Disconnected) {
+        console.debug(`[RoomInstance] Host ${pid} reclaim timeout, auto-transferring`);
+        this.autoTransferHost();
+        this.state.players = this.state.players.filter(p => p.id !== pid);
+        this.broadcastState();
+      }
+    }, this.HOST_RECLAIM_MS);
+  }
   // 防重入/防重复移除标记
   private removing: Set<PlayerId> = new Set();
 
@@ -197,8 +229,16 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       return;
     }
 
-    // Lobby / Spectating 玩家断开：按正常流程移除（即使 suspended=true 也直接走，
-    // 因为他不在游戏里，保留座位没意义）
+    // Lobby / Spectating 玩家断开：按正常流程移除
+    // 例外：房主断线保留座位（标记 Disconnected），避免刷新丢房主
+    if (player.isHost && !this.suspended) {
+      this.clearPerConnectionState(pid);
+      player.status = PreGamePlayerStatus.Disconnected;
+      this.startHostReclaimTimer(pid);
+      console.debug(`[RoomInstance] Host ${pid} -> Disconnected (reclaim in ${this.HOST_RECLAIM_MS}ms)`);
+      this.broadcastState();
+      return;
+    }
     this.removePlayer(pid, /*forceRemove=*/ true);
   }
 
@@ -917,6 +957,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   public destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.clearHostReclaimTimer();
     // 只有在显式 disband 或房间已无人时才通知 onDisband
     const shouldNotifyDisband = this.disbanded || (Array.isArray(this.state.players) && this.state.players.length === 0);
 
@@ -993,7 +1034,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     }));
   }
 
-  public canJoin(playerId: PlayerId): { success: true } | { success: false, message: string } {
+  public canJoin(playerId: PlayerId, password?: string): { success: true } | { success: false, message: string } {
     if (this.destroyed) {
       const msg = `[RoomInstance] Cannot add player to destroyed instance`;
       console.warn(msg);
@@ -1012,11 +1053,13 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
     const existing = this.state.players.find(p => p.id === playerId);
     // 已存在玩家（任何状态：Lobby / Playing / Spectating / Disconnected）一律放行：
-    //   addPlayer 内部会按"位移（displacement）"语义关掉旧 connector、替换为新 connector。
-    // 配合 sessionService 的"last-login-wins"反重复登录策略：HTTP 层旧 session 已失效，
-    // 走到 WS 层的新 connector 必然是有效新 session，应该接管玩家槽位。
     if (existing) {
       return { success: true };
+    }
+
+    // password check — new players only; first player (host) skips
+    if (password !== undefined && this.roomPassword && password !== this.roomPassword && this.state.players.length > 0) {
+      return { success: false, message: 'Wrong password' };
     }
 
     if (this.state.players.length >= this.state.playerLimit) {
@@ -1051,7 +1094,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   }
   /** 动态添加玩家（用于 GameService） */
   public addPlayer(
-    user: { id: PlayerId; name: string; displayName?: string; avatarThumbUrl?: string },
+    user: { id: PlayerId; name: string; displayName?: string; avatarThumbUrl?: string; password?: string },
     connector: RoomServerConnector,
   ): { success: true } | { success: false, message: string } {
     const playerId = user.id;
@@ -1059,7 +1102,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     const displayName = user.displayName;
     const avatarThumbUrl = user.avatarThumbUrl;
 
-    const res = this.canJoin(playerId);
+    const res = this.canJoin(playerId, user.password);
     if (!res.success) {
       return res;
     }
@@ -1072,7 +1115,12 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       if (displayName !== undefined) existing.displayName = displayName;
       if (avatarThumbUrl !== undefined) existing.avatarThumbUrl = avatarThumbUrl;
       if (existing.status === PreGamePlayerStatus.Disconnected) {
-        existing.status = PreGamePlayerStatus.Playing;
+        if (existing.isHost && this.hostReclaimTimer) {
+          existing.status = PreGamePlayerStatus.Lobby;
+          this.clearHostReclaimTimer();
+        } else {
+          existing.status = PreGamePlayerStatus.Playing;
+        }
       }
       this.version++;
       this.broadcastState();
@@ -1080,8 +1128,11 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       return { success: true };
     }
 
-    // 如果是第一个玩家，设为房主
+    // 如果是第一个玩家，设为房主；如果有 creatorId 则必须匹配
     const isHost = this.state.players.length === 0;
+    if (isHost && this.creatorId && playerId !== this.creatorId) {
+      return { success: false, message: 'Only the room creator can join as the first player' };
+    }
     if (isHost) {
       this.state.hostId = playerId;
     }

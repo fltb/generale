@@ -42,7 +42,7 @@ export function buildGameInfo(input: GameInfoInput): GameInfoSuccessResp['data']
     status,
     playerCount: players.length,
     maxPlayers: resolvedMaxPlayers,
-    hasPassword: false,
+    hasPassword: !!roomInstance?.getPassword(),
   } as GameInfoSuccessResp['data'];
 }
 
@@ -115,20 +115,18 @@ function normalizeSettings(
   roomType: 'standard' | 'custom',
   mapField: { width: number; height: number } | 'small' | 'medium' | 'large' | undefined,
   maxPlayers: number,
-  roomName: string,
+  _roomName: string,
 ) {
   if (roomType === 'custom') {
     return {
       maxPlayers,
       mapSize: mapField as { width: number; height: number },
       type: 'custom' as const,
-      roomName,
     };
   }
-  return {
-    maxPlayers,
-    mapSize: mapField as 'small' | 'medium' | 'large' | undefined,
-    type: 'standard' as const,
-    roomName,
-  };
+  // standard: mapSize 可选，非预设标签时不发
+  if (mapField && typeof mapField === 'string') {
+    return { maxPlayers, mapSize: mapField, type: 'standard' as const };
+  }
+  return { maxPlayers, type: 'standard' as const };
 }

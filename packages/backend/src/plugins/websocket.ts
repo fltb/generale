@@ -66,6 +66,8 @@ export interface WSContextBase {
   displayName?: string;
   /** profile 缩略头像 URL；用于 PlayerList 等小尺寸场景 */
   avatarThumbUrl?: string;
+  /** 房间密码（客户端 open payload 中传入，用于加入有密码的房间） */
+  password?: string;
 };
 
 export type WebSocketMessage<T = unknown, Context extends WSContextBase = WSContextBase> =

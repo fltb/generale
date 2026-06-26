@@ -55,6 +55,26 @@ export function useRoomSession(gameId: () => string | undefined) {
 
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [hasPassword, setHasPassword] = createSignal<boolean | undefined>(undefined);
+
+  // 密码状态
+  const [roomPassword, setRoomPassword] = createSignal<string | null>(
+    sessionStorage.getItem('room-invite-pw') ?? null,
+  );
+  const wrongPwFlag = sessionStorage.getItem('room-wrong-pw');
+  if (wrongPwFlag) sessionStorage.removeItem('room-wrong-pw');
+  const [wrongPassword, setWrongPassword] = createSignal(!!wrongPwFlag);
+
+  const needsPassword = createMemo(() =>
+    hasPassword() === true && !roomPassword(),
+  );
+
+  function setPassword(pw: string | null) {
+    if (pw) sessionStorage.setItem('room-invite-pw', pw);
+    else sessionStorage.removeItem('room-invite-pw');
+    setRoomPassword(pw);
+    setWrongPassword(false);
+  }
 
   /**
    * 初始 / 刷新连接信息（authoritative）
@@ -81,6 +101,8 @@ export function useRoomSession(gameId: () => string | undefined) {
 
       // authoritative phase
       setPhase(prev => (prev !== data.phase ? data.phase : prev));
+
+      setHasPassword(!!data.hasPassword);
 
       // domains: prefer explicit fields if provided
       const dRoom = data.domains?.room ?? null;
@@ -217,6 +239,11 @@ export function useRoomSession(gameId: () => string | undefined) {
     setRoomApi,
     loading,
     error,
+    hasPassword,
+    needsPassword,
+    wrongPassword,
+    setPassword,
+    roomPassword,
     showingGameUI,
     startedThisSession,
     // handlers

@@ -5,7 +5,6 @@ import RoomFilter from "./RoomFilter";
 import { getGameInfoApi } from "~/api/gameApi";
 import { useQuery } from "@tanstack/solid-query";
 import CreateRoomModal from "./CreateRoomModal";
-import { A } from "@solidjs/router";
 import { useGameListQuery } from "~/hooks/useGameListQuery";
 import { useLobbyRealtime } from "~/hooks/useLobbyRealtime";
 import { Button, Card, Badge, Alert, Spinner, Modal } from "~/ui";
@@ -158,7 +157,6 @@ export function RoomList() {
                       <div class="card-actions justify-end mt-3">
                         <Button variant="ghost" size="sm" onClick={() => openDetails(g.id)}>Details</Button>
                         <Button size="sm" variant={isFull ? "neutral" : "primary"} class={isFull ? "btn-disabled" : ""} onClick={() => handlePrepareConnect(g.id)}>Join</Button>
-                        <A href={`/game/${g.id}`} class="btn btn-sm">Open</A>
                       </div>
                     </div>
                   </Card>
@@ -190,27 +188,27 @@ export function RoomList() {
                 {(detail) => (
                   <>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p><strong>ID:</strong> <span class="font-mono">{detail().id}</span></p>
-                        <p><strong>Host:</strong> {detail().hostId}</p>
+                      <div class="space-y-2">
+                        <p><strong>ID:</strong> <span class="text-xs">{detail().id}</span></p>
+                        <p><strong>Host:</strong> {detail().hostName || detail().hostId || "—"}</p>
                         <p><strong>Players:</strong> {detail().playerCount} / {detail().maxPlayers}</p>
-                        <p><strong>Status:</strong> {detail().status}</p>
-                        <p><strong>Has password:</strong> {detail().hasPassword ? "Yes" : "No"}</p>
+                        <p>
+                          <strong>Status:</strong>
+                          <span classList={{ "text-success": detail().status === 'lobby', "text-warning": detail().status === 'in-progress' }}>
+                            {detail().status === 'lobby' ? '等待中' : detail().status === 'in-progress' ? '游戏中' : detail().status}
+                          </span>
+                        </p>
+                        <p><strong>Password:</strong> {detail().hasPassword ? '🔒 是' : '公开'}</p>
                       </div>
 
                       <div>
-                        <p class="font-semibold">Players list</p>
-                        <ul class="menu rounded-box p-2 bg-base-200">
+                        <p class="font-semibold mb-1">玩家列表</p>
+                        <ul class="space-y-1">
                           <For each={detail().players ?? []}>
                             {(p) => (
-                              <li>
-                                <div class="flex items-center justify-between">
-                                  <div>
-                                    <span class="font-medium">{p.name}</span>
-                                    <span class="text-xs text-muted ml-2">{p.isHost ? "(host)" : ""}</span>
-                                  </div>
-                                  <div class="text-sm font-mono">{p.id}</div>
-                                </div>
+                              <li class="text-sm flex items-center gap-2">
+                                <span class="font-medium">{p.name}</span>
+                                <Show when={p.isHost}><Badge variant="neutral" class="badge-xs">Host</Badge></Show>
                               </li>
                             )}
                           </For>

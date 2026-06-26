@@ -40,6 +40,10 @@ export type GameServiceConfig = {
   heartbeatInterval?: number;
   /** 队伍模式：ffa（默认）/ team。在 initializeRoom 时写入 initialState */
   teamMode?: PreGameTeamMode;
+  /** 可选的房间密码 */
+  password?: string;
+  /** 创建者 userId，用于确保第一个加入的就是房主 */
+  creatorId?: PlayerId;
   // optional: raw incoming gameSettings (from create request). Prefer normalized mapSize in gameConfig.mapSizeNormalized below
   gameSettings?: Partial<GameInstanceSettings>;
 } & ({
@@ -58,6 +62,7 @@ export type GameServiceConfig = {
 export type ConnectionInfo = {
   phase: GamePhase;
   domains: { primary: string; room?: string; chat: string };
+  hasPassword: boolean;
 };
 
 export type ConnectionResult =
@@ -171,6 +176,7 @@ export type ConnectionResult =
             name: username,
             ...(ctx.displayName ? { displayName: ctx.displayName } : {}),
             ...(ctx.avatarThumbUrl ? { avatarThumbUrl: ctx.avatarThumbUrl } : {}),
+            ...(ctx.password ? { password: ctx.password } : {}),
           },
           connector,
         );
@@ -277,6 +283,8 @@ export type ConnectionResult =
   private initializeRoom(): void {
     const initialState = this.buildInitialRoomState();
     this.roomInstance = new RoomInstance(initialState, new Map());
+    if (this.config.password) this.roomInstance.setPassword(this.config.password);
+    if (this.config.creatorId) this.roomInstance.setCreatorId(this.config.creatorId);
     this.wireRoomInstance();
     this.phase = GamePhase.PREGAME;
     this.chatInstance.activeStageInstance = this.roomInstance;
@@ -672,6 +680,8 @@ export type ConnectionResult =
       success: true,
       data: {
         phase,
+        // 已在房间内的玩家（包括房主）不需要再输入密码
+        hasPassword: !!this.roomInstance?.getPassword() && (this.roomInstance?.getState().players.length ?? 0) > 0,
         domains: {
           primary,
           room: `room-${this.gameId}`,

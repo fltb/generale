@@ -140,7 +140,8 @@ export type ListGamesQuery = Static<typeof listGamesQuerySchema>;
 // --- Request Schemas ---
 export const createGameReqSchema = t.Object({
     roomName: t.String({ minLength: 1, maxLength: 50 }),
-    gameSettings: t.Optional(gameCreationSettingsRouteSchema)
+    gameSettings: t.Optional(gameCreationSettingsRouteSchema),
+    password: t.Optional(t.String({ maxLength: 50 })),
 });
 export type CreateGameReqBody = Static<typeof createGameReqSchema>;
 
@@ -201,7 +202,8 @@ export const connectWsSuccessRespSchema = t.Object({
             room: t.Optional(t.String()),
             chat: t.String(),
         }),
-        message: t.String()
+        message: t.String(),
+        hasPassword: t.Boolean(),
     })
 });
 export type ConnectWsSuccessResp = Static<typeof connectWsSuccessRespSchema>;

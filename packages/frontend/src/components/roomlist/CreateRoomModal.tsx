@@ -34,6 +34,8 @@ export default function CreateRoomModal(props: {
   const [customWidth, setCustomWidth] = createSignal<number | "">("");
   const [customHeight, setCustomHeight] = createSignal<number | "">("");
   const [gameMode, setGameMode] = createSignal<"" | string>("");
+  const [password, setPassword] = createSignal("");
+  const [showAdvanced, setShowAdvanced] = createSignal(false);
 
   // mutation: create game (correct useMutation signature)
   const createMutation = useMutation<
@@ -45,15 +47,16 @@ export default function CreateRoomModal(props: {
       return createGameApi(payload);
     },
     onSuccess: (resp) => {
+      const gameId = resp.data?.gameId;
+      const pw = password().trim();
       qc.invalidateQueries({ queryKey: ["games"] as const });
       resetForm();
       props.onClose();
-      props.onCreated?.(resp.data.gameId);
-      const gameId = resp.data?.gameId;
+      props.onCreated?.(gameId);
 
-      // navigate to room page; include playerId if available
       if (gameId) {
-        navigate(`/game/${encodeURIComponent(gameId)}`);
+        if (pw) sessionStorage.setItem('room-invite-pw', pw);
+        navigate(`/game/${encodeURIComponent(gameId)}${pw ? `?join=${encodeURIComponent(pw)}` : ''}`);
       }
     },
     onError: (err: any) => {
@@ -71,6 +74,8 @@ export default function CreateRoomModal(props: {
     setGameMode("");
     setType("standard");
     setTeamMode("ffa");
+    setPassword("");
+    setShowAdvanced(false);
   }
 
   function validateAndBuildPayload(): CreateGameReqBody | null {
@@ -135,6 +140,7 @@ export default function CreateRoomModal(props: {
     return {
       roomName: name,
       gameSettings: hasExtraSettings ? settings : undefined,
+      ...(password().trim() ? { password: password().trim() } : {}),
     };
   }
 
@@ -166,8 +172,9 @@ export default function CreateRoomModal(props: {
           </div>
 
           <div class="mt-4 space-y-3">
+            {/* ==== 基本设置 ==== */}
             <label class="block">
-              <span class="label-text">房间名 (roomName)</span>
+              <span class="label-text">房间名</span>
               <Input
                 bordered
                 class="w-full"
@@ -177,121 +184,98 @@ export default function CreateRoomModal(props: {
               />
             </label>
 
+            <label class="block">
+              <span class="label-text">房间密码（可选，留空为公开）</span>
+              <Input
+                bordered
+                class="w-full"
+                type="password"
+                value={password()}
+                onInput={(e: any) => setPassword(e.target.value)}
+                placeholder="设置后玩家需输入密码才能加入"
+              />
+            </label>
+
             <div class="grid grid-cols-2 gap-2">
               <label class="block">
-                <span class="label-text">房间类别 (type)</span>
+                <span class="label-text">模式</span>
                 <Select
                   bordered
                   class="w-full"
                   value={type()}
                   onChange={(e: any) => setType(e.target.value)}
                 >
-                  <option value="standard">standard (快速)</option>
-                  <option value="custom">custom (自定义尺寸)</option>
+                  <option value="standard">快速 (预设尺寸)</option>
+                  <option value="custom">自定义 (自由尺寸)</option>
                 </Select>
               </label>
 
               <label class="block">
-                <span class="label-text">最大玩家数（可选）</span>
-                <Input
-                  type="number"
-                  min="2"
-                  max="8"
-                  bordered
-                  class="w-full"
-                  value={maxPlayers() === "" ? "" : String(maxPlayers())}
-                  onInput={(e: any) => {
-                    const v = e.target.value;
-                    setMaxPlayers(v === "" ? "" : Number(v));
-                  }}
-                  placeholder="2 - 8"
-                />
+                <span class="label-text">地图大小</span>
+                <Show when={type() === "standard"} fallback={
+                  <div class="flex gap-2">
+                    <Input type="number" min="10" max="500" bordered class="w-full"
+                      value={customWidth() === "" ? "" : String(customWidth())}
+                      onInput={(e: any) => setCustomWidth(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="宽" />
+                    <Input type="number" min="10" max="500" bordered class="w-full"
+                      value={customHeight() === "" ? "" : String(customHeight())}
+                      onInput={(e: any) => setCustomHeight(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="高" />
+                  </div>
+                }>
+                  <Select bordered class="w-full" value={mapSizeStd()} onChange={(e: any) => setMapSizeStd(e.target.value)}>
+                    <option value="">默认 (medium)</option>
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                  </Select>
+                </Show>
               </label>
             </div>
 
-            <label class="block">
-              <span class="label-text">队伍模式 (teamMode)</span>
-              <Select
-                bordered
-                class="w-full"
-                value={teamMode()}
-                onChange={(e: any) => setTeamMode(e.target.value)}
-              >
-                <option value="ffa">单人 (ffa)</option>
-                <option value="team">组队 (team)</option>
-              </Select>
-            </label>
+            {/* ==== 高级设置 ==== */}
+            <button
+              class="text-sm opacity-60 hover:opacity-100 flex items-center gap-1"
+              onClick={() => setShowAdvanced(v => !v)}
+            >
+              <span>{showAdvanced() ? "▾" : "▸"}</span>
+              高级设置
+            </button>
 
-            <Show when={type() === "standard"}>
-              <div>
+            <Show when={showAdvanced()}>
+              <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                  <label class="block">
+                    <span class="label-text">最大玩家数</span>
+                    <Input
+                      type="number" min="2" max="8" bordered class="w-full"
+                      value={maxPlayers() === "" ? "" : String(maxPlayers())}
+                      onInput={(e: any) => setMaxPlayers(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="2 - 8"
+                    />
+                  </label>
+
+                  <label class="block">
+                    <span class="label-text">队伍模式</span>
+                    <Select bordered class="w-full" value={teamMode()} onChange={(e: any) => setTeamMode(e.target.value)}>
+                      <option value="ffa">单人 (FFA)</option>
+                      <option value="team">组队 (Team)</option>
+                    </Select>
+                  </label>
+                </div>
+
                 <label class="block">
-                  <span class="label-text">地图 (standard)</span>
-                  <Select
-                    bordered
-                    class="w-full"
-                    value={mapSizeStd()}
-                    onChange={(e: any) => setMapSizeStd(e.target.value)}
-                  >
-                    <option value="">默认 (server 默认 medium)</option>
-                    <option value="small">small</option>
-                    <option value="medium">medium</option>
-                    <option value="large">large</option>
+                  <span class="label-text">游戏玩法（可选）</span>
+                  <Select bordered class="w-full" value={gameMode()} onChange={(e: any) => setGameMode(e.target.value)}>
+                    <option value="">默认</option>
+                    <option value="classic">Classic</option>
+                    <option value="blitz">Blitz</option>
+                    <option value="custom">Custom</option>
                   </Select>
                 </label>
               </div>
             </Show>
-
-            <Show when={type() === "custom"}>
-              <div class="grid grid-cols-2 gap-2">
-                <label>
-                  <span class="label-text">width (10 - 500)</span>
-                  <Input
-                    type="number"
-                    min="10"
-                    max="500"
-                    bordered
-                    class="w-full"
-                    value={customWidth() === "" ? "" : String(customWidth())}
-                    onInput={(e: any) => {
-                      const v = e.target.value;
-                      setCustomWidth(v === "" ? "" : Number(v));
-                    }}
-                    placeholder="宽度"
-                  />
-                </label>
-                <label>
-                  <span class="label-text">height (10 - 500)</span>
-                  <Input
-                    type="number"
-                    min="10"
-                    max="500"
-                    bordered
-                    class="w-full"
-                    value={customHeight() === "" ? "" : String(customHeight())}
-                    onInput={(e: any) => {
-                      const v = e.target.value;
-                      setCustomHeight(v === "" ? "" : Number(v));
-                    }}
-                    placeholder="高度"
-                  />
-                </label>
-              </div>
-            </Show>
-
-            <label>
-              <span class="label-text">游戏玩法 (可选)</span>
-              <Select
-                bordered
-                class="w-full"
-                value={gameMode()}
-                onChange={(e: any) => setGameMode(e.target.value)}
-              >
-                <option value="">默认</option>
-                <option value="classic">classic</option>
-                <option value="blitz">blitz</option>
-                <option value="custom">custom</option>
-              </Select>
-            </label>
 
             <div class="flex justify-end gap-2 mt-2">
               <Button variant="ghost" onClick={() => props.onClose()}>
