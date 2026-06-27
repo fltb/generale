@@ -1,7 +1,6 @@
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
-import sharp from "sharp";
 import { db } from "../db/client";
 import { profiles } from "../db/schema";
 
@@ -21,7 +20,7 @@ const DEFAULT_AVATAR_DIR = "./public/avatars/default";
 export const DEFAULT_AVATAR_URL = `${AVATAR_URL_PREFIX}/default/original.webp`;
 export const DEFAULT_AVATAR_THUMB_URL = `${AVATAR_URL_PREFIX}/default/thumb.webp`;
 
-/** 允许的输入 MIME 白名单（sharp 自己也会拒非图片，但提前 reject 错误更友好） */
+/** 允许的输入 MIME 白名单 */
 const ALLOWED_INPUT_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 /** 单文件最大 4MB —— 比原来 2MB 放宽一点，因为后端会重压缩 */
@@ -32,8 +31,8 @@ const ORIGINAL_SIZE = 1024;
 /** 缩略图：方形 128×128，cover 裁剪；webp 质量 80 */
 const THUMB_SIZE = 128;
 
-/** 防解码炸弹：拒绝维度超过这个的输入 */
-const MAX_INPUT_DIMENSION = 8000;
+/** 防解码炸弹：拒绝像素数超过这个的输入 */
+const MAX_PIXELS = 4096 * 4096;
 
 export class ProfileService {
   getProfile(userId: string) {
@@ -88,10 +87,8 @@ export class ProfileService {
    * 把头像字节解码、校验、重新编码为原图 + 缩略两份 webp 落地，
    * 更新 DB 里的 avatarUrl / avatarThumbUrl 并返回两个 URL。
    *
-   * 这里做了"原样字节绝不落地"——所有上传都经 sharp 解码 → 重编码，
+   * 这里做了"原样字节绝不落地"——所有上传都经 Bun.Image 解码 → 重编码，
    * 自动剥 EXIF / 拒绝 MIME 伪造 / 拒绝解码炸弹。
-   *
-   * 抽象在这里是为将来要换 R2/S3 时只改这个方法。
    */
   async saveAvatarBytes(
     userId: string,
@@ -105,42 +102,33 @@ export class ProfileService {
     const input = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes as ArrayBufferLike);
 
     // 1) 探一下元数据，做维度上限校验（防解码炸弹）
-    let meta: sharp.Metadata;
-    try {
-      meta = await sharp(input).metadata();
-    } catch (e: unknown) {
-      throw new Error(`Invalid image: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    if (!(meta.width && meta.height)) {
+    const meta = await new Bun.Image(input, { maxPixels: MAX_PIXELS }).metadata();
+    if (!meta.width || !meta.height) {
       throw new Error("Invalid image: missing dimensions");
     }
-    if (meta.width > MAX_INPUT_DIMENSION || meta.height > MAX_INPUT_DIMENSION) {
-      throw new Error(`Image dimensions too large: ${meta.width}x${meta.height} (max ${MAX_INPUT_DIMENSION})`);
+    if (meta.width > 8000 || meta.height > 8000) {
+      throw new Error(`Image dimensions too large: ${meta.width}x${meta.height} (max 8000)`);
     }
-    // sharp 解出来的 format 可以再校一遍，比 declaredMime 更可信
     if (!(meta.format && ["png", "jpeg", "webp"].includes(meta.format))) {
       throw new Error(`Detected format not allowed: ${meta.format}`);
     }
 
-    // 2) 生成原图 + 缩略两份 buffer。两者都先 .rotate() 按 EXIF orientation 校正，
-    //    然后重编码会自动丢弃 EXIF（隐私）
+    // 2) 生成原图 + 缩略两份 buffer。autoOrient 默认 true，自动按 EXIF orientation 校正，
+    //    重编码会自动丢弃 EXIF（隐私）
     const [originalBuf, thumbBuf] = await Promise.all([
-      sharp(input)
-        .rotate()
+      new Bun.Image(input, { autoOrient: true })
         .resize(ORIGINAL_SIZE, ORIGINAL_SIZE, {
-          fit: "cover",
-          withoutEnlargement: true, // 不放大：小图保留原始分辨率
+          fit: "inside",
+          withoutEnlargement: true,
         })
         .webp({ quality: 90 })
-        .toBuffer(),
-      sharp(input)
-        .rotate()
+        .buffer(),
+      new Bun.Image(input, { autoOrient: true })
         .resize(THUMB_SIZE, THUMB_SIZE, {
-          fit: "cover",
-          withoutEnlargement: false, // 缩略一律强制到 128，小图也放大
+          fit: "fill",
         })
         .webp({ quality: 80 })
-        .toBuffer(),
+        .buffer(),
     ]);
 
     // 3) 落地
@@ -167,10 +155,6 @@ export class ProfileService {
 
   /**
    * 默认头像的 URL 对（用户没上传时返回，前端无需再 fallback）。
-   *
-   * 没提供"按 userId 一步拿头像 URL"的便捷方法是故意的：调用方通常会同时还需要
-   * displayName / bio 等字段，那种 helper 会诱使在同一次请求里调两次 getProfile。
-   * 直接在调用端 `profile?.avatarUrl || defaults.avatarUrl` 一行就够了。
    */
   static defaultAvatarUrls(): { avatarUrl: string; avatarThumbUrl: string } {
     return { avatarUrl: DEFAULT_AVATAR_URL, avatarThumbUrl: DEFAULT_AVATAR_THUMB_URL };
@@ -178,56 +162,14 @@ export class ProfileService {
 
   /**
    * 启动期调用一次：确保 default avatar 两个 webp 存在。
-   *
-   * 不依赖任何位图资源 —— 用 sharp 把一段 SVG（灰底 + 人头剪影）渲染成 webp。
-   * 这样 repo 里就不需要 commit 二进制文件，部署起来也不会因为漏文件就 404。
+   * 文件由构建阶段生成并提交到仓库，这里只做存在性检查。
    */
   static async ensureDefaultAvatars(): Promise<void> {
     await mkdir(DEFAULT_AVATAR_DIR, { recursive: true });
-
-    const variants: Array<{ filename: string; size: number; quality: number }> = [
-      { filename: "original.webp", size: ORIGINAL_SIZE, quality: 90 },
-      { filename: "thumb.webp", size: THUMB_SIZE, quality: 80 },
-    ];
-
-    for (const v of variants) {
-      const path = join(DEFAULT_AVATAR_DIR, v.filename);
-      if (await Bun.file(path).exists()) continue;
-
-      const s = v.size;
-      // 像素风默认头像：16x16 网格的 RPG 角色（战士），sharp 用 crispEdges 保持块状像素感
-      const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 16 16" shape-rendering="crispEdges">
-  <!-- background -->
-  <rect width="16" height="16" fill="#1a1a2e"/>
-  <!-- hair top -->
-  <rect x="4" y="0" width="8" height="2" fill="#e94560"/>
-  <rect x="3" y="1" width="2" height="1" fill="#e94560"/>
-  <rect x="11" y="1" width="2" height="1" fill="#e94560"/>
-  <rect x="2" y="2" width="1" height="1" fill="#e94560"/>
-  <rect x="13" y="2" width="1" height="1" fill="#e94560"/>
-  <!-- face -->
-  <rect x="4" y="3" width="8" height="8" fill="#f5d6c6"/>
-  <!-- eyes -->
-  <rect x="6" y="5" width="2" height="2" fill="#0a0a1a"/>
-  <rect x="10" y="5" width="2" height="2" fill="#0a0a1a"/>
-  <!-- eye highlights -->
-  <rect x="7" y="5" width="1" height="1" fill="#ffffff"/>
-  <rect x="11" y="5" width="1" height="1" fill="#ffffff"/>
-  <!-- mouth -->
-  <rect x="8" y="8" width="2" height="1" fill="#c0392b"/>
-  <!-- body armor -->
-  <rect x="3" y="11" width="10" height="1" fill="#16213e"/>
-  <rect x="2" y="12" width="3" height="3" fill="#533483"/>
-  <rect x="5" y="12" width="6" height="3" fill="#533483"/>
-  <rect x="11" y="12" width="3" height="3" fill="#533483"/>
-  <!-- belt -->
-  <rect x="4" y="13" width="8" height="1" fill="#ffd34d"/>
-</svg>`;
-      const buf = await sharp(Buffer.from(svg)).webp({ quality: v.quality }).toBuffer();
-      await Bun.write(path, buf);
-      console.info(`[ProfileService] default avatar generated: ${path}`);
-    }
+    const original = join(DEFAULT_AVATAR_DIR, "original.webp");
+    const thumb = join(DEFAULT_AVATAR_DIR, "thumb.webp");
+    if (await Bun.file(original).exists() && await Bun.file(thumb).exists()) return;
+    console.warn("[ProfileService] default avatar files missing, run generation script to create them");
   }
 }
 

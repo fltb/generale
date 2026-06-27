@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import path from "path";
 import { db } from "./client";
 
-const MIGRATIONS_FOLDER = path.resolve(import.meta.dir, "../../drizzle");
+const MIGRATIONS_FOLDER = process.env["MIGRATIONS_FOLDER"] || path.resolve(import.meta.dir, "../../drizzle");
 
 export function runMigrations() {
   if (!existsSync(MIGRATIONS_FOLDER)) {

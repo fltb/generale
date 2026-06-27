@@ -2,6 +2,8 @@ import { cors } from "@elysiajs/cors";
 import { staticPlugin } from "@elysiajs/static";
 import { swagger } from "@elysiajs/swagger";
 import { Elysia } from "elysia";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { runMigrations } from "./db/migrate";
 import { authPlugin } from "./middleware/authPlugin";
 import { registerDomainHandler, websocketPlugin } from "./plugins/websocket";
@@ -116,6 +118,18 @@ const app = new Elysia()
       .get("/", () => ({ message: "Generale Game Server", version: "1.0.0" }))
       .get("/health", () => ({ status: "ok", timestamp: new Date().toISOString() })),
   )
+  // 前端静态文件 serve + SPA fallback（仅 NODE_ENV=production 时有效）
+  // 开发模式下 rbuild dev server 自己处理
+  .use(staticPlugin({ assets: process.env["FRONTEND_DIST"] || "./frontend", prefix: "/", alwaysStatic: true }))
+  .get("/*", ({ set }) => {
+    const dist = process.env["FRONTEND_DIST"] || "./frontend";
+    const indexHtml = join(dist, "index.html");
+    if (existsSync(indexHtml)) {
+      set.headers["Content-Type"] = "text/html";
+      return Bun.file(indexHtml);
+    }
+    return new Response("Not Found", { status: 404 });
+  })
   .listen({
     port: process.env["PORT"] || 3000,
     hostname: process.env["HOST"] || "0.0.0.0",

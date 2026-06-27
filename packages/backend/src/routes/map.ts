@@ -8,7 +8,6 @@ import type {
 } from "@generale/types";
 import { createMapReqSchema, updateMapReqSchema } from "@generale/types";
 import { Elysia, t } from "elysia";
-import sharp from "sharp";
 import { mapService } from "../services/mapService";
 import { sessionService } from "../services/sessionService";
 import { cookieScheme } from "./user";
@@ -248,10 +247,10 @@ export const mapRoutes = new Elysia({ prefix: "/maps" })
 
       const buf = new Uint8Array(await file.arrayBuffer());
       try {
-        const resized = await sharp(Buffer.from(buf))
+        const resized = await new Bun.Image(buf)
           .resize(400, 300, { fit: "inside", withoutEnlargement: true })
           .png()
-          .toBuffer();
+          .buffer();
         await mapService.saveThumbnail(params.id, resized);
         mapService.setHasCustomThumbnail(params.id, true);
       } catch {
