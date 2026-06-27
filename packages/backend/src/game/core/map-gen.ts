@@ -33,7 +33,6 @@ export async function generateMap(
     if (customData) {
       actualWidth = Math.max(1, customData[0]?.length ?? width);
       actualHeight = Math.max(1, customData.length);
-      // rebuild tiles array with actual dimensions
       tiles.length = 0;
       for (let y = 0; y < actualHeight; y++) {
         tiles[y] = [];
@@ -46,7 +45,7 @@ export async function generateMap(
           const ct = customData[y]![x]!;
           tiles[y]![x]! = {
             type: (ct.type as TileType) || TileType.Plain,
-            ownerId: ct.ownerId || null,
+            ownerId: null,
             army: ct.army ?? 0,
           };
         }
@@ -60,55 +59,43 @@ export async function generateMap(
   } else if (type === PreGameMapType.Random || type === PreGameMapType.Custom) {
     do {
       generateRandomMap(tiles, width, height, tileFrequency);
-      // 在随机生成后调整兵营总兵力到目标（尽量接近）
       adjustBarracksArmies(tiles, width, height);
     } while (!isAllLandConnected(tiles, width, height));
   }
 
-  // 自定义地图已预置王座：按顺序映射 ownerId → 实际 playerId，不再随机分配
+  // 自定义地图：按编辑器中放置的王座位置分配给玩家
   if (customMapId) {
-    const preplacedThrones: { x: number; y: number; ownerId: string }[] = [];
+    const throneCoords: { x: number; y: number }[] = [];
     for (let y = 0; y < actualHeight; y++) {
       for (let x = 0; x < actualWidth; x++) {
-        const tile = tiles[y]![x]!;
-        if (tile.type === TileType.Throne && tile.ownerId) {
-          preplacedThrones.push({ x, y, ownerId: tile.ownerId });
+        if (tiles[y]![x]!.type === TileType.Throne) {
+          throneCoords.push({ x, y });
         }
       }
     }
 
-    if (preplacedThrones.length > 0) {
-      // 按玩家列表顺序分配：p1 → players[0], p2 → players[1], ...
-      const sortedThrones = [...preplacedThrones].sort((a, b) => {
-        const na = parseInt(a.ownerId.replace(/\D/g, '')) || 0;
-        const nb = parseInt(b.ownerId.replace(/\D/g, '')) || 0;
-        return na - nb;
-      });
+    // 按位置排序：从上到下，从左到右，保证分配顺序稳定
+    throneCoords.sort((a, b) => a.y - b.y || a.x - b.x);
 
-      const remaining: typeof players = [];
-      players.forEach((player, i) => {
-        const throne = sortedThrones[i];
-        if (throne) {
-          tiles[throne.y]![throne.x]! = {
-            type: TileType.Throne,
-            ownerId: player.id,
-            army: 1,
-          };
-        } else {
-          remaining.push(player);
-        }
-      });
-
-      // 预置王座不够时，对剩余玩家用随机算法补位
-      if (remaining.length > 0) {
-        assignPlayerStartingPositions(tiles, actualWidth, actualHeight, remaining);
+    const remaining: typeof players = [];
+    players.forEach((player, i) => {
+      const coord = throneCoords[i];
+      if (coord) {
+        tiles[coord.y]![coord.x]! = {
+          type: TileType.Throne,
+          ownerId: player.id,
+          army: 1,
+        };
+      } else {
+        remaining.push(player);
       }
+    });
 
-      console.log(`[map-gen] Custom map ${customMapId}: ${sortedThrones.length} pre-placed thrones, ${remaining.length} random fallback`);
-    } else {
-      // 自定义地图没有预置王座：随机分配
-      assignPlayerStartingPositions(tiles, actualWidth, actualHeight, players);
+    if (remaining.length > 0) {
+      assignPlayerStartingPositions(tiles, actualWidth, actualHeight, remaining);
     }
+
+    console.log(`[map-gen] Custom map ${customMapId}: ${throneCoords.length} pre-placed thrones, ${remaining.length} random fallback`);
   } else {
     assignPlayerStartingPositions(tiles, width, height, players);
   }

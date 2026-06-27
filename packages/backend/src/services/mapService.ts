@@ -2,7 +2,7 @@ import { mkdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'path';
 import { db } from '../db/client';
-import { customMaps, users } from '../db/schema';
+import { customMaps, users, profiles } from '../db/schema';
 import { eq, and, desc, like } from 'drizzle-orm';
 import type { CustomMapTile } from '@generale/types';
 
@@ -23,19 +23,30 @@ function parseTags(tagsRaw: string | undefined): string[] {
   }
 }
 
+function resolveDisplayName(authorId: string): string {
+  const row = db.select({ displayName: profiles.displayName, username: users.username })
+    .from(users)
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .where(eq(users.id, authorId))
+    .get();
+  if (!row) return authorId;
+  return row.displayName || row.username || authorId;
+}
+
 function mapRowToSummary(r: any) {
   return {
     id: r.id,
     name: r.name,
     description: r.description || undefined,
     authorId: r.authorId,
-    authorName: r.authorName,
+    authorName: resolveDisplayName(r.authorId),
     width: r.width,
     height: r.height,
     minPlayers: r.minPlayers,
     maxPlayers: r.maxPlayers,
     isPublic: r.isPublic,
     isDraft: r.isDraft,
+    hasCustomThumbnail: r.hasCustomThumbnail,
     usageCount: r.usageCount,
     tags: parseTags(r.tags ?? undefined),
     createdAt: r.createdAt?.toISOString(),
@@ -46,21 +57,56 @@ function mapRowToSummary(r: any) {
 export class MapService {
   // ---- tile file storage ----
 
-  async saveTiles(id: string, tiles: CustomMapTile[][]): Promise<void> {
-    await ensureDir();
-    const filepath = path.join(MAPS_DIR, `${id}.json`);
-    await Bun.write(filepath, JSON.stringify(tiles));
+  private draftPath(id: string): string {
+    return path.join(MAPS_DIR, `${id}.draft.json`);
   }
 
-  async loadTiles(id: string): Promise<CustomMapTile[][] | null> {
-    const filepath = path.join(MAPS_DIR, `${id}.json`);
+  private mainPath(id: string): string {
+    return path.join(MAPS_DIR, `${id}.json`);
+  }
+
+  async saveTiles(id: string, tiles: CustomMapTile[][]): Promise<void> {
+    await ensureDir();
+    await Bun.write(this.mainPath(id), JSON.stringify(tiles));
+  }
+
+  async loadTiles(id: string, allowDraft = false): Promise<CustomMapTile[][] | null> {
+    if (allowDraft) {
+      const draft = this.draftPath(id);
+      if (existsSync(draft)) return await Bun.file(draft).json();
+    }
+    const filepath = this.mainPath(id);
     if (!existsSync(filepath)) return null;
     return await Bun.file(filepath).json();
   }
 
+  hasDraft(id: string): boolean {
+    return existsSync(this.draftPath(id));
+  }
+
+  async saveDraftTiles(id: string, tiles: CustomMapTile[][]): Promise<void> {
+    await ensureDir();
+    await Bun.write(this.draftPath(id), JSON.stringify(tiles));
+  }
+
+  async publishDraft(id: string): Promise<void> {
+    const draft = this.draftPath(id);
+    if (!existsSync(draft)) return;
+    const tiles = await Bun.file(draft).json();
+    await Bun.write(this.mainPath(id), JSON.stringify(tiles));
+    await rm(draft, { force: true });
+  }
+
+  async discardDraft(id: string): Promise<void> {
+    const draft = this.draftPath(id);
+    if (existsSync(draft)) await rm(draft, { force: true });
+  }
+
   async deleteTiles(id: string): Promise<void> {
-    const filepath = path.join(MAPS_DIR, `${id}.json`);
-    if (existsSync(filepath)) await rm(filepath, { force: true });
+    const main = this.mainPath(id);
+    if (existsSync(main)) await rm(main, { force: true });
+    const draft = this.draftPath(id);
+    if (existsSync(draft)) await rm(draft, { force: true });
   }
 
   async deleteThumbnail(id: string): Promise<void> {
@@ -74,17 +120,16 @@ export class MapService {
     await Bun.write(filepath, buf);
   }
 
+  setHasCustomThumbnail(id: string, val: boolean): void {
+    db.update(customMaps).set({ hasCustomThumbnail: val }).where(eq(customMaps.id, id)).run();
+  }
+
   thumbnailUrl(id: string): string {
     const filepath = path.join(MAPS_DIR, `${id}.png`);
     return existsSync(filepath) ? `/api/maps/thumbnail/${id}` : '';
   }
 
   // ---- DB CRUD ----
-
-  private getUserName(userId: string): string {
-    const u = db.select({ username: users.username }).from(users).where(eq(users.id, userId)).get();
-    return u?.username || userId;
-  }
 
   listPublic(limit: number, offset: number, search?: string) {
     const conditions = [eq(customMaps.isPublic, true), eq(customMaps.isDraft, false)];
@@ -130,7 +175,7 @@ export class MapService {
       name: data.name,
       description: data.description,
       authorId,
-      authorName: this.getUserName(authorId),
+      authorName: '',
       width: data.width,
       height: data.height,
       tileCount: data.tileCount,
@@ -181,7 +226,7 @@ export class MapService {
       name: `${meta.name} (fork)`,
       description: meta.description || '',
       authorId,
-      authorName: this.getUserName(authorId),
+      authorName: '',
       width: meta.width,
       height: meta.height,
       tileCount: meta.tileCount,

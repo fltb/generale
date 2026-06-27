@@ -5,6 +5,7 @@ import type {
 import type { RoomInstance } from '../../instance/RoomInstance';
 import type { GameInstance } from '../../instance/GameInstance';
 import type { GameInfoSuccessResp } from '@generale/types';
+import { mapService } from '../../../services/mapService';
 
 export interface GameInfoInput {
   gameId: GameId;
@@ -26,7 +27,7 @@ export function buildGameInfo(input: GameInfoInput): GameInfoSuccessResp['data']
     phase, roomInstance, gameInstance, maxPlayers,
   );
 
-  const { mapField, roomTypeField } = resolveMapField(phase, roomInstance, roomType, mapSizeConfig);
+  const { mapField, roomTypeField, customMapId, customMapName } = resolveMapField(phase, roomInstance, roomType, mapSizeConfig);
 
   const settings = normalizeSettings(roomTypeField, mapField, resolvedMaxPlayers, roomName);
 
@@ -43,6 +44,8 @@ export function buildGameInfo(input: GameInfoInput): GameInfoSuccessResp['data']
     playerCount: players.length,
     maxPlayers: resolvedMaxPlayers,
     hasPassword: !!roomInstance?.getPassword(),
+    customMapId: customMapId || undefined,
+    customMapName: customMapName || undefined,
   } as GameInfoSuccessResp['data'];
 }
 
@@ -68,7 +71,7 @@ function collectPlayers(
     const state = roomInstance.getState();
     players = state.players.map(p => ({
       id: String(p.id),
-      name: String(p.name ?? ''),
+      name: String(p.displayName ?? p.name ?? ''),
       isHost: Boolean(p.isHost),
     }));
     maxPlayers = state.playerLimit ?? maxPlayers;
@@ -78,7 +81,7 @@ function collectPlayers(
     const display: Record<string, any> = (gameInstance as any).getSettings?.()?.playerDisplay ?? {};
     players = Object.entries(state.players).map(([id, _p]: any) => ({
       id: String(id),
-      name: String(display[id]?.name ?? ''),
+      name: String(display[id]?.displayName ?? display[id]?.name ?? ''),
       isHost: false,
     }));
     maxPlayers = Math.max(maxPlayers, Object.keys(state.players).length);
@@ -96,6 +99,8 @@ function resolveMapField(
 ) {
   let mapField: { width: number; height: number } | 'small' | 'medium' | 'large' | undefined = mapSizeConfig as any;
   let roomTypeField = roomType;
+  let customMapId: string | undefined;
+  let customMapName: string | undefined;
 
   if (phase === 'pregame' && roomInstance) {
     const state = roomInstance.getState();
@@ -106,9 +111,14 @@ function resolveMapField(
     } else if (ms && typeof ms.width === 'number' && typeof ms.height === 'number') {
       mapField = { width: ms.width, height: ms.height };
     }
+    if (ms?.customMapId) {
+      customMapId = ms.customMapId;
+      const meta = mapService.getMeta(ms.customMapId);
+      customMapName = meta?.name;
+    }
   }
 
-  return { mapField, roomTypeField };
+  return { mapField, roomTypeField, customMapId, customMapName };
 }
 
 function normalizeSettings(

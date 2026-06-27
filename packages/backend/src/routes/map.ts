@@ -49,11 +49,13 @@ export const mapRoutes = new Elysia({ prefix: '/maps' })
   }, { cookie: cookieScheme })
 
   // ---- detail ----
-  .get('/detail/:id', async ({ params }): Promise<MapDetailSuccessRespBody | Response> => {
+  .get('/detail/:id', async ({ params, query }): Promise<MapDetailSuccessRespBody | Response> => {
     const meta = mapService.getMeta(params.id);
     if (!meta || (!meta.isPublic && !meta.isDraft)) return new Response('Not Found', { status: 404 });
-    const tiles = await mapService.loadTiles(params.id);
-    return { success: true, data: { ...meta, description: meta.description || undefined, tiles: tiles ?? [] } as any };
+    const hasDraft = mapService.hasDraft(params.id);
+    const allowDraft = (query as any)['draft'] !== '0';
+    const tiles = await mapService.loadTiles(params.id, allowDraft);
+    return { success: true, data: { ...meta, description: meta.description || undefined, hasDraft, tiles: tiles ?? [] } as any };
   })
 
   // ---- create (auth) ----
@@ -90,21 +92,45 @@ export const mapRoutes = new Elysia({ prefix: '/maps' })
     if (!meta) return new Response('Not Found', { status: 404 });
     if (meta.authorId !== session.userId) return new Response('Forbidden', { status: 403 });
 
+    const isPublishing = body.isPublic === true && body.isDraft === false;
+
     if (body.tiles !== undefined) {
       const tiles = body.tiles;
       if (tiles.length !== meta.height) return new Response(`tile rows (${tiles.length}) != height (${meta.height})`, { status: 400 });
       for (const row of tiles) {
         if (!Array.isArray(row) || row.length !== meta.width) return new Response(`tile row length != width (${meta.width})`, { status: 400 });
       }
-      await mapService.saveTiles(params.id, tiles as unknown as CustomMapTile[][]);
+      if (isPublishing) {
+        await mapService.saveTiles(params.id, tiles as unknown as CustomMapTile[][]);
+        await mapService.discardDraft(params.id);
+      } else if (!meta.isDraft) {
+        // draft save on published map: only save draft file, don't touch published meta
+        await mapService.saveDraftTiles(params.id, tiles as unknown as CustomMapTile[][]);
+        return { success: true, data: { id: params.id, message: 'Draft saved' } };
+      } else {
+        await mapService.saveTiles(params.id, tiles as unknown as CustomMapTile[][]);
+      }
     }
 
     mapService.update(meta, Object.fromEntries(
       Object.entries({ name: body.name, description: body.description, isPublic: body.isPublic, isDraft: body.isDraft, minPlayers: body.minPlayers, maxPlayers: body.maxPlayers, tags: body.tags, tiles: body.tiles }).filter(([, v]) => v !== undefined)
     ) as any);
 
-    return { success: true, data: { id: params.id, message: 'Updated' } };
+    return { success: true, data: { id: params.id, message: isPublishing ? 'Published' : 'Updated' } };
   }, { body: updateMapReqSchema, cookie: cookieScheme })
+
+  // ---- discard draft (auth, owner only) ----
+  .post('/discard-draft/:id', ({ params, cookie }): MapDeleteSuccessRespBody | Response => {
+    const session = getSession(cookie);
+    if (!session) return new Response('Unauthorized', { status: 401 });
+
+    const meta = mapService.getMeta(params.id);
+    if (!meta) return new Response('Not Found', { status: 404 });
+    if (meta.authorId !== session.userId) return new Response('Forbidden', { status: 403 });
+
+    mapService.discardDraft(params.id);
+    return { success: true };
+  }, { cookie: cookieScheme })
 
   // ---- delete (auth, owner only) ----
   .delete('/delete/:id', ({ params, cookie }): MapDeleteSuccessRespBody | Response => {
@@ -137,6 +163,12 @@ export const mapRoutes = new Elysia({ prefix: '/maps' })
     const tiles = await mapService.loadTiles(params.id);
     if (tiles) await mapService.saveTiles(newId, tiles);
 
+    // copy thumbnail if the original has one
+    const thumbFile = Bun.file(`./public/maps/${params.id}.png`);
+    if (await thumbFile.exists()) {
+      await Bun.write(`./public/maps/${newId}.png`, thumbFile);
+    }
+
     return { success: true, data: { id: newId, message: 'Map forked' } };
   }, { cookie: cookieScheme })
 
@@ -163,6 +195,7 @@ export const mapRoutes = new Elysia({ prefix: '/maps' })
         .png()
         .toBuffer();
       await mapService.saveThumbnail(params.id, resized);
+      mapService.setHasCustomThumbnail(params.id, true);
     } catch {
       return new Response('Invalid image', { status: 400 });
     }
