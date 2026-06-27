@@ -1,12 +1,7 @@
 import { createResource, createSignal, Show, For } from 'solid-js';
 import { A, useSearchParams } from '@solidjs/router';
 import { listMapsApi, myMapsApi, deleteMapApi, forkMapApi, mapThumbnailUrl } from '~/api/mapApi';
-import Button from '~/ui/Button';
-import Card from '~/ui/Card';
-import Spinner from '~/ui/Spinner';
-import Badge from '~/ui/Badge';
-import Input from '~/ui/Input';
-import Select from '~/ui/Select';
+import { Button, Card, Spinner, Badge, Input, Select, Tabs } from '~/ui';
 import type { MapSumaryRespBody } from '@generale/types';
 
 const SORT_OPTIONS = [
@@ -71,7 +66,7 @@ export default function MapsPage() {
         </A>
       </div>
 
-      <div class="tabs tabs-bordered mb-4">
+      <Tabs bordered class="mb-4">
         <A
           href="/maps"
           class={`tab ${tab() === 'public' ? 'tab-active' : ''}`}
@@ -84,7 +79,7 @@ export default function MapsPage() {
         >
           我的地图
         </A>
-      </div>
+      </Tabs>
 
       <div class="flex gap-2 mb-4">
         <Input
@@ -96,6 +91,9 @@ export default function MapsPage() {
           class="flex-1 max-w-xs"
         />
         <Button variant="ghost" size="sm" onClick={doSearch}>搜索</Button>
+        <Show when={searchText()}>
+          <Button variant="ghost" size="sm" onClick={() => { setSearchInput(''); setSearchParams({ search: undefined, sort: sortBy() !== 'updated' ? sortBy() : undefined }); }}>清空</Button>
+        </Show>
         <Select bordered size="sm"
           value={sortBy()}
           onChange={(e) => setSearchParams({ sort: e.currentTarget.value !== 'updated' ? e.currentTarget.value : undefined, search: searchText() || undefined })}
@@ -116,7 +114,7 @@ export default function MapsPage() {
         }>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <For each={maps()}>
-              {(m) => <MapCard map={m} onDelete={handleDelete} onFork={handleFork} />}
+              {(m) => <MapCard map={m} onDelete={handleDelete} onFork={handleFork} isOwner={tab() === 'my'} />}
             </For>
           </div>
         </Show>
@@ -125,12 +123,14 @@ export default function MapsPage() {
   );
 }
 
-function MapCard(props: { map: MapSumaryRespBody; onDelete: (id: string) => void; onFork: (id: string) => void }) {
+function MapCard(props: { map: MapSumaryRespBody; onDelete: (id: string) => void; onFork: (id: string) => void; isOwner: boolean }) {
   const m = props.map;
+
+  const editorLink = () => props.isOwner ? `/maps/editor/${m.id}` : `/maps/preview/${m.id}`;
 
   return (
     <Card class="overflow-hidden">
-      <A href={`/maps/editor/${m.id}`} class="block">
+      <A href={editorLink()} class="block">
         <div class="h-32 bg-base-300 flex items-center justify-center overflow-hidden">
           <img
             src={mapThumbnailUrl(m.id)}
@@ -145,28 +145,35 @@ function MapCard(props: { map: MapSumaryRespBody; onDelete: (id: string) => void
       <div class="p-3">
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <A href={`/maps/editor/${m.id}`} class="font-semibold text-sm hover:link truncate block">
+            <A href={editorLink()} class="font-semibold text-sm hover:link truncate block">
               {m.name}
             </A>
             <div class="text-xs text-base-content/60 mt-0.5">
-              {m.authorName} · {m.width}×{m.height} · {m.minPlayers}-{m.maxPlayers}人
+              {m.authorName} · {m.width}×{m.height}
             </div>
           </div>
           <div class="flex gap-1 shrink-0">
             <Show when={m.isDraft}>
-              <Badge class="badge-warning badge-xs">草稿</Badge>
+              <Badge variant="warning" class="badge-xs">草稿</Badge>
             </Show>
             <Show when={m.isPublic && !m.isDraft}>
-              <Badge class="badge-success badge-xs">公开</Badge>
+              <Badge variant="success" class="badge-xs">公开</Badge>
             </Show>
           </div>
         </div>
+        <Show when={m.description}>
+          <p class="text-xs text-base-content/50 mt-1 line-clamp-2">{m.description}</p>
+        </Show>
         <div class="flex gap-1 mt-2">
-          <A href={`/maps/editor/${m.id}`}>
-            <Button size="xs" variant="ghost">编辑</Button>
+          <A href={editorLink()}>
+            <Button size="xs" variant="ghost">{props.isOwner ? '编辑' : '预览'}</Button>
           </A>
-          <Button size="xs" variant="ghost" onClick={() => props.onFork(m.id)}>Fork</Button>
-          <Button size="xs" variant="ghost" onClick={() => props.onDelete(m.id)}>删除</Button>
+          <Show when={!props.isOwner}>
+            <Button size="xs" variant="ghost" onClick={() => props.onFork(m.id)}>Fork</Button>
+          </Show>
+          <Show when={props.isOwner}>
+            <Button size="xs" variant="ghost" onClick={() => props.onDelete(m.id)}>删除</Button>
+          </Show>
         </div>
       </div>
     </Card>

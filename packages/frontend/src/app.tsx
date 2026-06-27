@@ -20,6 +20,7 @@ import ConfirmEmailChangePage from "./routes/confirm-email-change";
 import VerifyEmailPage from "./routes/verify-email";
 import MapsPage from "./routes/maps";
 import MapEditorPage from "./routes/map-editor";
+import MapPreviewPage from "./routes/map-preview";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ export default function App() {
               <Route path="/maps" component={MapsPage} />
               <Route path="/maps/editor" component={MapEditorPage} />
               <Route path="/maps/editor/:id" component={MapEditorPage} />
+              <Route path="/maps/preview/:id" component={MapPreviewPage} />
             </Router>
           </WebSocketProvider>
         </AuthProvider>

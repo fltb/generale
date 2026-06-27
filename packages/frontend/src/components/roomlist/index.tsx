@@ -128,11 +128,11 @@ export function RoomList() {
                             <span class="text-sm ml-2 text-muted">({g.id})</span>
                           </h3>
 
-                          <p class="text-sm text-muted">
-                            <span class="mr-3"><strong>Host:</strong> {g.hostName ?? g.hostId ?? "未知"}</span>
-                            <span class="mr-3"><strong>Mode:</strong> {g.type ?? "standard"}</span>
-                            <span><strong>Map:</strong> {typeof g.map === "string" ? g.map : g.map?.width ? `${g.map.width}×${g.map.height}` : "—"}</span>
-                          </p>
+                        <p class="text-sm text-muted">
+                          <span class="mr-3"><strong>Host:</strong> {g.hostName ?? g.hostId ?? "未知"}</span>
+                          <span class="mr-3"><strong>Mode:</strong> {g.type ?? "standard"}</span>
+                          <span><strong>Map:</strong> {g.customMapName ? g.customMapName : typeof g.map === "string" ? g.map : g.map?.width ? `${g.map.width}×${g.map.height}` : "—"}</span>
+                        </p>
                         </div>
 
                         <div class="text-right">

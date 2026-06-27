@@ -24,9 +24,10 @@ export async function myMapsApi(query: Record<string, string> = {}) {
   return res;
 }
 
-export async function mapDetailApi(id: string) {
+export async function mapDetailApi(id: string, draft = true) {
+  const qs = draft ? '' : '?draft=0';
   const res = await api<MapDetailSuccessRespBody>(
-    `/api/maps/detail/${id}`
+    `/api/maps/detail/${id}${qs}`
   );
   return res;
 }
@@ -58,6 +59,14 @@ export async function deleteMapApi(id: string) {
 export async function forkMapApi(id: string) {
   const res = await api<MapCreateSuccessRespBody>(
     `/api/maps/fork/${id}`,
+    { method: 'POST' }
+  );
+  return res;
+}
+
+export async function discardDraftApi(id: string) {
+  const res = await api<MapDeleteSuccessRespBody>(
+    `/api/maps/discard-draft/${id}`,
     { method: 'POST' }
   );
   return res;

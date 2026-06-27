@@ -1,6 +1,6 @@
 import { createSignal, createResource, Show, For } from 'solid-js';
 import { listMapsApi, mapThumbnailUrl } from '~/api/mapApi';
-import { Button, Input, Spinner } from '~/ui';
+import { Button, Input, Spinner, Collapse, CollapseTitle, CollapseContent, Checkbox } from '~/ui';
 import type { Component } from 'solid-js';
 
 interface MapSelectorProps {
@@ -29,15 +29,15 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
   }
 
   return (
-    <div class="collapse collapse-arrow border border-base-300 bg-base-100">
-      <input type="checkbox" />
-      <div class="collapse-title text-sm font-medium">
+    <Collapse arrow class="border border-base-300 bg-base-100">
+      <Checkbox />
+      <CollapseTitle class="text-sm font-medium">
         <Show when={selectedMap()} fallback={<span class="opacity-50 ml-6">{props.placeholder || '选择地图...'}</span>}>
           <span class="text ml-5">{selectedMap()!.name}</span>
           <span class="text-xs opacity-50 ml-2">{selectedMap()!.width}×{selectedMap()!.height}</span>
         </Show>
-      </div>
-      <div class="collapse-content">
+      </CollapseTitle>
+      <CollapseContent>
         <div class="flex gap-2 mb-2">
           <Input value={search()} onInput={(e) => setSearch(e.currentTarget.value)} placeholder="搜索..." size="sm" class="flex-1" />
           <Button size="xs" variant="ghost" onClick={() => props.onChange('')}>清除</Button>
@@ -71,7 +71,7 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
             </div>
           </Show>
         </Show>
-      </div>
-    </div>
+      </CollapseContent>
+    </Collapse>
   );
 }
