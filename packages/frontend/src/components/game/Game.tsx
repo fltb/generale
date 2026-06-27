@@ -4,6 +4,7 @@ import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { Application } from "solid-pixi";
 import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
 import { useGameSession } from "~/game/useGameSession";
+import bridge from "~/testBridge";
 import { Badge, Button, Confetti, Countdown, Overlay, sfx, TakeoverOverlay, uiTheme } from "~/ui";
 import { MapRender, type ViewportApi } from "../MapRender";
 import PlayerList from "./PlayerList";
@@ -49,6 +50,20 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
 
   const [celebrate, setCelebrate] = createSignal(false);
   const [viewportApi, setViewportApi] = createSignal<ViewportApi | null>(null);
+
+  createEffect(() => {
+    const api = viewportApi();
+    if (api) {
+      bridge.viewportApi = {
+        panMap: (_dx, _dy) => {},
+        zoomMap: (_scale) => {},
+        zoomIn: () => api.zoomIn(),
+        zoomOut: () => api.zoomOut(),
+        zoomReset: () => api.zoomReset(),
+        getViewport: () => null,
+      };
+    }
+  });
   const [playerPanelOpen, setPlayerPanelOpen] = createSignal(true);
   let outcomePlayed = false;
   createEffect(() => {
@@ -93,9 +108,9 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
       </Show>
 
       {/* ---- HUD: 顶部信息栏 ---- */}
-      <div class="absolute top-0 left-0 right-0 flex items-center justify-between bg-base-200/70 backdrop-blur-sm px-3 py-2">
+      <div data-testid="game-hud" class="absolute top-0 left-0 right-0 flex items-center justify-between bg-base-200/70 backdrop-blur-sm px-3 py-2">
         <div class="flex items-center gap-3 text-sm">
-          <span class="font-semibold tracking-wide">{props.gameId}</span>
+          <span data-testid="game-id" class="font-semibold tracking-wide">{props.gameId}</span>
           <span class="opacity-60">
             Tick <span class="font-mono">{mergedState()?.tick}</span>
           </span>
@@ -106,7 +121,7 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
             when={!props.spectate}
             fallback={
               <>
-                <Badge variant="info" class="badge-xs">
+                <Badge variant="info" class="badge-xs" data-testid="spectator-badge">
                   观战中
                 </Badge>
                 <Button size="xs" variant="ghost" onClick={() => props.onLeaveSpectate?.()}>
@@ -118,7 +133,7 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
             <Button size="xs" variant="ghost" onClick={ctrl.handleClearQueue}>
               清空队列
             </Button>
-            <Button size="xs" variant="warning" onClick={ctrl.handleSurrender}>
+            <Button data-testid="surrender" size="xs" variant="warning" onClick={ctrl.handleSurrender}>
               投降
             </Button>
             <Button size="xs" variant="ghost" onClick={ctrl.handleLeave}>
@@ -174,7 +189,7 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
 
       {/* ---- 结算 overlay ---- */}
       <Show when={ctrl.gameEndedInfo()}>
-        <Overlay dim={70}>
+        <Overlay dim={70} data-testid="game-end-overlay">
           <Show
             when={endgameResult()?.selfOutcome === "won"}
             fallback={

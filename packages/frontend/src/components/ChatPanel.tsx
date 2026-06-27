@@ -147,6 +147,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
 
       <div
         ref={listEl}
+        data-testid="chat-messages"
         class={`min-h-0 flex-1 overflow-auto ${props.transparent ? "bg-base-300/20" : "bg-base-200"} p-2 pixel-border ${props.listClass ?? ""}`}
         style={{ height: "260px" }}
       >

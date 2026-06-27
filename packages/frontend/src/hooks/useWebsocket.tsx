@@ -2,6 +2,7 @@
 import { createContext, type JSX, onCleanup, useContext } from "solid-js";
 import type { WSOpenPayloadBase } from "~/ws/manager";
 import { ClientConnectionManager, type SubConnectorClient } from "~/ws/manager";
+import bridge from "~/testBridge";
 
 type WSManager<T extends WSOpenPayloadBase> = ClientConnectionManager<T>;
 
@@ -29,6 +30,8 @@ export function WebSocketProvider<T extends WSOpenPayloadBase = WSOpenPayloadBas
   if (props.autoConnect !== false) {
     manager.connect(true);
   }
+
+  bridge.wsManager = manager;
 
   onCleanup(() => {
     manager.close();

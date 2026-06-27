@@ -80,7 +80,7 @@ export function RoomList() {
       <div class="mb-4 flex items-center justify-between">
         <h2 class="text-2xl font-semibold">Active Rooms</h2>
         <div class="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setCreateOpen(true)}>
+          <Button data-testid="create-room" size="sm" variant="secondary" onClick={() => setCreateOpen(true)}>
             新建房间
           </Button>
           <Button size="sm" variant="primary" onClick={() => (gamesQuery.refetch ? gamesQuery.refetch() : null)}>
@@ -185,6 +185,7 @@ export function RoomList() {
                           Details
                         </Button>
                         <Button
+                          data-testid="join-room"
                           size="sm"
                           variant={isFull ? "neutral" : "primary"}
                           class={isFull ? "btn-disabled" : ""}

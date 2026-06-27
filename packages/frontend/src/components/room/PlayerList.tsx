@@ -73,7 +73,7 @@ const PlayerCard: Component<{
   const allColors = () => Object.values(PlayerColor).filter((v) => typeof v === "number") as PlayerColor[];
 
   return (
-    <div class="flex items-center justify-between p-3 bg-base-200 rounded shadow-sm w-full sm:w-1/2 md:w-1/3 lg:w-1/4">
+    <div data-player-id={p().id} class="flex items-center justify-between p-3 bg-base-200 rounded shadow-sm w-full sm:w-1/2 md:w-1/3 lg:w-1/4">
       {/* Left: avatar + info */}
       <div class="flex items-center gap-3 overflow-hidden">
         <A
@@ -424,7 +424,7 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
   const usedColors = createMemo(() => props.players.map((x) => x.tileColor));
 
   return (
-    <div class="space-y-5">
+    <div data-testid="player-list" class="space-y-5">
       <Show when={!isFfa() && props.selfId === props.hostId}>
         <div class="flex gap-2 items-center mb-2">
           <input

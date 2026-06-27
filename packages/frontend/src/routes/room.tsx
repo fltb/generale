@@ -1,10 +1,11 @@
 import { GamePhase, PreGamePlayerStatus } from "@generale/types";
 import { useNavigate, useParams } from "@solidjs/router";
-import { type Component, createSignal, Match, Show, Switch } from "solid-js";
+import { createEffect, type Component, createSignal, Match, Show, Switch } from "solid-js";
 import ChatPanel from "~/components/ChatPanel";
 import GameWithSync from "~/components/game/Game";
 import ConnectedRoom from "~/components/room/ConnectedRoom";
 import { useRoomSession } from "~/game/useRoomSession";
+import bridge from "~/testBridge";
 import { Alert, Button, Card, Input } from "~/ui";
 
 const RoomRoute: Component = () => {
@@ -20,6 +21,10 @@ const RoomRoute: Component = () => {
   const session = useRoomSession(() => params.id);
 
   const [chatVisible, setChatVisible] = createSignal(true);
+
+  createEffect(() => {
+    if (params.id) bridge.roomId = params.id;
+  });
 
   return (
     <main class="container mx-auto p-6">

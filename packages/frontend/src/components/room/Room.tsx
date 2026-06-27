@@ -90,7 +90,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         <div class="flex items-center justify-between">
           <div>
             <div class="text-lg font-semibold">房间信息</div>
-            <div class="text-sm opacity-70">Game ID: {room()?.gameId}</div>
+            <div data-testid="room-game-id" class="text-sm opacity-70">Game ID: {room()?.gameId}</div>
           </div>
           <div class="flex items-center gap-2">
             <Show when={isHost()}>

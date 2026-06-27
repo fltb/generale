@@ -17,6 +17,7 @@ export const PreGameControls: Component<PreGameControlsProps> = (props) => {
       <div class="flex gap-3">
         <Show when={!props.isHost}>
           <Button
+            data-testid="ready-toggle"
             silent
             variant={props.ready ? "success" : "primary"}
             onClick={() => {
@@ -34,17 +35,17 @@ export const PreGameControls: Component<PreGameControlsProps> = (props) => {
         </Show>
 
         <Show when={props.isHost}>
-          <Button variant="accent" onClick={() => props.onStartGame?.()} disabled={props.started}>
+          <Button data-testid="start-game" variant="accent" onClick={() => props.onStartGame?.()} disabled={props.started}>
             开始游戏
           </Button>
         </Show>
 
-        <Button variant="ghost" onClick={() => props.onLeave?.()}>
+        <Button variant="ghost" data-testid="leave-room" onClick={() => props.onLeave?.()}>
           离开房间
         </Button>
 
         <Show when={props.isHost}>
-          <Button variant="error" onClick={() => props.onDisband?.()}>
+          <Button variant="error" data-testid="disband-room" onClick={() => props.onDisband?.()}>
             解散房间
           </Button>
         </Show>

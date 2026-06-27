@@ -145,6 +145,7 @@ export default function CreateRoomModal(props: {
           <label class="block" for="cr-name">
             <span class="label-text">房间名</span>
             <Input
+              data-testid="create-room-name"
               id="cr-name"
               bordered
               class="w-full"
@@ -157,6 +158,7 @@ export default function CreateRoomModal(props: {
           <label class="block" for="cr-password">
             <span class="label-text">密码（可选）</span>
             <Input
+              data-testid="create-room-password"
               id="cr-password"
               bordered
               class="w-full"
@@ -321,7 +323,7 @@ export default function CreateRoomModal(props: {
             <Button variant="ghost" onClick={() => props.onClose()}>
               取消
             </Button>
-            <Button variant="primary" onClick={submit} disabled={createMutation.isPending}>
+            <Button data-testid="create-room-submit" variant="primary" onClick={submit} disabled={createMutation.isPending}>
               {createMutation.isPending ? "创建中..." : "创建房间"}
             </Button>
           </div>

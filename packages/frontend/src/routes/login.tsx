@@ -121,6 +121,7 @@ export default function LoginPage() {
       <Show when={tab() === "login"}>
         <form onSubmit={handleLogin} class="flex flex-col gap-2">
           <input
+            data-testid="login-username"
             placeholder="用户名或邮箱"
             value={loginUsername()}
             onInput={(e) => setLoginUsername(e.currentTarget.value)}
@@ -129,6 +130,7 @@ export default function LoginPage() {
             required
           />
           <input
+            data-testid="login-password"
             type="password"
             placeholder="密码"
             value={loginPassword()}
@@ -137,7 +139,7 @@ export default function LoginPage() {
             autocomplete="current-password"
             required
           />
-          <button type="submit" class="btn btn-primary" disabled={loginLoading()}>
+          <button data-testid="login-submit" type="submit" class="btn btn-primary" disabled={loginLoading()}>
             {loginLoading() ? "登录中..." : "登录"}
           </button>
         </form>

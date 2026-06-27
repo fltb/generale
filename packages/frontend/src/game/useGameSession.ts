@@ -15,6 +15,7 @@ import { confirmDialog } from "~/ui/dialogs";
 import { makeEmptyGameState } from "./defaults";
 import { applyGameEventLocal } from "./gameReducer";
 import { computeEndgameResult } from "./selectors";
+import bridge from "~/testBridge";
 
 export interface UseGameSessionParams {
   domain: string;
@@ -123,6 +124,18 @@ export function useGameSession(params: UseGameSessionParams) {
       console.warn("GameWithSync connect error", e);
     }
   });
+
+  // 测试桥：同步游戏状态和操作函数到全局 bridge
+  createEffect(() => {
+    const s = mergedState();
+    if (s && s.map && s.map.width > 0) {
+      bridge.gameState = s;
+    }
+  });
+  createEffect(() => {
+    bridge.onOperationQueued = params.spectate ? null : handleOperationQueued;
+  });
+  bridge.onClearQueue = params.spectate ? null : handleClearQueue;
 
   // MapRender -> onOperationQueued => dispatch PUSH action
   // 观战者点格子也不发；服务端会丢弃，但客户端层面提前阻断更省事

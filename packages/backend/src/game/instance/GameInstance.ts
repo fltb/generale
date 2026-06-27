@@ -15,7 +15,7 @@ import {
   SyncedPreGameServerEventPayloadType,
 } from "@generale/types";
 import { mask, tick } from "../core";
-import { autoJudge, playerDefeatedBy } from "../core/game-utils";
+import { autoJudge, playerDefeatedBy, updateGameState } from "../core/game-utils";
 import { displaceConnector as displace } from "./connector-manager";
 import { StateSyncState } from "./state-sync";
 
@@ -388,6 +388,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
 
     console.log(`[GameInstance] player ${pid} surrendered`);
     playerDefeatedBy(this.state, pid, null);
+    updateGameState(this.state);
     autoJudge(this.state);
     this.version++;
 
