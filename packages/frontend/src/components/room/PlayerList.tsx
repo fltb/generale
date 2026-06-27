@@ -1,10 +1,16 @@
-import { type PreGamePlayerInfo, type TeamInfo, type PreGameTeamMode, PreGamePlayerStatus, PlayerColor } from "@generale/types";
-import { type Component, For, Show, createMemo, createSignal } from "solid-js";
+import {
+  PlayerColor,
+  type PreGamePlayerInfo,
+  PreGamePlayerStatus,
+  type PreGameTeamMode,
+  type TeamInfo,
+} from "@generale/types";
 import { A } from "@solidjs/router";
+import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import Avatar from "~/components/Avatar";
+import { alertDialog, Badge, Button, confirmDialog } from "~/ui";
 import { playerColorCss } from "~/utils/playerColor";
 import { resolveDisplayNames } from "~/utils/playerDisplay";
-import { Button, Badge, confirmDialog, alertDialog } from "~/ui";
 
 /**
  * PlayerListProps
@@ -64,8 +70,7 @@ const PlayerCard: Component<{
   const isRoomHost = () => props.selfId === props.hostId;
   const [colorPickerOpen, setColorPickerOpen] = createSignal(false);
 
-  const allColors = () =>
-    Object.values(PlayerColor).filter((v) => typeof v === "number") as PlayerColor[];
+  const allColors = () => Object.values(PlayerColor).filter((v) => typeof v === "number") as PlayerColor[];
 
   return (
     <div class="flex items-center justify-between p-3 bg-base-200 rounded shadow-sm w-full sm:w-1/2 md:w-1/3 lg:w-1/4">
@@ -74,14 +79,11 @@ const PlayerCard: Component<{
         <A
           href={`/profile/${p().id}`}
           title={`查看 ${display()} 的资料`}
-          target="_blank" rel="noopener"
+          target="_blank"
+          rel="noopener"
           class="shrink-0"
         >
-          <Avatar
-            src={p().avatarThumbUrl ?? "/api/avatars/default/thumb.webp"}
-            size={40}
-            alt={display()}
-          />
+          <Avatar src={p().avatarThumbUrl ?? "/api/avatars/default/thumb.webp"} size={40} alt={display()} />
         </A>
 
         <div class="flex flex-col min-w-0">
@@ -93,10 +95,14 @@ const PlayerCard: Component<{
               <Badge class="text-xs ml-1">Host</Badge>
             </Show>
             <Show when={p().status === PreGamePlayerStatus.Playing}>
-              <Badge variant="info" class="text-xs">游戏中</Badge>
+              <Badge variant="info" class="text-xs">
+                游戏中
+              </Badge>
             </Show>
             <Show when={p().status === PreGamePlayerStatus.Disconnected}>
-              <Badge variant="warning" class="text-xs">离线</Badge>
+              <Badge variant="warning" class="text-xs">
+                离线
+              </Badge>
             </Show>
           </div>
 
@@ -110,32 +116,33 @@ const PlayerCard: Component<{
 
       {/* Middle: color swatch + picker（放在 overflow-hidden 之外防止弹出框被裁） */}
       <div class="relative shrink-0">
-        <div
+        <button
+          type="button"
           class={`w-5 h-5 rounded border shrink-0 ${isSelf() && props.onChangeColor ? "cursor-pointer hover:ring-1 hover:ring-primary" : ""}`}
-          style={{ "background-color": playerColorCss(p().tileColor as any), "border-color": "rgba(0,0,0,0.2)" }}
+          style={{ "background-color": playerColorCss(p().tileColor), "border-color": "rgba(0,0,0,0.2)" }}
           title={isSelf() ? "点击选择颜色" : undefined}
           onClick={() => {
             if (isSelf() && props.onChangeColor) {
               setColorPickerOpen((v) => !v);
             }
           }}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === " ") && isSelf() && props.onChangeColor) {
+              setColorPickerOpen((v) => !v);
+            }
+          }}
         />
         <Show when={colorPickerOpen()}>
-          <div
-            class="absolute right-0 top-6 z-50 p-1.5 bg-base-200 pixel-border rounded shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div class="absolute right-0 top-6 z-50 p-1.5 bg-base-200 pixel-border rounded shadow-lg">
             <div class="text-xs font-medium mb-1 opacity-70">选择颜色</div>
-            <div
-              class="grid gap-1"
-              style={{ "grid-template-columns": "repeat(4, 1.25rem)" }}
-            >
+            <div class="grid gap-1" style={{ "grid-template-columns": "repeat(4, 1.25rem)" }}>
               <For each={allColors()}>
                 {(c) => {
                   const isUsed = (props.usedColors ?? []).includes(c);
                   const isCurrent = c === p().tileColor;
                   return (
-                    <div
+                    <button
+                      type="button"
                       class="w-5 h-5 rounded border transition-all"
                       classList={{
                         "cursor-pointer hover:ring-1 hover:ring-primary": !isUsed || isCurrent,
@@ -143,7 +150,7 @@ const PlayerCard: Component<{
                         "ring-1 ring-white": isCurrent,
                       }}
                       style={{
-                        "background-color": playerColorCss(c as any),
+                        "background-color": playerColorCss(c),
                         "border-color": isCurrent ? "white" : "rgba(0,0,0,0.2)",
                       }}
                       title={isCurrent ? "当前颜色" : isUsed ? "已被占用" : "选择此颜色"}
@@ -151,6 +158,13 @@ const PlayerCard: Component<{
                         if (isUsed && !isCurrent) return;
                         props.onChangeColor?.(c);
                         setColorPickerOpen(false);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          if (isUsed && !isCurrent) return;
+                          props.onChangeColor?.(c);
+                          setColorPickerOpen(false);
+                        }
                       }}
                     />
                   );
@@ -165,9 +179,7 @@ const PlayerCard: Component<{
       <div class="flex items-center gap-2 ml-2">
         <div class="flex flex-col items-end">
           <Show when={!p().isHost}>
-            <div
-              class={`text-sm font-medium ${p().ready === 1 ? "text-success" : "text-error"}`}
-            >
+            <div class={`text-sm font-medium ${p().ready === 1 ? "text-success" : "text-error"}`}>
               {p().ready === 1 ? "Ready" : "Not Ready"}
             </div>
           </Show>
@@ -190,11 +202,7 @@ const PlayerCard: Component<{
           <div class="flex flex-col gap-1 ml-2 items-end">
             <div class="flex gap-1">
               <Show when={props.onTransferHost}>
-                <Button
-                  size="xs"
-                  variant="warning"
-                  onClick={() => props.onTransferHost?.(p().id)}
-                >
+                <Button size="xs" variant="warning" onClick={() => props.onTransferHost?.(p().id)}>
                   设为房主
                 </Button>
               </Show>
@@ -222,9 +230,7 @@ const PlayerCard: Component<{
                 title="将玩家移入指定队伍"
               >
                 <option value="">未分组</option>
-                <For each={props.teams ?? []}>
-                  {(t) => <option value={t.id}>{t.name ?? t.id}</option>}
-                </For>
+                <For each={props.teams ?? []}>{(t) => <option value={t.id}>{t.name ?? t.id}</option>}</For>
               </select>
             </Show>
           </div>
@@ -257,25 +263,24 @@ const TeamGroup: Component<{
       }
       // 不自动进入编辑模式（编辑通过右侧按钮）
       return;
-    } else {
-      // 点击 "未分组玩家" -> 将自己设为未分组（teamId = ""）
-      if (gp.props.onChangeTeam) {
-        gp.props.onChangeTeam(undefined, "");
-      }
-      return;
     }
+    // 点击 "未分组玩家" -> 将自己设为未分组（teamId = ""）
+    if (gp.props.onChangeTeam) {
+      gp.props.onChangeTeam(undefined, "");
+    }
+    return;
   };
 
   const submitRename = () => {
     const name = (editName() ?? "").trim();
-    if (!gp.team || !gp.props.onRenameTeam) return;
+    if (!(gp.team && gp.props.onRenameTeam)) return;
     if (!name) return;
     gp.props.onRenameTeam(gp.team.id, name);
     setEditing(false);
   };
 
   const tryDelete = () => {
-    if (!gp.team || !gp.props.onDeleteTeam) return;
+    if (!(gp.team && gp.props.onDeleteTeam)) return;
     // local safety: only allow delete if no members (client-side)
     if ((gp.members?.length ?? 0) > 0) {
       // UI-level guard; server is authoritative.
@@ -295,13 +300,24 @@ const TeamGroup: Component<{
   return (
     <div class="border p-3 rounded">
       <div class="flex items-center justify-between mb-2">
-        <h3
-          class="font-bold text-base cursor-pointer select-none"
+        <button
+          type="button"
+          class="font-bold text-base cursor-pointer select-none text-start"
           onClick={clickHeader}
-          title={gp.team ? "点击加入该队（房主/玩家均可）。房主管理请使用右侧按钮进行重命名/删除。" : "点击将自己设为未分组玩家"}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              clickHeader();
+            }
+          }}
+          title={
+            gp.team
+              ? "点击加入该队（房主/玩家均可）。房主管理请使用右侧按钮进行重命名/删除。"
+              : "点击将自己设为未分组玩家"
+          }
         >
           {headerText()}
-        </h3>
+        </button>
 
         <div class="flex items-center gap-2">
           <Show when={editing()}>
@@ -310,13 +326,21 @@ const TeamGroup: Component<{
               value={editName()}
               onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
             />
-            <Button size="xs" onClick={submitRename}>保存</Button>
-            <Button size="xs" variant="ghost" onClick={() => setEditing(false)}>取消</Button>
+            <Button size="xs" onClick={submitRename}>
+              保存
+            </Button>
+            <Button size="xs" variant="ghost" onClick={() => setEditing(false)}>
+              取消
+            </Button>
           </Show>
 
-          <Show when={!editing() && (gp.props.selfId === gp.props.hostId)}>
-            <Button size="xs" onClick={() => setEditing(true)}>重命名</Button>
-            <Button size="xs" variant="error" onClick={tryDelete}>删除</Button>
+          <Show when={!editing() && gp.props.selfId === gp.props.hostId}>
+            <Button size="xs" onClick={() => setEditing(true)}>
+              重命名
+            </Button>
+            <Button size="xs" variant="error" onClick={tryDelete}>
+              删除
+            </Button>
           </Show>
         </div>
       </div>
@@ -347,9 +371,7 @@ const TeamGroup: Component<{
 /* ---------------------- Main PlayerList ---------------------- */
 export const PlayerList: Component<PlayerListProps> = (props) => {
   const resolvedNames = createMemo(() =>
-    resolveDisplayNames(
-      props.players.map((p) => ({ id: p.id, name: p.name, displayName: p.displayName })),
-    ),
+    resolveDisplayNames(props.players.map((p) => ({ id: p.id, name: p.name, displayName: p.displayName }))),
   );
 
   /**
@@ -361,12 +383,12 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
     for (const p of props.players) {
       const key = p.teamId ?? "no team";
       if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(p);
+      map.get(key)?.push(p);
     }
     // Build groups following props.teams order, plus no-team at end if present
     const groups: Array<[string, PreGamePlayerInfo[]]> = [];
     const known = new Set<string>();
-    for (const t of (props.teams ?? [])) {
+    for (const t of props.teams ?? []) {
       groups.push([t.id, map.get(t.id) ?? []]);
       known.add(t.id);
     }
@@ -399,9 +421,7 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
 
   const isFfa = () => (props.teamMode ?? "ffa") === "ffa";
 
-  const usedColors = createMemo(() =>
-    props.players.map((x) => x.tileColor),
-  );
+  const usedColors = createMemo(() => props.players.map((x) => x.tileColor));
 
   return (
     <div class="space-y-5">
@@ -413,7 +433,9 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
             value={newTeamName()}
             onInput={(e) => setNewTeamName((e.target as HTMLInputElement).value)}
           />
-          <Button size="sm" onClick={createTeam}>新建队伍并加入</Button>
+          <Button size="sm" onClick={createTeam}>
+            新建队伍并加入
+          </Button>
         </div>
       </Show>
 
@@ -445,8 +467,17 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
       >
         <For each={grouped()}>
           {([teamId, members]) => {
-            const team = props.teams?.find(t => t.id === teamId) ?? (teamId === "no team" ? null : { id: teamId, name: teamId });
-            return <TeamGroup team={team} members={members} props={props} resolvedNames={resolvedNames()} usedColors={usedColors()} />;
+            const team =
+              props.teams?.find((t) => t.id === teamId) ?? (teamId === "no team" ? null : { id: teamId, name: teamId });
+            return (
+              <TeamGroup
+                team={team}
+                members={members}
+                props={props}
+                resolvedNames={resolvedNames()}
+                usedColors={usedColors()}
+              />
+            );
           }}
         </For>
       </Show>

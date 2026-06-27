@@ -1,14 +1,12 @@
-import { For, Index, createMemo, createSignal, createEffect, onCleanup, onMount, type Component } from "solid-js";
-import * as P from "solid-pixi";
+import type { Coordinates, PlayerOperation, SyncedGameState } from "@generale/types";
+import { PlayerOperationType, type TileType } from "@generale/types";
 import * as PIXI from "pixi.js";
-
-import type { SyncedGameState, Coordinates, PlayerOperation } from "@generale/types";
-import { PlayerOperationType, TileType } from "@generale/types";
-
-import { MapTile } from "./MapTile";
-import { type FaIconKey, createIconFactory, type IconFactory } from "~/utils/faIconGraphic";
+import { type Component, createEffect, createMemo, createSignal, For, Index, onCleanup, onMount } from "solid-js";
+import * as P from "solid-pixi";
 import { DEFAULT_TILE_THEME, DIRECTION_ICON } from "~/game/render/tileTheme";
 import { useMapInput } from "~/game/render/useMapInput";
+import { createIconFactory, type FaIconKey, type IconFactory } from "~/utils/faIconGraphic";
+import { MapTile } from "./MapTile";
 
 export interface ViewportApi {
   zoomIn: () => void;
@@ -27,7 +25,10 @@ export interface MapRenderProps {
 type DirectionKey = keyof typeof DIRECTION_ICON;
 
 const OperationArrow: Component<{
-  op: PlayerOperation; size: number; z?: number; iconFactory?: IconFactory;
+  op: PlayerOperation;
+  size: number;
+  z?: number;
+  iconFactory?: IconFactory;
 }> = (props) => {
   const [g, setG] = createSignal<PIXI.Graphics | undefined>(undefined);
 
@@ -37,14 +38,18 @@ const OperationArrow: Component<{
 
     if (props.op.type !== PlayerOperationType.Move) {
       graphics.clear();
-      try { graphics.removeChildren(); } catch { }
+      try {
+        graphics.removeChildren();
+      } catch {}
       return;
     }
 
-    const payload = (props.op as any).payload;
+    const payload = props.op.payload;
     if (!payload) {
       graphics.clear();
-      try { graphics.removeChildren(); } catch { }
+      try {
+        graphics.removeChildren();
+      } catch {}
       return;
     }
 
@@ -57,7 +62,9 @@ const OperationArrow: Component<{
     const ey = (to.y + 0.5) * props.size;
 
     graphics.clear();
-    try { graphics.removeChildren(); } catch { }
+    try {
+      graphics.removeChildren();
+    } catch {}
 
     const dx = ex - sx;
     const dy = ey - sy;
@@ -69,7 +76,7 @@ const OperationArrow: Component<{
     }
 
     const arrowSize = Math.min(24, props.size * 0.4);
-    const arrow = props.iconFactory!.createScaledIcon(DIRECTION_ICON[dir], arrowSize, DEFAULT_TILE_THEME.colors.arrow);
+    const arrow = props.iconFactory?.createScaledIcon(DIRECTION_ICON[dir], arrowSize, DEFAULT_TILE_THEME.colors.arrow);
 
     const mx = (sx + ex) / 2;
     const my = (sy + ey) / 2;
@@ -88,10 +95,18 @@ const OperationArrow: Component<{
   });
 
   // ref wrapper — 必须返回 cleanup 函数或 undefined
-  return <P.Graphics ref={(inst) => { setG(inst); return () => setG(undefined); }} zIndex={props.z ?? 0} />;
+  return (
+    <P.Graphics
+      ref={(inst) => {
+        setG(inst);
+        return () => setG(undefined);
+      }}
+      zIndex={props.z ?? 0}
+    />
+  );
 };
 
-  export const MapRender: Component<MapRenderProps> = (props) => {
+export const MapRender: Component<MapRenderProps> = (props) => {
   const iconFactory = createIconFactory();
   onCleanup(() => iconFactory.destroy());
 
@@ -155,7 +170,10 @@ const OperationArrow: Component<{
   const viewportApi: ViewportApi = {
     zoomIn: () => zoomTowardsCenter(1.25),
     zoomOut: () => zoomTowardsCenter(1 / 1.25),
-    zoomReset: () => { setViewScale(1); centerMap(); },
+    zoomReset: () => {
+      setViewScale(1);
+      centerMap();
+    },
   };
 
   // ---- drag state (PixiJS events) ----
@@ -220,9 +238,16 @@ const OperationArrow: Component<{
 
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "=" || e.key === "+") { e.preventDefault(); viewportApi.zoomIn(); }
-      else if (e.key === "-") { e.preventDefault(); viewportApi.zoomOut(); }
-      else if (e.key === "0") { e.preventDefault(); viewportApi.zoomReset(); }
+      if (e.key === "=" || e.key === "+") {
+        e.preventDefault();
+        viewportApi.zoomIn();
+      } else if (e.key === "-") {
+        e.preventDefault();
+        viewportApi.zoomOut();
+      } else if (e.key === "0") {
+        e.preventDefault();
+        viewportApi.zoomReset();
+      }
     };
 
     canvas?.addEventListener("wheel", onWheel, { passive: false });
@@ -260,7 +285,7 @@ const OperationArrow: Component<{
     const graphics = gCursor();
     graphics?.clear();
     const c = active();
-    if (!graphics || !c) return;
+    if (!(graphics && c)) return;
 
     const cx = c.x;
     const cy = c.y;

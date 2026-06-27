@@ -1,17 +1,11 @@
-import {
-  type Component,
-  createSignal,
-  createMemo,
-  createEffect,
-  Show,
-} from "solid-js";
-import * as P from "solid-pixi";
-import * as PIXI from "pixi.js";
-import type { Coordinates, Tile, SyncedGameState } from "@generale/types";
+import type { Coordinates, SyncedGameState, Tile } from "@generale/types";
 import { TileType } from "@generale/types";
-import { tileColorNumber } from "~/utils/playerColor";
-import { type FaIconKey, type IconFactory } from "~/utils/faIconGraphic";
+import * as PIXI from "pixi.js";
+import { type Component, createEffect, createMemo, createSignal, Show } from "solid-js";
+import * as P from "solid-pixi";
 import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
+import type { FaIconKey, IconFactory } from "~/utils/faIconGraphic";
+import { tileColorNumber } from "~/utils/playerColor";
 
 export interface MapTileProps {
   coord: Coordinates;
@@ -30,16 +24,16 @@ export const MapTile: Component<MapTileProps> = (props) => {
   const tileColor = createMemo(() =>
     props.tile.type === TileType.Fog
       ? DEFAULT_TILE_THEME.colors.fog
-      : (props.tile.ownerId
-          ? tileColorNumber(props.playerDisplay[props.tile.ownerId]?.tileColor as any)
-          : DEFAULT_TILE_THEME.colors.unowned)
+      : props.tile.ownerId
+        ? tileColorNumber(props.playerDisplay[props.tile.ownerId]?.tileColor)
+        : DEFAULT_TILE_THEME.colors.unowned,
   );
 
   // 选出对应的 FaIconKey
   const iconGcKey = createMemo<FaIconKey | null>(() =>
     props.tile.type === TileType.Plain || props.tile.type === TileType.Fog
       ? null
-      : props.iconTextures[props.tile.type] ?? null
+      : (props.iconTextures[props.tile.type] ?? null),
   );
 
   const textStyle = createMemo(
@@ -53,7 +47,7 @@ export const MapTile: Component<MapTileProps> = (props) => {
         },
         fontWeight: "bold",
         align: "center",
-      })
+      }),
   );
 
   // 背景绘制
@@ -64,7 +58,11 @@ export const MapTile: Component<MapTileProps> = (props) => {
     const color = tileColor();
     graphics.clear();
     graphics.rect(0, 0, size, size).fill({ color });
-    graphics.stroke({ width: 1, color: DEFAULT_TILE_THEME.colors.gridStroke, alpha: DEFAULT_TILE_THEME.colors.gridStrokeAlpha });
+    graphics.stroke({
+      width: 1,
+      color: DEFAULT_TILE_THEME.colors.gridStroke,
+      alpha: DEFAULT_TILE_THEME.colors.gridStrokeAlpha,
+    });
   });
 
   // 图标绘制（防御性：clear + removeChildren）
@@ -83,12 +81,12 @@ export const MapTile: Component<MapTileProps> = (props) => {
 
     if (key) {
       const iconSize = Math.round(props.size * 0.6);
-      const scaledIcon = props.iconFactory!.createScaledIcon(key, iconSize, DEFAULT_TILE_THEME.colors.tileIcon);
-      
+      const scaledIcon = props.iconFactory?.createScaledIcon(key, iconSize, DEFAULT_TILE_THEME.colors.tileIcon);
+
       // 设置位置到瓦片中心
       scaledIcon.x = props.size / 2;
       scaledIcon.y = props.size / 2;
-      
+
       graphics.addChild(scaledIcon);
     }
   });
@@ -108,16 +106,21 @@ export const MapTile: Component<MapTileProps> = (props) => {
   // --- 关键改动：ref wrapper，必须返回函数或 undefined ---
   return (
     <P.Container x={x()} y={y()} interactive buttonMode onpointerdown={handlePointerDown}>
-      <P.Graphics ref={(inst) => { setG(inst); return () => setG(undefined); }} />
-      <P.Graphics ref={(inst) => { setIconGraphics(inst); return () => setIconGraphics(undefined); }} />
+      <P.Graphics
+        ref={(inst) => {
+          setG(inst);
+          return () => setG(undefined);
+        }}
+      />
+      <P.Graphics
+        ref={(inst) => {
+          setIconGraphics(inst);
+          return () => setIconGraphics(undefined);
+        }}
+      />
 
       <Show when={props.tile.army > 0}>
-        <P.Text
-          anchor={0.5}
-          x={props.size / 2}
-          y={props.size / 2}
-          style={textStyle()}
-        >
+        <P.Text anchor={0.5} x={props.size / 2} y={props.size / 2} style={textStyle()}>
           {String(props.tile.army)}
         </P.Text>
       </Show>

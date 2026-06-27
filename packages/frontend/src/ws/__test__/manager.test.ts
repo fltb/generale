@@ -1,5 +1,5 @@
 // src/ws/__test__/manager.test.ts
-import { describe, it, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { ClientConnectionManager } from "../manager"; // 调整为你的路径，如果不在同目录请改
 
 // --- Fake WebSocket ---
@@ -12,10 +12,10 @@ class FakeWebSocket {
   static CLOSING = 2;
   static CLOSED = 3;
 
-  public onopen: ((ev?: any) => void) | null = null;
-  public onmessage: ((ev: { data: any }) => void) | null = null;
-  public onclose: ((ev?: any) => void) | null = null;
-  public onerror: ((ev?: any) => void) | null = null;
+  public onopen: ((ev?: Event) => void) | null = null;
+  public onmessage: ((ev: { data: string }) => void) | null = null;
+  public onclose: ((ev?: { code: number; reason?: string }) => void) | null = null;
+  public onerror: ((ev?: Event) => void) | null = null;
   public readyState = FakeWebSocket.CONNECTING;
   public sent: string[] = [];
   public url: string;
@@ -31,7 +31,7 @@ class FakeWebSocket {
     }, 0);
   }
 
-  send(data: any) {
+  send(data: unknown) {
     // store as string to mimic browser WS behavior (string frames)
     try {
       this.sent.push(typeof data === "string" ? data : JSON.stringify(data));
@@ -54,8 +54,7 @@ class FakeWebSocket {
 }
 
 beforeEach(() => {
-  // Replace global WebSocket for each test
-  (globalThis as any).WebSocket = FakeWebSocket as any;
+  (globalThis as { WebSocket: new (...args: string[]) => void }).WebSocket = FakeWebSocket as unknown as new (...args: string[]) => void;
 });
 
 describe("ClientConnectionManager basic flows (fake ws)", () => {
@@ -85,7 +84,9 @@ describe("ClientConnectionManager basic flows (fake ws)", () => {
     const sub = manager.getOrCreateSub("game");
 
     let opened = false;
-    sub.onOpen(() => { opened = true; });
+    sub.onOpen(() => {
+      opened = true;
+    });
 
     // request server to open domain (client side will send open request)
     manager.openDomain("game", {});
@@ -109,8 +110,10 @@ describe("ClientConnectionManager basic flows (fake ws)", () => {
     const ws = FakeWebSocket.lastInstance!;
 
     const sub = manager.getOrCreateSub<{ action: string }, { event: string }>("lobby");
-    let recv: any = null;
-    sub.onMessage((p) => { recv = p; });
+    let recv: unknown = null;
+    sub.onMessage((p) => {
+      recv = p;
+    });
 
     // simulate server opening domain first
     ws._emitObj({ domain: "lobby", type: "open", payload: { userid: "u" } });

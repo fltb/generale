@@ -1,6 +1,6 @@
 // src/types.ts
-import type { Operation } from 'fast-json-patch';
-import type { SyncedGameServerEventType } from '../game';
+import type { Operation } from "fast-json-patch";
+import type { SyncedGameServerEventType } from "../game";
 
 /**
  * Full synchronization mechanism explanation:
@@ -43,10 +43,10 @@ import type { SyncedGameServerEventType } from '../game';
 
 /** Backend-pushed synchronization event types to client */
 export enum SyncedStateServerStateUpdatePayloadType {
-    /** Complete snapshot */
-    SNAPSHOT = 'snapshot',
-    /** Differential update (Patch array) */
-    PATCH = 'patch',
+  /** Complete snapshot */
+  SNAPSHOT = "snapshot",
+  /** Differential update (Patch array) */
+  PATCH = "patch",
 }
 
 /**
@@ -54,48 +54,50 @@ export enum SyncedStateServerStateUpdatePayloadType {
  * @template T Complete state type
  */
 export type SyncedStateServerStateUpdatePayload<T> =
-    | {
-        /**
-         * Complete snapshot event
-         * - type = Snapshot
-         * - payload is complete state T
-         */
-        type: SyncedStateServerStateUpdatePayloadType.SNAPSHOT;
-        /** Current version number */
-        version: number;
-        /** Latest confirmed optimistic operation ID */
-        confirmedOp: number;
-        /** Complete state data */
-        payload: T;
+  | {
+      /**
+       * Complete snapshot event
+       * - type = Snapshot
+       * - payload is complete state T
+       */
+      type: SyncedStateServerStateUpdatePayloadType.SNAPSHOT;
+      /** Current version number */
+      version: number;
+      /** Latest confirmed optimistic operation ID */
+      confirmedOp: number;
+      /** Complete state data */
+      payload: T;
     }
-    | {
-        /**
-         * Differential update event
-         * - type = Patch
-         * - payload is array of patches against T
-         */
-        type: SyncedStateServerStateUpdatePayloadType.PATCH;
-        /** Current version number */
-        version: number;
-        /** Latest confirmed optimistic operation ID */
-        confirmedOp: number;
-        /** Patch array */
-        payload: Operation[];
+  | {
+      /**
+       * Differential update event
+       * - type = Patch
+       * - payload is array of patches against T
+       */
+      type: SyncedStateServerStateUpdatePayloadType.PATCH;
+      /** Current version number */
+      version: number;
+      /** Latest confirmed optimistic operation ID */
+      confirmedOp: number;
+      /** Patch array */
+      payload: Operation[];
     };
 
 export enum SyncedStateServerEventType {
-    STATE_UPDATE = "state-update",
-    ACTION_RESULT = "action-result",
-    CUSTOM = "custom",
+  STATE_UPDATE = "state-update",
+  ACTION_RESULT = "action-result",
+  CUSTOM = "custom",
 }
 
-export type SyncedStateServerEvent<T, CUSTOM extends unknown> = {
-    type: SyncedStateServerEventType.STATE_UPDATE;
-    payload: SyncedStateServerStateUpdatePayload<T>
-} | {
-    type: SyncedStateServerEventType.ACTION_RESULT;
-    payload: {
-        /** 
+export type SyncedStateServerEvent<T, CUSTOM> =
+  | {
+      type: SyncedStateServerEventType.STATE_UPDATE;
+      payload: SyncedStateServerStateUpdatePayload<T>;
+    }
+  | {
+      type: SyncedStateServerEventType.ACTION_RESULT;
+      payload: {
+        /**
          * Success or failure
          * Note: Server must ensure that async success requests immediately delete the operation client-side,
          * so the server must guarantee this operation won't corrupt the local optimistic update state view
@@ -105,14 +107,15 @@ export type SyncedStateServerEvent<T, CUSTOM extends unknown> = {
         optimisticId: number;
         /** Optional message */
         message?: string;
+      };
     }
-} | {
-    type: SyncedGameServerEventType.CUSTOM,
-    payload: CUSTOM
-};
+  | {
+      type: SyncedGameServerEventType.CUSTOM;
+      payload: CUSTOM;
+    };
 
 export enum SyncedStateClientBaseActionType {
-    SYNC_ACTION = 'sync-action',
+  SYNC_ACTION = "sync-action",
 }
 
 /**
@@ -121,13 +124,10 @@ export enum SyncedStateClientBaseActionType {
  * @template P operation payload type
  * - optimisticId: Unique optimistic update identifier for confirmation/rollback
  */
-export type SyncedStateClientGenericSyncAction<
-  T extends string,
-  P extends unknown = undefined
-> = {
+export type SyncedStateClientGenericSyncAction<T extends string, P = undefined> = {
   readonly optimisticId: number;
   readonly type: T;
-} & (P extends undefined ? {} : { readonly payload: P });
+} & (P extends undefined ? object : { readonly payload: P });
 
 // Currently unused
 // /**

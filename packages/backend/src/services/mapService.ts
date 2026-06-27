@@ -1,12 +1,12 @@
-import { mkdir, rm } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import path from 'path';
-import { db } from '../db/client';
-import { customMaps, users, profiles } from '../db/schema';
-import { eq, and, desc, like } from 'drizzle-orm';
-import type { CustomMapTile } from '@generale/types';
+import { existsSync } from "node:fs";
+import { mkdir, rm } from "node:fs/promises";
+import type { CustomMapTile } from "@generale/types";
+import { and, desc, eq, like, type InferSelectModel } from "drizzle-orm";
+import path from "path";
+import { db } from "../db/client";
+import { customMaps, profiles, users } from "../db/schema";
 
-const MAPS_DIR = './public/maps';
+const MAPS_DIR = "./public/maps";
 
 async function ensureDir() {
   if (!existsSync(MAPS_DIR)) {
@@ -19,12 +19,16 @@ function parseTags(tagsRaw: string | undefined): string[] {
   try {
     return JSON.parse(tagsRaw);
   } catch {
-    return tagsRaw.split(',').map(s => s.trim()).filter(Boolean);
+    return tagsRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 }
 
 function resolveDisplayName(authorId: string): string {
-  const row = db.select({ displayName: profiles.displayName, username: users.username })
+  const row = db
+    .select({ displayName: profiles.displayName, username: users.username })
     .from(users)
     .leftJoin(profiles, eq(profiles.userId, users.id))
     .where(eq(users.id, authorId))
@@ -33,11 +37,11 @@ function resolveDisplayName(authorId: string): string {
   return row.displayName || row.username || authorId;
 }
 
-function mapRowToSummary(r: any) {
+function mapRowToSummary(r: InferSelectModel<typeof customMaps>) {
   return {
     id: r.id,
     name: r.name,
-    description: r.description || undefined,
+    ...(r.description ? { description: r.description } : {}),
     authorId: r.authorId,
     authorName: resolveDisplayName(r.authorId),
     width: r.width,
@@ -49,8 +53,8 @@ function mapRowToSummary(r: any) {
     hasCustomThumbnail: r.hasCustomThumbnail,
     usageCount: r.usageCount,
     tags: parseTags(r.tags ?? undefined),
-    createdAt: r.createdAt?.toISOString(),
-    updatedAt: r.updatedAt?.toISOString(),
+    ...(r.createdAt ? { createdAt: r.createdAt.toISOString() } : {}),
+    ...(r.updatedAt ? { updatedAt: r.updatedAt.toISOString() } : {}),
   };
 }
 
@@ -126,7 +130,7 @@ export class MapService {
 
   thumbnailUrl(id: string): string {
     const filepath = path.join(MAPS_DIR, `${id}.png`);
-    return existsSync(filepath) ? `/api/maps/thumbnail/${id}` : '';
+    return existsSync(filepath) ? `/api/maps/thumbnail/${id}` : "";
   }
 
   // ---- DB CRUD ----
@@ -136,18 +140,26 @@ export class MapService {
     if (search) {
       conditions.push(like(customMaps.name, `%${search}%`));
     }
-    const rows = db.select().from(customMaps)
+    const rows = db
+      .select()
+      .from(customMaps)
       .where(and(...conditions))
       .orderBy(desc(customMaps.updatedAt))
-      .limit(limit).offset(offset).all();
+      .limit(limit)
+      .offset(offset)
+      .all();
     return rows.map(mapRowToSummary);
   }
 
   listByAuthor(authorId: string, limit: number, offset: number) {
-    const rows = db.select().from(customMaps)
+    const rows = db
+      .select()
+      .from(customMaps)
       .where(eq(customMaps.authorId, authorId))
       .orderBy(desc(customMaps.updatedAt))
-      .limit(limit).offset(offset).all();
+      .limit(limit)
+      .offset(offset)
+      .all();
     return rows.map(mapRowToSummary);
   }
 
@@ -157,56 +169,74 @@ export class MapService {
 
   getMetaOrThrow(id: string): NonNullable<ReturnType<typeof this.getMeta>> {
     const meta = this.getMeta(id);
-    if (!meta) throw new Response('Not Found', { status: 404 });
+    if (!meta) throw new Response("Not Found", { status: 404 });
     return meta;
   }
 
-  create(authorId: string, data: {
-    id: string; name: string; description: string;
-    width: number; height: number; tileCount: number;
-    minPlayers: number; maxPlayers: number;
-    isPublic: boolean; isDraft: boolean;
-    tags?: string[];
-    tiles: CustomMapTile[][];
-  }) {
+  create(
+    authorId: string,
+    data: {
+      id: string;
+      name: string;
+      description: string;
+      width: number;
+      height: number;
+      tileCount: number;
+      minPlayers: number;
+      maxPlayers: number;
+      isPublic: boolean;
+      isDraft: boolean;
+      tags?: string[];
+      tiles: CustomMapTile[][];
+    },
+  ) {
     const now = new Date();
-    db.insert(customMaps).values({
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      authorId,
-      authorName: '',
-      width: data.width,
-      height: data.height,
-      tileCount: data.tileCount,
-      minPlayers: data.minPlayers,
-      maxPlayers: data.maxPlayers,
-      isPublic: data.isPublic,
-      isDraft: data.isDraft,
-      usageCount: 0,
-      tags: JSON.stringify(data.tags ?? []),
-      createdAt: now,
-      updatedAt: now,
-    }).run();
+    db.insert(customMaps)
+      .values({
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        authorId,
+        authorName: "",
+        width: data.width,
+        height: data.height,
+        tileCount: data.tileCount,
+        minPlayers: data.minPlayers,
+        maxPlayers: data.maxPlayers,
+        isPublic: data.isPublic,
+        isDraft: data.isDraft,
+        usageCount: 0,
+        tags: JSON.stringify(data.tags ?? []),
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
     return { id: data.id, tiles: data.tiles };
   }
 
-  update(meta: NonNullable<ReturnType<typeof this.getMeta>>, updates: {
-    name?: string; description?: string;
-    isPublic?: boolean; isDraft?: boolean;
-    minPlayers?: number; maxPlayers?: number;
-    tags?: string[]; tiles?: CustomMapTile[][];
-  }) {
-    const dbUpdates: any = {};
-    if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.description !== undefined) dbUpdates.description = updates.description;
-    if (updates.isPublic !== undefined) dbUpdates.isPublic = updates.isPublic;
-    if (updates.isDraft !== undefined) dbUpdates.isDraft = updates.isDraft;
-    if (updates.minPlayers !== undefined) dbUpdates.minPlayers = updates.minPlayers;
-    if (updates.maxPlayers !== undefined) dbUpdates.maxPlayers = updates.maxPlayers;
-    if (updates.tags !== undefined) dbUpdates.tags = JSON.stringify(updates.tags);
-    if (updates.tiles !== undefined) dbUpdates.tileCount = updates.tiles.reduce((s, r) => s + r.length, 0);
-    dbUpdates.updatedAt = new Date();
+  update(
+    meta: NonNullable<ReturnType<typeof this.getMeta>>,
+    updates: {
+      name?: string;
+      description?: string;
+      isPublic?: boolean;
+      isDraft?: boolean;
+      minPlayers?: number;
+      maxPlayers?: number;
+      tags?: string[];
+      tiles?: CustomMapTile[][];
+    },
+  ) {
+    const dbUpdates: Record<string, unknown> = {};
+    if (updates.name !== undefined) dbUpdates["name"] = updates.name;
+    if (updates.description !== undefined) dbUpdates["description"] = updates.description;
+    if (updates.isPublic !== undefined) dbUpdates["isPublic"] = updates.isPublic;
+    if (updates.isDraft !== undefined) dbUpdates["isDraft"] = updates.isDraft;
+    if (updates.minPlayers !== undefined) dbUpdates["minPlayers"] = updates.minPlayers;
+    if (updates.maxPlayers !== undefined) dbUpdates["maxPlayers"] = updates.maxPlayers;
+    if (updates.tags !== undefined) dbUpdates["tags"] = JSON.stringify(updates.tags);
+    if (updates.tiles !== undefined) dbUpdates["tileCount"] = updates.tiles.reduce((s, r) => s + r.length, 0);
+    dbUpdates["updatedAt"] = new Date();
     db.update(customMaps).set(dbUpdates).where(eq(customMaps.id, meta.id)).run();
   }
 
@@ -221,24 +251,26 @@ export class MapService {
     if (!meta) return null;
     const newId = `map_${Date.now()}`;
     const now = new Date();
-    db.insert(customMaps).values({
-      id: newId,
-      name: `${meta.name} (fork)`,
-      description: meta.description || '',
-      authorId,
-      authorName: '',
-      width: meta.width,
-      height: meta.height,
-      tileCount: meta.tileCount,
-      minPlayers: meta.minPlayers,
-      maxPlayers: meta.maxPlayers,
-      isPublic: false,
-      isDraft: true,
-      usageCount: 0,
-      tags: meta.tags,
-      createdAt: now,
-      updatedAt: now,
-    }).run();
+    db.insert(customMaps)
+      .values({
+        id: newId,
+        name: `${meta.name} (fork)`,
+        description: meta.description || "",
+        authorId,
+        authorName: "",
+        width: meta.width,
+        height: meta.height,
+        tileCount: meta.tileCount,
+        minPlayers: meta.minPlayers,
+        maxPlayers: meta.maxPlayers,
+        isPublic: false,
+        isDraft: true,
+        usageCount: 0,
+        tags: meta.tags,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
     return newId;
   }
 }

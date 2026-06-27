@@ -1,23 +1,18 @@
 // src/hooks/useAuth.tsx
-import { createContext, useContext, JSX } from "solid-js";
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/solid-query";
-
-import * as authApi from "~/api/auth";
-import { ApiError } from "~/api/base";
 
 import type {
+  ErrorResp,
+  LoginReqBody,
+  MessageResp,
+  RegisterReqBody,
   UserProfileRespBody,
   UserSuccessRespBody,
-  LoginReqBody,
-  RegisterReqBody,
-  ErrorResp,
   VerifyReqBody,
-  MessageResp,
 } from "@generale/types/dist/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/solid-query";
+import { createContext, type JSX, useContext } from "solid-js";
+import * as authApi from "~/api/auth";
+import type { ApiError } from "~/api/base";
 
 type User = UserProfileRespBody;
 
@@ -51,38 +46,22 @@ export function AuthProvider(props: { children: JSX.Element }) {
   // -----------------------
   // mutations
   // -----------------------
-  const loginMutation = useMutation<
-    UserSuccessRespBody,
-    ApiError<ErrorResp>,
-    LoginReqBody
-  >(() => ({
+  const loginMutation = useMutation<UserSuccessRespBody, ApiError<ErrorResp>, LoginReqBody>(() => ({
     mutationFn: (vars: LoginReqBody) => authApi.loginApi(vars),
     onSuccess: (data) => {
       qc.setQueryData(["me"], data);
     },
   }));
 
-  const registerMutation = useMutation<
-    MessageResp,
-    ApiError<ErrorResp>,
-    RegisterReqBody
-  >(() => ({
+  const registerMutation = useMutation<MessageResp, ApiError<ErrorResp>, RegisterReqBody>(() => ({
     mutationFn: (vars) => authApi.registerApi(vars),
   }));
 
-  const verifyMutation = useMutation<
-    MessageResp,
-    ApiError<ErrorResp>,
-    VerifyReqBody
-  >(() => ({
+  const verifyMutation = useMutation<MessageResp, ApiError<ErrorResp>, VerifyReqBody>(() => ({
     mutationFn: (vars) => authApi.verifyApi(vars),
   }));
 
-  const logoutMutation = useMutation<
-    { ok: true },
-    ApiError<ErrorResp>,
-    void
-  >(() => ({
+  const logoutMutation = useMutation<{ ok: true }, ApiError<ErrorResp>, void>(() => ({
     mutationFn: () => authApi.logoutApi(),
     onSuccess: () => {
       qc.setQueryData(["me"], null);
@@ -117,10 +96,10 @@ export function AuthProvider(props: { children: JSX.Element }) {
       const res = await loginMutation.mutateAsync(payload);
       return res.user;
     },
-    register: async (payload) => {
+    register: (payload) => {
       return registerMutation.mutateAsync(payload);
     },
-    verify: async (payload) => {
+    verify: (payload) => {
       return verifyMutation.mutateAsync(payload);
     },
     logout: async () => {

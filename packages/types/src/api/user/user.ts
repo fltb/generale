@@ -1,5 +1,5 @@
-import { t, type Static } from 'elysia';
-import { errorRespSchema, okRespSchema, messageRespSchema } from '../base';
+import { type Static, t } from "elysia";
+import type { errorRespSchema, messageRespSchema, okRespSchema } from "../base";
 
 // --- Requests ---
 
@@ -7,19 +7,19 @@ import { errorRespSchema, okRespSchema, messageRespSchema } from '../base';
  * Schema for the body of the POST /api/register request.
  */
 export const registerReqSchema = t.Object({
-    username: t.String({ 
-        minLength: 3, 
-        maxLength: 50, 
-        error: "Username must be between 3 and 50 characters." 
-    }),
-    password: t.String({ 
-        minLength: 8, 
-        error: "Password must be at least 8 characters long." 
-    }),
-    email: t.String({ 
-        format: 'email', 
-        error: "Please provide a valid email address." 
-    })
+  username: t.String({
+    minLength: 3,
+    maxLength: 50,
+    error: "Username must be between 3 and 50 characters.",
+  }),
+  password: t.String({
+    minLength: 8,
+    error: "Password must be at least 8 characters long.",
+  }),
+  email: t.String({
+    format: "email",
+    error: "Please provide a valid email address.",
+  }),
 });
 
 /**
@@ -33,8 +33,8 @@ export type RegisterReqBody = Static<typeof registerReqSchema>;
  * 名字保留为 username 是为了兼容已经发出的客户端代码；语义上等价于 identifier。
  */
 export const loginReqSchema = t.Object({
-    username: t.String(),
-    password: t.String()
+  username: t.String(),
+  password: t.String(),
 });
 
 /**
@@ -46,7 +46,7 @@ export type LoginReqBody = Static<typeof loginReqSchema>;
  * Schema for the body of the POST /api/request-password-reset request.
  */
 export const requestPasswordResetReqSchema = t.Object({
-    email: t.String({ format: 'email' })
+  email: t.String({ format: "email" }),
 });
 
 /**
@@ -58,8 +58,8 @@ export type RequestPasswordResetReqBody = Static<typeof requestPasswordResetReqS
  * Schema for the body of the POST /api/reset-password request.
  */
 export const resetPasswordReqSchema = t.Object({
-    token: t.String(),
-    newPassword: t.String({ minLength: 8 })
+  token: t.String(),
+  newPassword: t.String({ minLength: 8 }),
 });
 
 /**
@@ -71,8 +71,8 @@ export type ResetPasswordReqBody = Static<typeof resetPasswordReqSchema>;
  * 登录态下改密码：需要当前密码 + 新密码
  */
 export const changePasswordReqSchema = t.Object({
-    currentPassword: t.String(),
-    newPassword: t.String({ minLength: 8 }),
+  currentPassword: t.String(),
+  newPassword: t.String({ minLength: 8 }),
 });
 export type ChangePasswordReqBody = Static<typeof changePasswordReqSchema>;
 
@@ -80,8 +80,8 @@ export type ChangePasswordReqBody = Static<typeof changePasswordReqSchema>;
  * 登录态下发起改邮箱：需要当前密码（防 session 劫持）+ 新邮箱
  */
 export const changeEmailReqSchema = t.Object({
-    currentPassword: t.String(),
-    newEmail: t.String({ format: 'email' }),
+  currentPassword: t.String(),
+  newEmail: t.String({ format: "email" }),
 });
 export type ChangeEmailReqBody = Static<typeof changeEmailReqSchema>;
 
@@ -89,7 +89,7 @@ export type ChangeEmailReqBody = Static<typeof changeEmailReqSchema>;
  * 改邮箱确认（用户点新邮箱里的链接拉过来的）
  */
 export const confirmEmailChangeReqSchema = t.Object({
-    token: t.String(),
+  token: t.String(),
 });
 export type ConfirmEmailChangeReqBody = Static<typeof confirmEmailChangeReqSchema>;
 
@@ -97,11 +97,11 @@ export type ConfirmEmailChangeReqBody = Static<typeof confirmEmailChangeReqSchem
  * 登录态下改用户名：需要新用户名。受频率限制（默认每 7 天一改）+ 防重名。
  */
 export const changeUsernameReqSchema = t.Object({
-    username: t.String({
-        minLength: 3,
-        maxLength: 50,
-        error: "Username must be between 3 and 50 characters."
-    }),
+  username: t.String({
+    minLength: 3,
+    maxLength: 50,
+    error: "Username must be between 3 and 50 characters.",
+  }),
 });
 export type ChangeUsernameReqBody = Static<typeof changeUsernameReqSchema>;
 
@@ -109,8 +109,8 @@ export type ChangeUsernameReqBody = Static<typeof changeUsernameReqSchema>;
  * 改用户名响应：返回新 username 和修改时间（前端据此算下次可改时间）。
  */
 export const changeUsernameRespSchema = t.Object({
-    username: t.String(),
-    usernameChangedAt: t.String({ format: 'date-time' }),
+  username: t.String(),
+  usernameChangedAt: t.String({ format: "date-time" }),
 });
 export type ChangeUsernameRespBody = Static<typeof changeUsernameRespSchema>;
 
@@ -120,17 +120,17 @@ export type ChangeUsernameRespBody = Static<typeof changeUsernameRespSchema>;
  * displayName / avatarUrl / avatarThumbUrl / bio 来自 profiles 表（GET /me 时一并返回）。
  */
 export const userProfileSchemaResp = t.Object({
-    id: t.String(),
-    username: t.String(),
-    email: t.String(),
-    displayName: t.Optional(t.String()),
-    /** 原图 URL，profile 页用 */
-    avatarUrl: t.Optional(t.String()),
-    /** 缩略图 URL，Nav / PlayerList 等小尺寸场景用 */
-    avatarThumbUrl: t.Optional(t.String()),
-    bio: t.Optional(t.String()),
-    /** 上次修改 username 的时间（null 表示从未改过）。前端据此计算下次可改时间。 */
-    usernameChangedAt: t.Optional(t.String({ format: 'date-time' })),
+  id: t.String(),
+  username: t.String(),
+  email: t.String(),
+  displayName: t.Optional(t.String()),
+  /** 原图 URL，profile 页用 */
+  avatarUrl: t.Optional(t.String()),
+  /** 缩略图 URL，Nav / PlayerList 等小尺寸场景用 */
+  avatarThumbUrl: t.Optional(t.String()),
+  bio: t.Optional(t.String()),
+  /** 上次修改 username 的时间（null 表示从未改过）。前端据此计算下次可改时间。 */
+  usernameChangedAt: t.Optional(t.String({ format: "date-time" })),
 });
 
 /**
@@ -142,7 +142,7 @@ export type UserProfileRespBody = Static<typeof userProfileSchemaResp>;
  * Schema for a successful API response that includes user data (e.g., on login or /me).
  */
 export const userSuccessRespSchema = t.Object({
-    user: userProfileSchemaResp
+  user: userProfileSchemaResp,
 });
 
 /**
@@ -154,7 +154,7 @@ export type UserSuccessRespBody = Static<typeof userSuccessRespSchema>;
  * Schema for the successful POST /api/logout response.
  */
 export const logoutRespSchema = t.Object({
-    ok: t.Literal(true)
+  ok: t.Literal(true),
 });
 
 /**
@@ -166,9 +166,9 @@ export type LogoutRespBody = Static<typeof logoutRespSchema>;
  * Schema for a password reset token validation response
  */
 export const passwordResetTokenRespSchema = t.Object({
-    valid: t.Boolean(),
-    success: t.Optional(t.Boolean()),
-    message: t.Optional(t.String())
+  valid: t.Boolean(),
+  success: t.Optional(t.Boolean()),
+  message: t.Optional(t.String()),
 });
 
 export type PasswordResetTokenRespBody = Static<typeof passwordResetTokenRespSchema>;

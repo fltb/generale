@@ -1,10 +1,6 @@
+import { PlayerColor, type PreGamePlayerInfo, PreGamePlayerReadyState } from "@generale/types";
 import { createSignal } from "solid-js";
 import { PlayerList } from "../PlayerList";
-import {
-  type PreGamePlayerInfo,
-  PreGamePlayerReadyState,
-  PlayerColor,
-} from "@generale/types";
 
 export const TestPlayerList = () => {
   // 模拟生成测试数据
@@ -30,8 +26,8 @@ export const TestPlayerList = () => {
       prev.map((p) =>
         p.id === playerId
           ? { ...p, ready: ready ? PreGamePlayerReadyState.Ready : PreGamePlayerReadyState.NotReady }
-          : p
-      )
+          : p,
+      ),
     );
   };
 
@@ -41,9 +37,7 @@ export const TestPlayerList = () => {
 
   const onTransferHost = (playerId: string) => {
     setHostId(playerId);
-    setPlayers((prev) =>
-      prev.map((p) => ({ ...p, isHost: p.id === playerId }))
-    );
+    setPlayers((prev) => prev.map((p) => ({ ...p, isHost: p.id === playerId })));
   };
 
   return (
@@ -52,16 +46,10 @@ export const TestPlayerList = () => {
 
       <div class="flex items-center gap-3">
         <span>当前用户: {selfId()}</span>
-        <button
-          class="btn btn-sm"
-          onClick={() => setSelfId("p1")}
-        >
+        <button type="button" class="btn btn-sm" onClick={() => setSelfId("p1")}>
           切换为 p1 (Host)
         </button>
-        <button
-          class="btn btn-sm"
-          onClick={() => setSelfId("p2")}
-        >
+        <button type="button" class="btn btn-sm" onClick={() => setSelfId("p2")}>
           切换为 p2
         </button>
       </div>

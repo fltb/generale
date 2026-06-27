@@ -1,5 +1,5 @@
-import type { PreGameRoomState, GameId } from '@generale/types';
-import type { RoomInstance } from '../../instance/RoomInstance';
+import type { GameId, PreGameRoomState } from "@generale/types";
+import type { RoomInstance } from "../../instance/RoomInstance";
 
 type EmitFn = (gameId: GameId) => void;
 
@@ -38,7 +38,7 @@ export class RoomUpdateFilter {
             return;
           }
         } catch (err) {
-          console.error('[RoomUpdateFilter] filter error', err);
+          console.error("[RoomUpdateFilter] filter error", err);
         }
       }
     });
@@ -51,20 +51,20 @@ export class RoomUpdateFilter {
 
   private buildSignificantChangeFilter() {
     const playerListFp = (s?: PreGameRoomState) =>
-      JSON.stringify((s?.players ?? []).map(p => ({ id: p.id, name: p.name, isHost: p.isHost })));
+      JSON.stringify((s?.players ?? []).map((p) => ({ id: p.id, name: p.name, isHost: p.isHost })));
 
     const mapSettingFp = (s?: PreGameRoomState) => {
-      const ms: any = s?.mapSetting;
-      if (!ms) return '';
+      const ms = s?.mapSetting as { width?: number; height?: number; sizeLabel?: string } | undefined;
+      if (!ms) return "";
       return JSON.stringify({ width: ms.width, height: ms.height, sizeLabel: ms.sizeLabel ?? null });
     };
 
     return (prev?: PreGameRoomState, curr?: PreGameRoomState) => {
       if ((prev?.players.length ?? 0) !== (curr?.players.length ?? 0)) return true;
-      if ((prev?.hostId ?? '') !== (curr?.hostId ?? '')) return true;
+      if ((prev?.hostId ?? "") !== (curr?.hostId ?? "")) return true;
       if ((prev?.started ?? false) !== (curr?.started ?? false)) return true;
       if ((prev?.playerLimit ?? 0) !== (curr?.playerLimit ?? 0)) return true;
-      if ((prev?.roomType ?? '') !== (curr?.roomType ?? '')) return true;
+      if ((prev?.roomType ?? "") !== (curr?.roomType ?? "")) return true;
       if (mapSettingFp(prev) !== mapSettingFp(curr)) return true;
       if (playerListFp(prev) !== playerListFp(curr)) return true;
       return false;

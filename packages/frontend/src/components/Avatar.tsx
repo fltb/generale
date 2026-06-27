@@ -1,4 +1,4 @@
-import { type JSX } from "solid-js";
+import type { JSX } from "solid-js";
 
 /**
  * 通用头像组件。纯 <img> 的薄包装：
@@ -25,12 +25,7 @@ export function Avatar(props: AvatarProps): JSX.Element {
       class={`inline-flex items-center justify-center rounded-full overflow-hidden shrink-0 bg-base-300 ${props.class ?? ""}`}
       style={{ width: `${size()}px`, height: `${size()}px` }}
     >
-      <img
-        src={props.src}
-        alt={props.alt ?? "avatar"}
-        class="object-cover w-full h-full"
-        loading="lazy"
-      />
+      <img src={props.src} alt={props.alt ?? "avatar"} class="object-cover w-full h-full" loading="lazy" />
     </div>
   );
 }

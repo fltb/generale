@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { initEmailService, sendVerificationEmail } from '../emailService';
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { initEmailService, sendVerificationEmail } from "../emailService";
 
 // Mock the nodemailer library
 const mockSendMail = vi.fn();
 const mockVerify = vi.fn();
-vi.mock('nodemailer', () => ({
+vi.mock("nodemailer", () => ({
   default: {
     createTransport: vi.fn(() => ({
       sendMail: mockSendMail,
@@ -15,23 +15,22 @@ vi.mock('nodemailer', () => ({
 }));
 
 const mockConfig = {
-  method: 'smtp' as const,
-  from: 'noreply@test.com',
+  method: "smtp" as const,
+  from: "noreply@test.com",
   smtp: {
-    host: 'smtp.test.com',
+    host: "smtp.test.com",
     port: 587,
     secure: true,
-    auth: { user: 'user', pass: 'pass' },
+    auth: { user: "user", pass: "pass" },
   },
 };
 
-describe('EmailService', () => {
-
+describe("EmailService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Stub environment variables
-    vi.stubEnv('APP_URL', 'http://localhost:3000');
-    vi.stubEnv('EMAIL_FROM', 'sender@app.com');
+    vi.stubEnv("APP_URL", "http://localhost:3000");
+    vi.stubEnv("EMAIL_FROM", "sender@app.com");
   });
 
   afterEach(() => {
@@ -40,7 +39,7 @@ describe('EmailService', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should initialize the transporter and verify the connection', async () => {
+  it("should initialize the transporter and verify the connection", async () => {
     mockVerify.mockResolvedValue(true);
     await initEmailService(mockConfig);
 
@@ -54,26 +53,25 @@ describe('EmailService', () => {
     expect(mockVerify).toHaveBeenCalled();
   });
 
-  it('should throw an error if send is called before initialization', async () => {
+  it("should throw an error if send is called before initialization", async () => {
     // We need to import a fresh version of the module where init was not called
-    const { sendVerificationEmail: freshSend } = await import('../emailService');
-    await expect(freshSend('test@example.com', 'token123'))
-      .rejects.toThrow('Email service not initialized');
+    const { sendVerificationEmail: freshSend } = await import("../emailService");
+    await expect(freshSend("test@example.com", "token123")).rejects.toThrow("Email service not initialized");
   });
 
-  it.skip('should send a verification email with the correct parameters', async () => {
-    const to = 'recipient@example.com';
-    const token = 'my-verification-token';
+  it.skip("should send a verification email with the correct parameters", async () => {
+    const to = "recipient@example.com";
+    const token = "my-verification-token";
     const verificationUrl = `http://localhost:3000/verify?token=${token}`;
-    
+
     await initEmailService(mockConfig); // Initialize first
     await sendVerificationEmail(to, token);
 
     expect(mockSendMail).toHaveBeenCalledOnce();
     expect(mockSendMail).toHaveBeenCalledWith({
-      from: 'sender@app.com', // from .env
+      from: "sender@app.com", // from .env
       to,
-      subject: '请验证您的邮箱',
+      subject: "请验证您的邮箱",
       html: `请点击此链接验证您的邮箱: <a href="${verificationUrl}">${verificationUrl}</a>`,
     });
   });

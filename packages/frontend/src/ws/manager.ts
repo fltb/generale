@@ -1,8 +1,7 @@
 // src/ws/manager.ts
 import { createSignal } from "solid-js";
 
-
-export interface WSOpenPayloadBase {}
+export type WSOpenPayloadBase = Record<string, never>;
 
 export type WebSocketMessage<T = unknown, Context extends WSOpenPayloadBase = WSOpenPayloadBase> =
   | { domain: string; type: "open"; payload: Context }
@@ -12,12 +11,12 @@ export type WebSocketMessage<T = unknown, Context extends WSOpenPayloadBase = WS
   // server-level control messages
   | { type: "connection_ack"; payload: { connectionId: string } }
   | { type: "reconnection_ack"; payload: { success: boolean; connectionId?: string } }
-  | { type: "error"; payload: any };
+  | { type: "error"; payload: unknown };
 
 /**
  * SubConnectorClient: client-side mirror of server SubConnectorImpl
  */
-export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSOpenPayloadBase = WSOpenPayloadBase> {
+export class SubConnectorClient<CEvt = unknown, SEvt = unknown, Ctx extends WSOpenPayloadBase = WSOpenPayloadBase> {
   private openCallbacks: (() => void)[] = [];
   private closeCallbacks: ((code?: number, reason?: string) => void)[] = [];
   private disconnectCallbacks: ((err?: Error) => void)[] = [];
@@ -25,22 +24,32 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSOpenPayloa
   private messageCallbacks: ((payload: SEvt) => void)[] = [];
 
   private _ready = false;
-  private _explicitlyClosed = false;
-  private _closeInfo: { code?: number; reason?: string } | null = null;
 
   constructor(
     public readonly domain: string,
-    private manager: ClientConnectionManager<Ctx>
-  ) { }
+    private manager: ClientConnectionManager<Ctx>,
+  ) {}
 
-  get ready() { return this._ready; }
-  getConnectionId() { return this.manager.connectionId; }
+  get ready() {
+    return this._ready;
+  }
+  getConnectionId() {
+    return this.manager.connectionId;
+  }
 
   // lifecycle/callbacks registration
-  onOpen(cb: () => void) { this.openCallbacks.push(cb); }
-  onClose(cb: (code?: number, reason?: string) => void) { this.closeCallbacks.push(cb); }
-  onDisconnect(cb: (err?: Error) => void) { this.disconnectCallbacks.push(cb); }
-  onReconnect(cb: () => void) { this.reconnectCallbacks.push(cb); }
+  onOpen(cb: () => void) {
+    this.openCallbacks.push(cb);
+  }
+  onClose(cb: (code?: number, reason?: string) => void) {
+    this.closeCallbacks.push(cb);
+  }
+  onDisconnect(cb: (err?: Error) => void) {
+    this.disconnectCallbacks.push(cb);
+  }
+  onReconnect(cb: () => void) {
+    this.reconnectCallbacks.push(cb);
+  }
   onMessage(cb: (payload: SEvt) => void) {
     this.messageCallbacks.push(cb);
   }
@@ -64,26 +73,36 @@ export class SubConnectorClient<CEvt = any, SEvt = any, Ctx extends WSOpenPayloa
   _triggerOpen() {
     this._ready = true;
     this._explicitlyClosed = false;
-    this.openCallbacks.forEach(cb => cb());
+    this.openCallbacks.forEach((cb) => {
+      cb();
+    });
   }
   _triggerClose(code?: number, reason?: string) {
     this._ready = false;
     this._explicitlyClosed = true;
     this._closeInfo = { code, reason };
-    this.closeCallbacks.forEach(cb => cb(code, reason));
+    this.closeCallbacks.forEach((cb) => {
+      cb(code, reason);
+    });
   }
   _triggerDisconnect(err?: Error) {
     this._ready = false;
-    this.disconnectCallbacks.forEach(cb => cb(err));
+    this.disconnectCallbacks.forEach((cb) => {
+      cb(err);
+    });
   }
   _triggerReconnect() {
     this._ready = true;
     this._explicitlyClosed = false;
     this._closeInfo = null;
-    this.reconnectCallbacks.forEach(cb => cb());
+    this.reconnectCallbacks.forEach((cb) => {
+      cb();
+    });
   }
   _triggerMessage(payload: SEvt) {
-    this.messageCallbacks.forEach(cb => cb(payload));
+    this.messageCallbacks.forEach((cb) => {
+      cb(payload);
+    });
   }
 }
 
@@ -105,11 +124,11 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
   public connectionId: string | null = null;
   public isConnected = false;
 
-  private subConnectors = new Map<string, SubConnectorClient<any, any, OpenPayload>>();
+  private subConnectors = new Map<string, SubConnectorClient<unknown, unknown, OpenPayload>>();
 
   /** domains we've asked the server to open but haven't yet received server 'open' ack */
   private pendingOpens = new Set<string>();
-  private openPayloads = new Map<string, any>();
+  private openPayloads = new Map<string, Partial<OpenPayload>>();
 
   /**
    * 每个 domain 的 open-ack 超时重试定时器。
@@ -147,7 +166,7 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
       let u: URL;
       try {
         u = new URL(this.url);
-      } catch (e) {
+      } catch (_e) {
         u = new URL(this.url, `${location.protocol}//${location.host}`);
       }
 
@@ -189,7 +208,9 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
         if (ev && ev.code === 4001) {
           console.warn("[WS] closed due to auth failure (4001). Will not attempt reconnect.");
           this.manualClose = true;
-          try { window.dispatchEvent(new CustomEvent("ws:auth-failed")); } catch { }
+          try {
+            window.dispatchEvent(new CustomEvent("ws:auth-failed"));
+          } catch {}
           return;
         }
 
@@ -206,7 +227,7 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
   }
 
   private _scheduleReconnect() {
-    const backoff = Math.min(30_000, 1000 * Math.pow(1.5, this.reconnectAttempts));
+    const backoff = Math.min(30_000, 1000 * 1.5 ** this.reconnectAttempts);
     this.reconnectAttempts++;
     if (this.reconnectTimer) window.clearTimeout(this.reconnectTimer);
     this.reconnectTimer = window.setTimeout(() => {
@@ -245,7 +266,8 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
   private _flushOutbox() {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     while (this.outbox.length > 0) {
-      const obj = this.outbox.shift()!;
+      const obj = this.outbox.shift();
+      if (!obj) break;
       try {
         this.ws.send(JSON.stringify(obj));
         console.debug("[WS] flushed outbox item ->", obj);
@@ -258,13 +280,12 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
     }
   }
 
-
   // create or get local subconnector (client-side)
-  getOrCreateSub<CEvt = any, SEvt = any>(domain: string) {
+  getOrCreateSub<CEvt = unknown, SEvt = unknown>(domain: string) {
     let sub = this.subConnectors.get(domain) as SubConnectorClient<CEvt, SEvt, OpenPayload> | undefined;
     if (!sub) {
       sub = new SubConnectorClient<CEvt, SEvt, OpenPayload>(domain, this);
-      this.subConnectors.set(domain, sub);
+      this.subConnectors.set(domain, sub as unknown as SubConnectorClient<unknown, unknown, OpenPayload>);
       console.debug("[WS] getOrCreateSub: CREATED sub", domain, sub);
     } else {
       console.debug("[WS] getOrCreateSub: REUSE sub", domain, sub);
@@ -285,13 +306,13 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
 
     // If already pending, don't re-send
     if (this.pendingOpens.has(domain)) {
-      console.debug('[WS] openDomain: already pending', domain);
+      console.debug("[WS] openDomain: already pending", domain);
       return sub;
     }
 
     // If sub exists and is already ready, nothing to do
     if (this.subConnectors.has(domain) && sub.ready) {
-      console.debug('[WS] openDomain: sub already ready', domain);
+      console.debug("[WS] openDomain: sub already ready", domain);
       return sub;
     }
 
@@ -349,7 +370,7 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
   }
 
   // route incoming server messages
-  private _handleIncoming(msg: WebSocketMessage<any, OpenPayload>) {
+  private _handleIncoming(msg: WebSocketMessage<unknown, OpenPayload>) {
     // connection ack
     if (msg.type === "connection_ack") {
       const connectionId = msg.payload.connectionId;
@@ -382,11 +403,9 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
     // domain messages
     if (msg.domain) {
       const domain = msg.domain;
-      const type = msg.type;
-      const payload = msg.payload;
-      console.debug("[WS] domain got msg:", domain, type, payload);
+      console.debug("[WS] domain got msg:", domain, msg.type, msg.payload);
       // dispatch by type
-      switch (type) {
+      switch (msg.type) {
         case "open": {
           // server opened subconnector; create if not exists
           const sub = this.getOrCreateSub(domain);
@@ -394,15 +413,13 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
           this.pendingOpens.delete(domain);
           this._clearOpenRetry(domain);
           sub._triggerOpen();
-          console.debug("[WS] domain open ack:", domain, payload);
+          console.debug("[WS] domain open ack:", domain, msg.payload);
           break;
         }
         case "close": {
           const sub = this.subConnectors.get(domain);
           if (sub) {
-            const code = payload?.code;
-            const reason = payload?.reason;
-            sub._triggerClose(code, reason);
+            sub._triggerClose(msg.payload?.code, msg.payload?.reason);
             this.deleteSub(domain);
           }
           break;
@@ -418,10 +435,11 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
         }
         case "message": {
           const sub = this.subConnectors.get(domain);
-          if (sub) sub._triggerMessage(payload);
+          if (sub) sub._triggerMessage(msg.payload);
           break;
-        } default:
-          console.warn("Unknown domain message type", type);
+        }
+        default:
+          console.warn("Unknown domain message type", (msg as WebSocketMessage).type);
       }
     } else {
       // unknown non-domain message
@@ -431,7 +449,7 @@ export class ClientConnectionManager<OpenPayload extends WSOpenPayloadBase = WSO
 
   // when connection ack/reconnect ack arrives, retry opens for domains we asked before
   private _retryPendingOpens() {
-    if (!this.isConnected || !this.pendingOpens.size) return;
+    if (!(this.isConnected && this.pendingOpens.size)) return;
     for (const domain of Array.from(this.pendingOpens)) {
       const sub = this.subConnectors.get(domain);
       const ctx = sub ? this.openPayloads.get(domain) : {};

@@ -12,7 +12,11 @@ import { createSignal } from "solid-js";
 const MUTE_KEY = "generale.muted";
 
 const initialMuted = (() => {
-  try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; }
+  try {
+    return localStorage.getItem(MUTE_KEY) === "1";
+  } catch {
+    return false;
+  }
 })();
 
 const [muted, setMutedSignal] = createSignal(initialMuted);
@@ -20,15 +24,22 @@ const [muted, setMutedSignal] = createSignal(initialMuted);
 export const isMuted = muted;
 export function setMuted(v: boolean) {
   setMutedSignal(v);
-  try { localStorage.setItem(MUTE_KEY, v ? "1" : "0"); } catch { }
+  try {
+    localStorage.setItem(MUTE_KEY, v ? "1" : "0");
+  } catch {}
 }
-export function toggleMuted() { setMuted(!muted()); }
+export function toggleMuted() {
+  setMuted(!muted());
+}
 
 let ctx: AudioContext | null = null;
 function getCtx(): AudioContext | null {
   if (muted()) return null;
   try {
-    if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!ctx)
+      ctx = new (
+        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      )();
     if (ctx.state === "suspended") ctx.resume();
     return ctx;
   } catch {
@@ -67,32 +78,98 @@ function melody(notes: Array<[freq: number, dur: number]>, opts: { type?: Wave; 
 
 // 音名 → 频率（够用的几个）
 const N = {
-  C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, A4: 440.0, B4: 493.88,
-  C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, C6: 1046.5,
+  C4: 261.63,
+  D4: 293.66,
+  E4: 329.63,
+  F4: 349.23,
+  G4: 392.0,
+  A4: 440.0,
+  B4: 493.88,
+  C5: 523.25,
+  D5: 587.33,
+  E5: 659.25,
+  G5: 783.99,
+  C6: 1046.5,
 };
 
 export const sfx = {
   /** 通用按钮咔哒 */
-  click() { tone(660, 0.05, { type: "square", gain: 0.12 }); },
+  click() {
+    tone(660, 0.05, { type: "square", gain: 0.12 });
+  },
   /** 准备就绪：上行两音 */
-  ready() { melody([[N.E5, 0.07], [N.G5, 0.11]], { type: "square", gain: 0.16 }); },
+  ready() {
+    melody(
+      [
+        [N.E5, 0.07],
+        [N.G5, 0.11],
+      ],
+      { type: "square", gain: 0.16 },
+    );
+  },
   /** 取消准备：下行 */
-  unready() { melody([[N.G4, 0.07], [N.D4, 0.1]], { type: "square", gain: 0.13 }); },
+  unready() {
+    melody(
+      [
+        [N.G4, 0.07],
+        [N.D4, 0.1],
+      ],
+      { type: "square", gain: 0.13 },
+    );
+  },
   /** 倒计时滴答 */
-  countdownBeep() { tone(N.A4, 0.12, { type: "square", gain: 0.18 }); },
+  countdownBeep() {
+    tone(N.A4, 0.12, { type: "square", gain: 0.18 });
+  },
   /** 开战！ */
-  go() { melody([[N.C5, 0.08], [N.E5, 0.08], [N.G5, 0.18]], { type: "square", gain: 0.2 }); },
+  go() {
+    melody(
+      [
+        [N.C5, 0.08],
+        [N.E5, 0.08],
+        [N.G5, 0.18],
+      ],
+      { type: "square", gain: 0.2 },
+    );
+  },
   /** 占领格子：短促上行（地图迭代会用到） */
-  capture() { tone(N.C5, 0.05, { type: "square", gain: 0.1 }); },
+  capture() {
+    tone(N.C5, 0.05, { type: "square", gain: 0.1 });
+  },
   /** 夺取王座：重音 */
-  throne() { melody([[N.C5, 0.06], [N.G5, 0.06], [N.C6, 0.16]], { type: "square", gain: 0.22 }); },
+  throne() {
+    melody(
+      [
+        [N.C5, 0.06],
+        [N.G5, 0.06],
+        [N.C6, 0.16],
+      ],
+      { type: "square", gain: 0.22 },
+    );
+  },
   /** 胜利号角 */
   victory() {
-    melody([[N.C5, 0.14], [N.E5, 0.14], [N.G5, 0.14], [N.C6, 0.34]], { type: "square", gain: 0.2 });
+    melody(
+      [
+        [N.C5, 0.14],
+        [N.E5, 0.14],
+        [N.G5, 0.14],
+        [N.C6, 0.34],
+      ],
+      { type: "square", gain: 0.2 },
+    );
   },
   /** 失败哀号：下行 */
   defeat() {
-    melody([[N.G4, 0.16], [N.F4, 0.16], [N.D4, 0.16], [N.C4, 0.4]], { type: "triangle", gain: 0.2 });
+    melody(
+      [
+        [N.G4, 0.16],
+        [N.F4, 0.16],
+        [N.D4, 0.16],
+        [N.C4, 0.4],
+      ],
+      { type: "triangle", gain: 0.2 },
+    );
   },
 };
 

@@ -1,17 +1,18 @@
 // 账号管理：忘记密码 / 改密码 / 改邮箱 / 改用户名 / 确认改邮箱
-import { api } from "./base";
+
 import type {
-  RequestPasswordResetReqBody,
-  ResetPasswordReqBody,
-  ChangePasswordReqBody,
   ChangeEmailReqBody,
-  ConfirmEmailChangeReqBody,
+  ChangePasswordReqBody,
   ChangeUsernameReqBody,
   ChangeUsernameRespBody,
+  ConfirmEmailChangeReqBody,
+  ErrorResp,
   MessageResp,
   PasswordResetTokenRespBody,
-  ErrorResp,
+  RequestPasswordResetReqBody,
+  ResetPasswordReqBody,
 } from "@generale/types/dist/api";
+import { api } from "./base";
 
 export function forgotPasswordApi(body: RequestPasswordResetReqBody): Promise<MessageResp> {
   return api<MessageResp, ErrorResp>("/api/forgot-password", {

@@ -2,6 +2,7 @@
   "name": "generale-game-monorepo",
   "module": "index.ts",
   "devDependencies": {
+    "@biomejs/biome": "2.5.1",
     "@types/bun": "latest"
   },
   "peerDependencies": {
@@ -11,7 +12,12 @@
   "scripts": {
     "build": "bun run --filter=./packages/* build",
     "dev": "bun run --filter=./packages/* dev",
-    "test": "bun run --filter=./packages/* test"
+    "test": "bun run --filter=./packages/* test",
+    "lint": "bunx biome lint",
+    "format": "bunx biome format --write",
+    "check": "bunx biome check",
+    "check:write": "bunx biome check --write",
+    "ci:lint": "bunx biome ci --reporter=github"
   },
   "type": "module",
   "workspaces": [

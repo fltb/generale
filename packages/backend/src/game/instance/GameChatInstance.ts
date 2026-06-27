@@ -1,19 +1,19 @@
-import {
-  PlayerId,
-  ChatMessage,
+import type {
   ChatClientToServer,
-  ChatServerToClient,
-  ChatSendMessageReq,
+  ChatMessage,
   ChatSenderMeta,
-} from '@generale/types';
+  ChatSendMessageReq,
+  ChatServerToClient,
+  PlayerId,
+} from "@generale/types";
 
 /**
  * 依赖注入：ws sub-connector
  */
-export type GameChatConnector = ServerSyncConnector<ChatClientToServer, ChatServerToClient>
+export type GameChatConnector = ServerSyncConnector<ChatClientToServer, ChatServerToClient>;
 
-import { IBaseInstance, IRoomRoster } from './interface';
-import { ServerSyncConnector } from '@generale/types';
+import type { ServerSyncConnector } from "@generale/types";
+import type { IBaseInstance, IRoomRoster } from "./interface";
 
 export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatServerToClient> {
   private messages: ChatMessage[] = [];
@@ -28,15 +28,13 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
     this._activeStageInstance = instance;
   }
 
-  private destroyed: boolean = false;
+  private destroyed = false;
 
   constructor(maxMessages = 100) {
     this.maxMessages = maxMessages;
-    this.addSystemMessage('游戏聊天已启动，欢迎大家！');
+    this.addSystemMessage("游戏聊天已启动，欢迎大家！");
   }
 
-
-  
   public destroy(): void {
     this.destroyed = true;
     for (const connector of this.connectors.values()) {
@@ -66,7 +64,10 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
 
   /** 玩家加入 */
   /** 动态添加玩家（用于 GameService） */
-  public addPlayer(user: { id: PlayerId, name: string }, connector: ServerSyncConnector<ChatClientToServer, ChatServerToClient>): { success: true } | { success: false, message: string } {
+  public addPlayer(
+    user: { id: PlayerId; name: string },
+    connector: ServerSyncConnector<ChatClientToServer, ChatServerToClient>,
+  ): { success: true } | { success: false; message: string } {
     const pid = user.id;
     const name = user.name;
     const canJoin = this.canJoin(pid);
@@ -76,10 +77,10 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
       console.warn(msg);
       return { success: false, message: msg };
     }
-    console.debug(`[GameChatInstance] user ${name}#${pid} joined chat.`)
+    console.debug(`[GameChatInstance] user ${name}#${pid} joined chat.`);
     this.playerNames.set(pid, name);
     this.connectors.set(pid, connector);
-    connector.onClientMessage(msg => this.handleMessage(pid, msg));
+    connector.onClientMessage((msg) => this.handleMessage(pid, msg));
     // 发送最近消息
     this.sendRecentMessages(pid, 30);
     this.addSystemMessage(`${name} 加入了游戏`);
@@ -98,13 +99,13 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
   /** 处理 ws 消息 */
   private handleMessage(pid: PlayerId, msg: ChatClientToServer) {
     switch (msg.type) {
-      case 'send_message':
+      case "send_message":
         this.handleSendMessage(pid, msg);
         break;
-      case 'fetch_recent':
+      case "fetch_recent":
         this.sendRecentMessages(pid, msg.limit);
         break;
-      case 'fetch_history':
+      case "fetch_history":
         this.sendHistoryMessages(pid, msg.beforeId, msg.limit);
         break;
       default:
@@ -118,17 +119,17 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
     const name = this.playerNames.get(pid) || `玩家${pid}`;
     const content = msg.content.trim();
     if (!content) {
-      this.sendResult(pid, 'failed', undefined, '消息不能为空');
+      this.sendResult(pid, "failed", undefined, "消息不能为空");
       return;
     }
     if (content.length > 500) {
-      this.sendResult(pid, 'failed', undefined, '消息过长');
+      this.sendResult(pid, "failed", undefined, "消息过长");
       return;
     }
     const meta = this.getSenderMeta(pid);
-    const scope = msg.scope === 'team' ? 'team' : (meta?.presence === 'game' ? 'game' : 'room');
-    if (scope === 'team' && !this.canSendTeamMessage(pid, meta)) {
-      this.sendResult(pid, 'failed', undefined, '当前不能发送小队消息');
+    const scope = msg.scope === "team" ? "team" : meta?.presence === "game" ? "game" : "room";
+    if (scope === "team" && !this.canSendTeamMessage(pid, meta)) {
+      this.sendResult(pid, "failed", undefined, "当前不能发送小队消息");
       return;
     }
     const chatMsg: ChatMessage = {
@@ -137,26 +138,26 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
       playerName: name,
       content,
       timestamp: Date.now(),
-      type: 'user',
+      type: "user",
       scope,
       ...(meta ? { meta } : {}),
-      ...(scope === 'team' ? { recipientIds: this.getTeamRecipientIds(meta!.teamId!) } : {}),
+      ...(scope === "team" && meta?.teamId ? { recipientIds: this.getTeamRecipientIds(meta.teamId) } : {}),
     };
     this.addMessage(chatMsg);
     this.broadcastNewMessage(chatMsg);
-    this.sendResult(pid, 'success', chatMsg.id);
+    this.sendResult(pid, "success", chatMsg.id);
   }
 
   /** 添加系统消息 */
   private addSystemMessage(content: string) {
     const msg: ChatMessage = {
       id: this.generateMessageId(),
-      playerId: 'system' as PlayerId,
-      playerName: '系统',
+      playerId: "system" as PlayerId,
+      playerName: "系统",
       content,
       timestamp: Date.now(),
-      type: 'system',
-      scope: 'room',
+      type: "system",
+      scope: "room",
     };
     this.addMessage(msg);
     this.broadcastNewMessage(msg);
@@ -174,16 +175,16 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
   private broadcastNewMessage(msg: ChatMessage) {
     for (const [pid, conn] of this.connectors) {
       if (!this.canReceiveMessage(pid, msg)) continue;
-      conn.send({ type: 'new_message', message: msg });
+      conn.send({ type: "new_message", message: msg });
     }
   }
 
   /** 发送最近 N 条消息 */
   private sendRecentMessages(pid: PlayerId, limit: number) {
-    const visible = this.messages.filter(m => this.canReceiveMessage(pid, m));
+    const visible = this.messages.filter((m) => this.canReceiveMessage(pid, m));
     const msgs = visible.slice(-limit);
     this.connectors.get(pid)?.send({
-      type: 'messages_batch',
+      type: "messages_batch",
       messages: msgs,
       isEnd: msgs.length === visible.length,
     });
@@ -191,25 +192,28 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
 
   /** 滚动历史加载 */
   private sendHistoryMessages(pid: PlayerId, beforeId: string, limit: number) {
-    const visible = this.messages.filter(m => this.canReceiveMessage(pid, m));
-    const idx = visible.findIndex(m => m.id === beforeId);
+    const visible = this.messages.filter((m) => this.canReceiveMessage(pid, m));
+    const idx = visible.findIndex((m) => m.id === beforeId);
     if (idx === -1) {
       this.sendRecentMessages(pid, limit);
       return;
     }
     const msgs = visible.slice(Math.max(0, idx - limit), idx);
     this.connectors.get(pid)?.send({
-      type: 'messages_batch',
+      type: "messages_batch",
       messages: msgs,
       isEnd: idx - limit <= 0,
     });
   }
 
   /** 发送操作结果 */
-  private sendResult(pid: PlayerId, status: 'success' | 'failed', messageId?: string, reason?: string) {
-    const evt: any = { type: 'send_result', status };
-    if (messageId !== undefined) evt.messageId = messageId;
-    if (reason !== undefined) evt.reason = reason;
+  private sendResult(pid: PlayerId, status: "success" | "failed", messageId?: string, reason?: string) {
+    const evt: ChatServerToClient = {
+      type: "send_result",
+      status,
+      ...(messageId !== undefined ? { messageId } : {}),
+      ...(reason !== undefined ? { reason } : {}),
+    };
     this.connectors.get(pid)?.send(evt);
   }
 
@@ -224,28 +228,26 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
 
   private canSendTeamMessage(pid: PlayerId, meta?: ChatSenderMeta): boolean {
     const resolved = meta ?? this.getSenderMeta(pid);
-    return !!resolved?.teamId
-      && resolved.teamMode === 'team'
-      && resolved.presence === 'game';
+    return !!resolved?.teamId && resolved.teamMode === "team" && resolved.presence === "game";
   }
 
   private canReceiveMessage(pid: PlayerId, msg: ChatMessage): boolean {
-    if (msg.type === 'system' || msg.scope !== 'team') return true;
+    if (msg.type === "system" || msg.scope !== "team") return true;
     if (msg.recipientIds?.includes(pid)) return true;
     const recipientMeta = this.getSenderMeta(pid);
-    return !!recipientMeta?.teamId
-      && recipientMeta.teamId === msg.meta?.teamId
-      && recipientMeta.teamMode === 'team'
-      && recipientMeta.presence === 'game';
+    return (
+      !!recipientMeta?.teamId &&
+      recipientMeta.teamId === msg.meta?.teamId &&
+      recipientMeta.teamMode === "team" &&
+      recipientMeta.presence === "game"
+    );
   }
 
   private getTeamRecipientIds(teamId: string): PlayerId[] {
     const players = this._activeStageInstance?.getPlayersForTeamChat();
-    if (!players || !Array.isArray(players)) {
-      return Array.from(this.connectors.keys()).filter(pid => this.getSenderMeta(pid)?.teamId === teamId);
+    if (!(players && Array.isArray(players))) {
+      return Array.from(this.connectors.keys()).filter((pid) => this.getSenderMeta(pid)?.teamId === teamId);
     }
-    return players
-      .filter(p => p.teamId === teamId && p.status === 'playing')
-      .map(p => p.id);
+    return players.filter((p) => p.teamId === teamId && p.status === "playing").map((p) => p.id);
   }
 }

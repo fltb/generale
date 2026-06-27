@@ -5,8 +5,8 @@
  * Emits Partial<ListGamesQuery> to parent.
  */
 
-import { type Component, createSignal, createEffect, Show } from "solid-js";
 import type { ListGamesQuery } from "@generale/types/dist/api";
+import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { Button, Card, Input, Select } from "~/ui";
 
 type Props = {
@@ -15,9 +15,9 @@ type Props = {
 };
 
 // simple debounce
-function debounce<T extends (...args: any[]) => void>(fn: T, wait = 250) {
-  let t: any;
-  return (...args: Parameters<T>) => {
+function debounce<A extends unknown[]>(fn: (...args: A) => void, wait = 250) {
+  let t: ReturnType<typeof setTimeout> | undefined;
+  return (...args: A) => {
     clearTimeout(t);
     t = setTimeout(() => fn(...args), wait);
   };
@@ -25,7 +25,7 @@ function debounce<T extends (...args: any[]) => void>(fn: T, wait = 250) {
 
 export const RoomFilter: Component<Props> = (props) => {
   const [local, setLocal] = createSignal<Partial<ListGamesQuery>>({
-    ...props.value
+    ...props.value,
   });
 
   const [customWidth, setCustomWidth] = createSignal("");
@@ -38,14 +38,11 @@ export const RoomFilter: Component<Props> = (props) => {
     setLocal({ ...(props.value ?? {}) });
   });
 
-  function setField<K extends keyof ListGamesQuery>(
-    key: K,
-    value: string | undefined
-  ) {
-    setLocal(prev => {
+  function setField<K extends keyof ListGamesQuery>(key: K, value: string | undefined) {
+    setLocal((prev) => {
       const next = {
         ...prev,
-        [key]: value === "" || value === undefined ? undefined : value
+        [key]: value === "" || value === undefined ? undefined : value,
       };
 
       // type change resets map
@@ -81,7 +78,6 @@ export const RoomFilter: Component<Props> = (props) => {
   return (
     <Card class="p-4 mb-4">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-
         {/* room name */}
         <Input
           size="sm"
@@ -102,21 +98,13 @@ export const RoomFilter: Component<Props> = (props) => {
 
         {/* mode / status / password */}
         <div class="flex gap-2">
-          <Select
-            size="sm"
-            value={local().type ?? ""}
-            onChange={(e) => setField("type", e.currentTarget.value)}
-          >
+          <Select size="sm" value={local().type ?? ""} onChange={(e) => setField("type", e.currentTarget.value)}>
             <option value="">All modes</option>
             <option value="standard">standard</option>
             <option value="custom">custom</option>
           </Select>
 
-          <Select
-            size="sm"
-            value={local().status ?? ""}
-            onChange={(e) => setField("status", e.currentTarget.value)}
-          >
+          <Select size="sm" value={local().status ?? ""} onChange={(e) => setField("status", e.currentTarget.value)}>
             <option value="">Any status</option>
             <option value="lobby">lobby</option>
             <option value="in-progress">in-progress</option>
@@ -154,11 +142,7 @@ export const RoomFilter: Component<Props> = (props) => {
 
           {/* map filter */}
           <Show when={local().type === "standard"}>
-            <Select
-              size="sm"
-              value={local().map ?? ""}
-              onChange={(e) => setField("map", e.currentTarget.value)}
-            >
+            <Select size="sm" value={local().map ?? ""} onChange={(e) => setField("map", e.currentTarget.value)}>
               <option value="">Any map</option>
               <option value="small">small</option>
               <option value="medium">medium</option>
@@ -203,11 +187,7 @@ export const RoomFilter: Component<Props> = (props) => {
 
         {/* sort */}
         <div class="flex gap-2 items-center">
-          <Select
-            size="sm"
-            value={local().sortBy ?? ""}
-            onChange={(e) => setField("sortBy", e.currentTarget.value)}
-          >
+          <Select size="sm" value={local().sortBy ?? ""} onChange={(e) => setField("sortBy", e.currentTarget.value)}>
             <option value="">Sort by</option>
             <option value="playerCount">playerCount</option>
             <option value="roomName">roomName</option>

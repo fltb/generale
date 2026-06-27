@@ -12,11 +12,11 @@ const COLORS = ["#f2b21c", "#3b82c4", "#3fa34d", "#d23b3b", "#f5e6c8", "#b8439b"
 
 // 不用 Math.random（环境里被禁用且无所谓真随机）——用确定性伪散布即可。
 function spread(i: number) {
-  const left = ((i * 73) % 100);
+  const left = (i * 73) % 100;
   const color = COLORS[i % COLORS.length];
-  const delay = ((i * 37) % 100) / 100;       // 0..1s
-  const dur = 1.8 + ((i * 53) % 120) / 100;    // 1.8..3s
-  const size = 6 + (i % 3) * 3;                // 6/9/12 px
+  const delay = ((i * 37) % 100) / 100; // 0..1s
+  const dur = 1.8 + ((i * 53) % 120) / 100; // 1.8..3s
+  const size = 6 + (i % 3) * 3; // 6/9/12 px
   return { left, color, delay, dur, size };
 }
 

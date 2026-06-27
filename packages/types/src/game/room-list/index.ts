@@ -1,59 +1,58 @@
 import type { GameInfoRoute, ListGamesQuery } from "../../api";
 
 export enum LobbyServerMessageType {
-    LIST = "room-list",
-    CREATED = "room-created",
-    UPDATED = "room-updated",
-    DELETED = "room-deleted"
+  LIST = "room-list",
+  CREATED = "room-created",
+  UPDATED = "room-updated",
+  DELETED = "room-deleted",
 }
 
 export interface LobbyServerRoomListMessage {
-    type: LobbyServerMessageType.LIST
-    payload: GameInfoRoute[]
-    meta: {
-        ts: number
-        seq: number
-    }
+  type: LobbyServerMessageType.LIST;
+  payload: GameInfoRoute[];
+  meta: {
+    ts: number;
+    seq: number;
+  };
 }
 
 export interface LobbyServerRoomCreatedMessage {
-    type: LobbyServerMessageType.CREATED
-    payload: GameInfoRoute
-    meta: {
-        ts: number
-        seq: number
-        id: string
-    }
+  type: LobbyServerMessageType.CREATED;
+  payload: GameInfoRoute;
+  meta: {
+    ts: number;
+    seq: number;
+    id: string;
+  };
 }
 
 export interface LobbyServerRoomUpdatedMessage {
-    type: LobbyServerMessageType.UPDATED
-    payload: GameInfoRoute
-    meta: {
-        ts: number
-        seq: number
-        id: string
-    }
+  type: LobbyServerMessageType.UPDATED;
+  payload: GameInfoRoute;
+  meta: {
+    ts: number;
+    seq: number;
+    id: string;
+  };
 }
 
 export interface LobbyServerRoomDeletedMessage {
-    type: LobbyServerMessageType.DELETED
-    payload: {
-        gameId: string
-    }
-    meta: {
-        ts: number
-        seq: number
-        id: string
-    }
+  type: LobbyServerMessageType.DELETED;
+  payload: {
+    gameId: string;
+  };
+  meta: {
+    ts: number;
+    seq: number;
+    id: string;
+  };
 }
 
 export type LobbyMessage =
-    | LobbyServerRoomListMessage
-    | LobbyServerRoomCreatedMessage
-    | LobbyServerRoomUpdatedMessage
-    | LobbyServerRoomDeletedMessage;
-
+  | LobbyServerRoomListMessage
+  | LobbyServerRoomCreatedMessage
+  | LobbyServerRoomUpdatedMessage
+  | LobbyServerRoomDeletedMessage;
 
 export enum LobbyClientEventType {
   REQUEST_LIST = "request-list",
@@ -61,45 +60,45 @@ export enum LobbyClientEventType {
   SYNC_FROM_SEQ = "sync-from-seq",
   PING = "ping",
   PONG = "pong",
-  CLOSE = "close"
+  CLOSE = "close",
 }
 
 export interface LobbyClientRequestListEvent {
-  type: LobbyClientEventType.REQUEST_LIST
+  type: LobbyClientEventType.REQUEST_LIST;
   payload: {
-    filters?: ListGamesQuery
-    offset?: number
-    limit?: number
-  }
+    filters?: ListGamesQuery;
+    offset?: number;
+    limit?: number;
+  };
 }
 
 export interface LobbyClientSetFiltersEvent {
-  type: LobbyClientEventType.SET_FILTERS
+  type: LobbyClientEventType.SET_FILTERS;
   payload: {
-    filters?: ListGamesQuery
-  }
+    filters?: ListGamesQuery;
+  };
 }
 
 export interface LobbyClientSyncFromSeqEvent {
-  type: LobbyClientEventType.SYNC_FROM_SEQ
+  type: LobbyClientEventType.SYNC_FROM_SEQ;
   payload: {
-    lastSeenSeq: number
-  }
+    lastSeenSeq: number;
+  };
 }
 
 export interface LobbyClientPingEvent {
-  type: LobbyClientEventType.PING
+  type: LobbyClientEventType.PING;
 }
 
 export interface LobbyClientPongEvent {
-  type: LobbyClientEventType.PONG
+  type: LobbyClientEventType.PONG;
 }
 
 export interface LobbyClientCloseEvent {
-  type: LobbyClientEventType.CLOSE
+  type: LobbyClientEventType.CLOSE;
   payload: {
-    reason?: string
-  }
+    reason?: string;
+  };
 }
 
 export type LobbyClientEvent =

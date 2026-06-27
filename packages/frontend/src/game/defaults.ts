@@ -1,7 +1,10 @@
 import {
+  type GameStatus,
+  type GameMap,
+  type GameSettings,
+  PreGameMapType,
   type PreGameRoomState,
   type SyncedGameState,
-  PreGameMapType,
 } from "@generale/types";
 
 /**
@@ -45,12 +48,12 @@ export const makeEmptyRoom = (gameId = ""): PreGameRoomState => ({
 
 /** minimal initial game state fallback（masked shape） */
 export const makeEmptyGameState = (): SyncedGameState => ({
-  status: undefined as any,
+  status: undefined as unknown as GameStatus,
   tick: 0,
-  map: { width: 0, height: 0, tiles: [] } as any,
+  map: { width: 0, height: 0, tiles: [] } as unknown as GameMap,
   players: {},
   teams: {},
-  settings: {} as any,
+  settings: {} as unknown as GameSettings,
   playerDisplay: {},
   playerOperationQueue: [],
 });

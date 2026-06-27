@@ -1,10 +1,13 @@
-import { PlayerId, TeamId, ServerSyncConnector } from "@generale/types";
 import type { ChatSenderMeta } from "@generale/types";
+import { PlayerId, ServerSyncConnector, TeamId } from "@generale/types";
 
 export interface IBaseInstance<CEvt, SEvt> {
-    destroy(): void;
-    canJoin(id: PlayerId): {success: true} | {success: false, message: string};
-    addPlayer(user: {id: PlayerId, name: string}, connector: ServerSyncConnector<CEvt, SEvt>): { success: true } | { success: false, message: string };
+  destroy(): void;
+  canJoin(id: PlayerId): { success: true } | { success: false; message: string };
+  addPlayer(
+    user: { id: PlayerId; name: string },
+    connector: ServerSyncConnector<CEvt, SEvt>,
+  ): { success: true } | { success: false; message: string };
 }
 
 /**
@@ -13,7 +16,7 @@ export interface IBaseInstance<CEvt, SEvt> {
  * ChatInstance 通过此接口获取鉴权和展示所需的元数据，不再依赖具体 Instance 类型。
  */
 export interface IRoomRoster {
-    canJoin(playerId: PlayerId): { success: true } | { success: false; message: string };
-    getPlayerChatMeta(playerId: PlayerId): ChatSenderMeta | null;
-    getPlayersForTeamChat(): Array<{ id: PlayerId; teamId?: TeamId; status: string }>;
+  canJoin(playerId: PlayerId): { success: true } | { success: false; message: string };
+  getPlayerChatMeta(playerId: PlayerId): ChatSenderMeta | null;
+  getPlayersForTeamChat(): Array<{ id: PlayerId; teamId?: TeamId; status: string }>;
 }

@@ -1,49 +1,46 @@
-import { initEmailService, sendVerificationEmail } from '../src/services/emailService';
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
+import { initEmailService, sendVerificationEmail } from "../src/services/emailService";
 
 dotenv.config();
 
 async function sendTestEmail() {
   try {
     // Validate required SMTP environment variables
-    const requiredVars = [
-      'EMAIL_FROM',
-      'SMTP_HOST',
-      'SMTP_PORT',
-      'SMTP_USER',
-      'SMTP_PASS',
-      'TEST_EMAIL_TO',
-    ];
-    
+    const requiredVars = ["EMAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "TEST_EMAIL_TO"];
+
     for (const varName of requiredVars) {
       if (!process.env[varName]) {
         throw new Error(`${varName} is required in environment`);
       }
     }
 
+    const EMAIL_FROM = process.env["EMAIL_FROM"] ?? "";
+    const SMTP_HOST = process.env["SMTP_HOST"] ?? "";
+    const SMTP_PORT = process.env["SMTP_PORT"] ?? "";
+    const SMTP_USER = process.env["SMTP_USER"] ?? "";
+    const SMTP_PASS = process.env["SMTP_PASS"] ?? "";
+    const TEST_EMAIL_TO = process.env["TEST_EMAIL_TO"] ?? "";
+
     await initEmailService({
-      method: 'smtp',
-      from: process.env['EMAIL_FROM']!,
+      method: "smtp",
+      from: EMAIL_FROM,
       smtp: {
-        host: process.env['SMTP_HOST']!,
-        port: parseInt(process.env['SMTP_PORT']!),
+        host: SMTP_HOST,
+        port: parseInt(SMTP_PORT, 10),
         secure: true,
         auth: {
-          user: process.env['SMTP_USER']!,
-          pass: process.env['SMTP_PASS']!
-        }
+          user: SMTP_USER,
+          pass: SMTP_PASS,
+        },
       },
-      proxy: process.env['HTTP_PROXY']!,
+      ...(process.env["HTTP_PROXY"] ? { proxy: process.env["HTTP_PROXY"] } : {}),
     });
-    
-    await sendVerificationEmail(
-      process.env['TEST_EMAIL_TO']!, 
-      'Test Email from SMTP', 
-    );
-    
-    console.log('Email sent successfully via SMTP');
+
+    await sendVerificationEmail(TEST_EMAIL_TO, "Test Email from SMTP");
+
+    console.log("Email sent successfully via SMTP");
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error("Failed to send email:", error);
   }
 }
 

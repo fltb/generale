@@ -1,26 +1,27 @@
 // src/app.tsx
+
+import { MetaProvider } from "@solidjs/meta";
+import { Route, Router } from "@solidjs/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
-import { MetaProvider } from "@solidjs/meta";
-import { Router, Route } from "@solidjs/router";
 import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
-import Home from "./routes";
-import Test from "./routes/test";
-import Nav from "./components/Nav";
 import { Suspense } from "solid-js";
-import LoginPage from "./routes/login";
+import Nav from "./components/Nav";
 import { WebSocketProvider } from "./hooks/useWebsocket";
-import RoomRoute from "./routes/room";
-import ProfilePage from "./routes/profile";
-import PublicProfilePage from "./routes/profile-view";
-import ForgotPasswordPage from "./routes/forgot-password";
-import ResetPasswordPage from "./routes/reset-password";
+import Home from "./routes";
 import ConfirmEmailChangePage from "./routes/confirm-email-change";
-import VerifyEmailPage from "./routes/verify-email";
-import MapsPage from "./routes/maps";
+import ForgotPasswordPage from "./routes/forgot-password";
+import LoginPage from "./routes/login";
 import MapEditorPage from "./routes/map-editor";
 import MapPreviewPage from "./routes/map-preview";
+import MapsPage from "./routes/maps";
+import ProfilePage from "./routes/profile";
+import PublicProfilePage from "./routes/profile-view";
+import ResetPasswordPage from "./routes/reset-password";
+import RoomRoute from "./routes/room";
+import Test from "./routes/test";
+import VerifyEmailPage from "./routes/verify-email";
 
 const queryClient = new QueryClient();
 

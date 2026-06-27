@@ -1,6 +1,6 @@
 // 游戏房间阶段（RoomInstance）核心类型定义，最大程度复用 core-type
-import type { PlayerId, TeamId, GameId, TileType } from '../core-type';
-import { PlayerColor } from './player-colors';
+import type { GameId, PlayerId, TeamId, TileType } from "../core-type";
+import type { PlayerColor } from "./player-colors";
 
 export interface TeamInfo {
   id: TeamId;
@@ -9,9 +9,9 @@ export interface TeamInfo {
 
 // 地图类型
 export enum PreGameMapType {
-  Random = 'random',
-  Custom = 'custom',
-  Imported = 'imported',
+  Random = "random",
+  Custom = "custom",
+  Imported = "imported",
 }
 
 // standard 房间的预设尺寸 label，标记当前选中的预设；custom 房间为 null/undefined
@@ -43,7 +43,7 @@ export interface PreGameCustomMapSetting {
   width: number;
   height: number;
   tileFrequency: Partial<Record<TileType, number>>;
-  customData?: any; // 可进一步细化
+  customData?: unknown; // 可进一步细化
 }
 
 // 导入地图参数（从地图工坊选取）
@@ -53,20 +53,20 @@ export interface PreGameImportedMapSetting {
   customMapId: string;
 }
 
-export type PreGameMapSetting =
-  | PreGameRandomMapSetting
-  | PreGameCustomMapSetting
-  | PreGameImportedMapSetting;
+export type PreGameMapSetting = PreGameRandomMapSetting | PreGameCustomMapSetting | PreGameImportedMapSetting;
 
 // 游戏通用设置（如后续与 GameSettings 兼容可再调整）
 export interface PreGameGameSetting {
   /** 游戏倍速 0.5-3，仅用于 tick 调度，不参与 GameSettings */
   speed: number;
   /** 地块增长规则，格式与 GameSettings.tileGrow 一致 */
-  tileGrow: Record<TileType, {
-    duration: number;
-    growth: number;
-  }>;
+  tileGrow: Record<
+    TileType,
+    {
+      duration: number;
+      growth: number;
+    }
+  >;
   /** 挂机多少 tick 视为失败，格式与 GameSettings.afkThreshold 一致 */
   afkThreshold: number;
 }
@@ -85,10 +85,10 @@ export enum PreGamePlayerReadyState {
  * - Spectating:   Lobby 的受限变体；在 INGAME 期间打开 game 域观战；游戏结束/退出回 Lobby
  */
 export enum PreGamePlayerStatus {
-  Lobby = 'lobby',
-  Playing = 'playing',
-  Disconnected = 'disconnected',
-  Spectating = 'spectating',
+  Lobby = "lobby",
+  Playing = "playing",
+  Disconnected = "disconnected",
+  Spectating = "spectating",
 }
 
 // 玩家房间信息（只保留房间阶段必需字段）
@@ -136,14 +136,14 @@ export interface PreGameRoomState {
   started: boolean;
 }
 
-export { PlayerColor } from './player-colors';
+export { PlayerColor } from "./player-colors";
 
 /**
  * 游戏阶段枚举
  */
 export enum GamePhase {
-  PREGAME = 'pregame',    // 房间准备阶段
-  INGAME = 'ingame',      // 游戏进行阶段
-  ENDED = 'ended',        // 游戏结束阶段
-  DISBANDED = 'disbanded' // 房间解散
+  PREGAME = "pregame", // 房间准备阶段
+  INGAME = "ingame", // 游戏进行阶段
+  ENDED = "ended", // 游戏结束阶段
+  DISBANDED = "disbanded", // 房间解散
 }

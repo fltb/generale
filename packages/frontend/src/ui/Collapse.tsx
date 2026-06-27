@@ -8,9 +8,12 @@ export interface CollapseProps extends JSX.HTMLAttributes<HTMLDivElement> {
 export const Collapse: Component<CollapseProps> = (props) => {
   const [local, rest] = splitProps(props, ["arrow", "class", "children"]);
   const cls = () =>
-    ["collapse pixel-border", local.arrow ? "collapse-arrow" : "", local.class ?? ""]
-      .filter(Boolean).join(" ");
-  return <div {...rest} class={cls()}>{local.children}</div>;
+    ["collapse pixel-border", local.arrow ? "collapse-arrow" : "", local.class ?? ""].filter(Boolean).join(" ");
+  return (
+    <div {...rest} class={cls()}>
+      {local.children}
+    </div>
+  );
 };
 
 export const CollapseTitle: Component<JSX.HTMLAttributes<HTMLDivElement>> = (props) => {

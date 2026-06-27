@@ -14,9 +14,7 @@ export const Modal: Component<ModalProps> = (props) => {
   const [local] = splitProps(props, ["boxClass", "children"]);
   return (
     <div class="modal modal-open">
-      <div class={["modal-box pixel-border", local.boxClass ?? ""].filter(Boolean).join(" ")}>
-        {local.children}
-      </div>
+      <div class={["modal-box pixel-border", local.boxClass ?? ""].filter(Boolean).join(" ")}>{local.children}</div>
     </div>
   );
 };

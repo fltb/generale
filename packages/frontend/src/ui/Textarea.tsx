@@ -8,9 +8,7 @@ export interface TextareaProps extends JSX.TextareaHTMLAttributes<HTMLTextAreaEl
 export const Textarea: Component<TextareaProps> = (props) => {
   const [local, rest] = splitProps(props, ["bordered", "class"]);
   const cls = () =>
-    ["textarea pixel-border", local.bordered ? "textarea-bordered" : "", local.class ?? ""]
-      .filter(Boolean)
-      .join(" ");
+    ["textarea pixel-border", local.bordered ? "textarea-bordered" : "", local.class ?? ""].filter(Boolean).join(" ");
   return <textarea {...rest} class={cls()} />;
 };
 

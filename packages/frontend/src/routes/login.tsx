@@ -1,6 +1,6 @@
-import { useAuth } from "~/hooks/useAuth";
-import { useNavigate, A } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
+import { useAuth } from "~/hooks/useAuth";
 
 type Tab = "login" | "register";
 
@@ -52,11 +52,11 @@ export default function LoginPage() {
       //   console.warn("WebSocket connect/open failed:", wsErr);
       //   // 不要阻塞用户登录流程：仅记录或展示非致命提示
       // }
-      console.log("try nav")
+      console.log("try nav");
       nav("/");
       console.log("nav called");
-    } catch (err: any) {
-      setLoginError(err?.message || "登录失败");
+    } catch (err: unknown) {
+      setLoginError((err as Error)?.message || "登录失败");
     } finally {
       setLoginLoading(false);
     }
@@ -78,8 +78,8 @@ export default function LoginPage() {
       });
       setRegMessage(res?.message || "验证链接已发送，请查收邮箱后点击链接完成验证");
       setRegSent(true);
-    } catch (err: any) {
-      setRegMessage(err?.message || "注册失败");
+    } catch (err: unknown) {
+      setRegMessage((err as Error)?.message || "注册失败");
     } finally {
       setRegLoading(false);
     }
@@ -100,6 +100,7 @@ export default function LoginPage() {
       {/* Tab 控制 */}
       <div class="tabs mb-4">
         <button
+          type="button"
           class={`tab ${tab() === "login" ? "tab-active" : ""}`}
           onClick={() => switchTo("login")}
           aria-pressed={tab() === "login"}
@@ -107,6 +108,7 @@ export default function LoginPage() {
           登录
         </button>
         <button
+          type="button"
           class={`tab ${tab() === "register" ? "tab-active" : ""}`}
           onClick={() => switchTo("register")}
           aria-pressed={tab() === "register"}
@@ -135,21 +137,19 @@ export default function LoginPage() {
             autocomplete="current-password"
             required
           />
-          <button
-            type="submit"
-            class="btn btn-primary"
-            disabled={loginLoading()}
-          >
+          <button type="submit" class="btn btn-primary" disabled={loginLoading()}>
             {loginLoading() ? "登录中..." : "登录"}
           </button>
         </form>
         <p class="mt-2 text-red-500">{loginError()}</p>
         <p class="mt-2 text-sm">
-          <A href="/forgot-password" class="link">忘记密码？</A>
+          <A href="/forgot-password" class="link">
+            忘记密码？
+          </A>
         </p>
         <p class="mt-2">
           还没有账号？{" "}
-          <button class="link" onClick={() => switchTo("register")}>
+          <button type="button" class="link" onClick={() => switchTo("register")}>
             去注册
           </button>
         </p>
@@ -162,15 +162,22 @@ export default function LoginPage() {
             when={!regSent()}
             fallback={
               <div class="space-y-3">
-                <div class="alert alert-success">
-                  {regMessage() || "验证链接已发送，请查收邮箱后点击链接完成验证"}
-                </div>
+                <div class="alert alert-success">{regMessage() || "验证链接已发送，请查收邮箱后点击链接完成验证"}</div>
                 <p class="text-sm opacity-70">
                   查看邮箱（包括垃圾邮件），点击邮件里的链接即可激活账号。链接 10 分钟内有效。
                 </p>
                 <div class="flex gap-2">
-                  <button class="btn btn-ghost btn-sm" onClick={() => switchTo("login")}>返回登录</button>
-                  <button class="btn btn-sm" onClick={() => { setRegSent(false); setRegMessage(""); }}>
+                  <button type="button" class="btn btn-ghost btn-sm" onClick={() => switchTo("login")}>
+                    返回登录
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    onClick={() => {
+                      setRegSent(false);
+                      setRegMessage("");
+                    }}
+                  >
                     重新填写注册信息
                   </button>
                 </div>
@@ -204,11 +211,7 @@ export default function LoginPage() {
                 autocomplete="new-password"
                 required
               />
-              <button
-                type="submit"
-                class="btn btn-primary"
-                disabled={regLoading()}
-              >
+              <button type="submit" class="btn btn-primary" disabled={regLoading()}>
                 {regLoading() ? "提交中..." : "注册"}
               </button>
               <Show when={regMessage()}>
@@ -219,7 +222,7 @@ export default function LoginPage() {
 
           <p class="mt-2">
             已有账号？{" "}
-            <button class="link" onClick={() => switchTo("login")}>
+            <button type="button" class="link" onClick={() => switchTo("login")}>
               去登录
             </button>
           </p>

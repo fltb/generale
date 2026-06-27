@@ -1,14 +1,9 @@
-import { createMemo, createEffect, createSignal, Show } from "solid-js";
-import { useSearchParams, useNavigate, A } from "@solidjs/router";
+import type { ErrorResp, MessageResp, VerifyReqBody } from "@generale/types/dist/api";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
-
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import type { ApiError } from "~/api/base";
 import { useAuth } from "~/hooks/useAuth";
-import { ApiError } from "~/api/base";
-import type {
-  VerifyReqBody,
-  MessageResp,
-  ErrorResp,
-} from "@generale/types/dist/api";
 
 /**
  * 注册邮箱验证页：用户从邮件点过来，URL 带 token。
@@ -49,13 +44,17 @@ export default function VerifyEmailPage() {
           <div class="space-y-3">
             <div class="alert alert-success">{mutation.data?.message ?? "邮箱验证成功"}</div>
             <p class="text-sm opacity-70">即将跳转到登录页...</p>
-            <A href="/login" class="link">立即登录</A>
+            <A href="/login" class="link">
+              立即登录
+            </A>
           </div>
         </Show>
         <Show when={mutation.isError}>
           <div class="space-y-3">
             <div class="alert alert-error">{mutation.error?.message ?? "验证失败"}</div>
-            <A href="/login" class="link">返回登录</A>
+            <A href="/login" class="link">
+              返回登录
+            </A>
           </div>
         </Show>
       </Show>

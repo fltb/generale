@@ -1,25 +1,22 @@
-import type { SubConnectorClient } from "~/ws/manager";
+import { type SyncedStateServerEvent, SyncedStateServerEventType } from "@generale/types";
 
-import { onMount, onCleanup } from "solid-js";
-import { useWS } from "./useWebsocket";
+import { onCleanup, onMount } from "solid-js";
+import type { SubConnectorClient, WSOpenPayloadBase } from "~/ws/manager";
 import { useVersionedOptimisticState } from "./useVersionedOptimisticState";
-import {
-  SyncedStateServerEventType,
-  type SyncedStateServerEvent,
-} from "@generale/types";
+import { useWS } from "./useWebsocket";
 
 export function useSyncedState<
   TState,
   TAction extends { readonly optimisticId: number; readonly type: string },
-  Custom extends unknown
+  Custom,
 >({
   domain,
   initialState,
   initialVersion = 0,
   applyEvent,
   openPayload: context = {},
-  onCustomEvent = () => { },
-  onConnectionClosed = () => { },
+  onCustomEvent = () => {},
+  onConnectionClosed = () => {},
   autoOpen = true,
 }: {
   domain: string;
@@ -27,18 +24,14 @@ export function useSyncedState<
   initialVersion?: number;
   applyEvent: (state: TState, event: TAction) => TState;
   onCustomEvent?: (event: Custom) => void;
-  openPayload?: Record<string, any>;
+  openPayload?: Record<string, unknown>;
   onConnectionClosed?: (info: { code?: number; reason?: string }) => void;
   autoOpen?: boolean;
 }) {
   // manager from hook (the ClientConnectionManager)
   const wsMgr = useWS(); /* ClientConnectionManager<any> */
 
-  const stateManager = useVersionedOptimisticState<TState, TAction>(
-    initialState,
-    initialVersion,
-    applyEvent
-  );
+  const stateManager = useVersionedOptimisticState<TState, TAction>(initialState, initialVersion, applyEvent);
 
   // NOTE: we no longer use useSubConnector hook here.
   // We'll create/attach the sub via wsMgr.getOrCreateSub when connecting to print debug msg.
@@ -46,11 +39,12 @@ export function useSyncedState<
   let connectRequested = false;
 
   // buffer outgoing messages while sub isn't ready
-  const pendingOut: any[] = [];
+  const pendingOut: { type: string }[] = [];
 
+  type CommitResult = { status: string; optimisticId: number; message?: string };
   const pendingRequests = new Map<
     number,
-    { resolve: (v: any) => void; reject: (e?: any) => void; timeoutId: number }
+    { resolve: (v: CommitResult) => void; reject: (e: Error) => void; timeoutId: number }
   >();
 
   // ---- helper: ensure we have local sub and attach handlers ----
@@ -70,24 +64,18 @@ export function useSyncedState<
         }
       });
       console.debug(`[REGISTER ONMESSAGE:${domain}] onMessage handler recv`);
-      sub.onMessage((m: any) => {
+      sub.onMessage((m) => {
         try {
-          _onMessage(m);
+          _onMessage(m as SyncedStateServerEvent<TState, Custom>);
         } catch (e) {
-          console.error(
-            `[useSyncedState:${domain}] onMessage handler error`,
-            e
-          );
+          console.error(`[useSyncedState:${domain}] onMessage handler error`, e);
         }
       });
       sub.onDisconnect((err?: Error) => {
         try {
           _onDisconnect(err);
         } catch (e) {
-          console.error(
-            `[useSyncedState:${domain}] onDisconnect handler error`,
-            e
-          );
+          console.error(`[useSyncedState:${domain}] onDisconnect handler error`, e);
         }
       });
       sub.onClose((code?: number, reason?: string) => {
@@ -99,18 +87,13 @@ export function useSyncedState<
       });
 
       if (!sub.ready) {
-        wsMgr.openDomain(domain, context);
+        wsMgr.openDomain(domain, context as WSOpenPayloadBase);
       }
     }
   }
 
-  function _sendOrBuffer(obj: any) {
-    console.debug(
-      `[useSyncedState:${domain}] Try send`,
-      obj,
-      "subReady=",
-      !!sub && !!sub.ready
-    );
+  function _sendOrBuffer(obj: { type: string; [key: string]: unknown }) {
+    console.debug(`[useSyncedState:${domain}] Try send`, obj, "subReady=", !!sub && !!sub.ready);
     // ensure there's a sub (so the manager has the local object and callbacks attached)
     try {
       ensureSubAndAttach();
@@ -118,7 +101,7 @@ export function useSyncedState<
       console.warn("ensureSubAndAttach failed", e);
     }
 
-    if (sub && sub.ready) {
+    if (sub?.ready) {
       try {
         sub.send(obj);
         console.debug(`[useSyncedState:${domain}] Sending`, obj);
@@ -129,11 +112,9 @@ export function useSyncedState<
     } else {
       // if websocket is connected but domain not yet opened, trigger openDomain as a fallback
       try {
-        if (wsMgr && wsMgr.isConnected) {
-          console.debug(
-            `[useSyncedState:${domain}] socket connected but sub not ready — requesting domain open`
-          );
-          wsMgr.openDomain(domain, context);
+        if (wsMgr?.isConnected) {
+          console.debug(`[useSyncedState:${domain}] socket connected but sub not ready — requesting domain open`);
+          wsMgr.openDomain(domain, context as WSOpenPayloadBase);
         }
       } catch (e) {
         console.warn(`[useSyncedState:${domain}] auto openDomain failed`, e);
@@ -145,8 +126,9 @@ export function useSyncedState<
   function _flushPendingOut() {
     while (pendingOut.length > 0) {
       const p = pendingOut.shift();
+      if (!p) break;
       try {
-        if (sub && sub.ready) {
+        if (sub?.ready) {
           sub.send(p);
           console.debug(`[useSyncedState:${domain}] flushed pending`, p);
         } else {
@@ -154,7 +136,7 @@ export function useSyncedState<
           pendingOut.unshift(p);
           break;
         }
-      } catch (e) {
+      } catch (_e) {
         // push back and stop
         pendingOut.unshift(p);
         break;
@@ -184,16 +166,14 @@ export function useSyncedState<
     if (msg.type === SyncedStateServerEventType.ACTION_RESULT) {
       const p = msg.payload;
       const optimisticId = p.optimisticId;
-      if (
-        typeof optimisticId === "number" &&
-        pendingRequests.has(optimisticId)
-      ) {
-        const rec = pendingRequests.get(optimisticId)!;
-        clearTimeout(rec.timeoutId);
-        if (p.status === "success" || msg.type === "action-result")
-          rec.resolve(p);
-        else rec.reject(new Error(p.message ?? "action failed"));
-        pendingRequests.delete(optimisticId);
+      if (typeof optimisticId === "number") {
+        const rec = pendingRequests.get(optimisticId);
+        if (rec) {
+          clearTimeout(rec.timeoutId);
+          if (p.status === "success" || msg.type === "action-result") rec.resolve(p);
+          else rec.reject(new Error(p.message ?? "action failed"));
+          pendingRequests.delete(optimisticId);
+        }
       }
       return;
     }
@@ -216,10 +196,7 @@ export function useSyncedState<
 
   function _onDisconnect(err?: Error) {
     // keep optimistic queue for now
-    console.debug(
-      `[useSyncedState:${domain}] sub disconnected`,
-      err?.message ?? ""
-    );
+    console.debug(`[useSyncedState:${domain}] sub disconnected`, err?.message ?? "");
     // allow a future connect() call to re-request
     connectRequested = false;
   }
@@ -242,10 +219,7 @@ export function useSyncedState<
         connect();
       }
     } catch (e) {
-      console.error(
-        `[useSyncedState:${domain}] attach handlers failed on mount`,
-        e
-      );
+      console.error(`[useSyncedState:${domain}] attach handlers failed on mount`, e);
     }
   });
 
@@ -272,8 +246,8 @@ export function useSyncedState<
 
   function commit(
     action: Omit<TAction, "optimisticId">,
-    timeoutMs = 10000
-  ): Promise<any> {
+    timeoutMs = 10000,
+  ): Promise<{ status: string; optimisticId: number; message?: string }> {
     const optimisticId = stateManager.dispatchOptimisticEvent(action);
     const out = {
       optimisticId,
@@ -300,16 +274,13 @@ export function useSyncedState<
       if (wsMgr.isConnected) return resolve();
 
       // poll small interval until connected or timeout
-      let done = false;
       const start = Date.now();
       const iv = window.setInterval(() => {
         if (wsMgr.isConnected) {
-          done = true;
           clearInterval(iv);
           return resolve();
         }
         if (Date.now() - start > timeoutMs) {
-          done = true;
           clearInterval(iv);
           return resolve();
         }
@@ -321,7 +292,7 @@ export function useSyncedState<
   async function connect() {
     try {
       // 如果已经准备好了，直接返回（幂等）
-      if (sub && sub.ready) {
+      if (sub?.ready) {
         console.debug(`[useSyncedState:${domain}] connect() ignored - sub.ready`);
         return;
       }
@@ -333,7 +304,7 @@ export function useSyncedState<
       connectRequested = true;
 
       // ensure websocket connected
-      if (!wsMgr || !wsMgr.isConnected) {
+      if (!wsMgr?.isConnected) {
         wsMgr.connect(true);
       }
 
@@ -345,7 +316,7 @@ export function useSyncedState<
 
       if (autoOpen) {
         try {
-          wsMgr.openDomain(domain, context);
+          wsMgr.openDomain(domain, context as WSOpenPayloadBase);
           console.debug(`[useSyncedState:${domain}] openDomain requested`);
         } catch (e) {
           console.warn(`[useSyncedState:${domain}] openDomain throw`, e);
@@ -364,7 +335,7 @@ export function useSyncedState<
       if (sub) {
         try {
           sub.close();
-        } catch { }
+        } catch {}
         // keep sub reference (manager may reattach), or optionally null it:
         sub = null;
       }

@@ -1,20 +1,18 @@
-import { db } from '../db/client'
-import { users, profiles } from '../db/schema'
-import { verificationTokens } from '../db/schema' // 用于删除 token
-import { randomBytes, pbkdf2Sync, timingSafeEqual } from 'node:crypto'
-import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
-import { DEFAULT_AVATAR_THUMB_URL, DEFAULT_AVATAR_URL } from './profileService'
+import { pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { eq, type InferSelectModel } from "drizzle-orm";
+import { db } from "../db/client";
+import { profiles, users, verificationTokens } from "../db/schema";
+import { DEFAULT_AVATAR_THUMB_URL, DEFAULT_AVATAR_URL } from "./profileService";
 
 export interface User {
-  id: string
-  username: string
-  email: string
-  password: string
-  verified: boolean
-  createdAt: Date
-  updatedAt: Date
-  usernameChangedAt: Date | null
+  id: string;
+  username: string;
+  email: string;
+  password: string;
+  verified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  usernameChangedAt: Date | null;
 }
 
 /** username 允许的字符集 + 频率限制 */
@@ -28,99 +26,105 @@ export class UserService {
    * Hash and salt password using PBKDF2.
    */
   private hashPassword(password: string): string {
-    const salt = randomBytes(16).toString('hex')
-    const hash = pbkdf2Sync(password, salt, 1000, 32, 'sha256').toString('hex')
-    return `${salt}$${hash}`
+    const salt = randomBytes(16).toString("hex");
+    const hash = pbkdf2Sync(password, salt, 1000, 32, "sha256").toString("hex");
+    return `${salt}$${hash}`;
   }
 
   /**
    * Compare raw password against stored hash.
    */
   verifyPassword(password: string, stored: string): boolean {
-    const [salt, hash] = stored.split('$')
-    if (!salt || !hash) return false
-    const calcHash = pbkdf2Sync(password, salt, 1000, 32, 'sha256').toString('hex')
-    return timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(calcHash, 'hex'))
+    const [salt, hash] = stored.split("$");
+    if (!(salt && hash)) return false;
+    const calcHash = pbkdf2Sync(password, salt, 1000, 32, "sha256").toString("hex");
+    return timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(calcHash, "hex"));
   }
 
   /**
    * Create a new user record.
    */
-  async create(
-    username: string,
-    password: string,
-    email: string
-  ): Promise<User> {
-    const id = randomUUID()
-    const now = new Date()
-    const hashedPassword = this.hashPassword(password)
+  create(username: string, password: string, email: string): User {
+    const id = randomUUID();
+    const now = new Date();
+    const hashedPassword = this.hashPassword(password);
 
-    db.insert(users).values({
+    db.insert(users)
+      .values({
+        id,
+        username,
+        email,
+        password: hashedPassword,
+        verified: false,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    // 顺手建一行 profile，displayName 默认 = username。
+    // 这样新用户一注册就有 displayName，下游全链路（/me、WS context、PlayerList）
+    // 直接拿到字符串值，不用再做 "?? username" 兜底。
+    db.insert(profiles)
+      .values({
+        userId: id,
+        displayName: username,
+        avatarUrl: DEFAULT_AVATAR_URL,
+        avatarThumbUrl: DEFAULT_AVATAR_THUMB_URL,
+        updatedAt: now,
+      })
+      .run();
+
+    return {
       id,
       username,
       email,
       password: hashedPassword,
       verified: false,
       createdAt: now,
-      updatedAt: now
-    }).run()
-
-    // 顺手建一行 profile，displayName 默认 = username。
-    // 这样新用户一注册就有 displayName，下游全链路（/me、WS context、PlayerList）
-    // 直接拿到字符串值，不用再做 "?? username" 兜底。
-    db.insert(profiles).values({
-      userId: id,
-      displayName: username,
-      avatarUrl: DEFAULT_AVATAR_URL,
-      avatarThumbUrl: DEFAULT_AVATAR_THUMB_URL,
       updatedAt: now,
-    }).run()
-
-    return { id, username, email, password: hashedPassword, verified: false, createdAt: now, updatedAt: now, usernameChangedAt: null }
+      usernameChangedAt: null,
+    };
   }
 
   /**
    * Find user by primary key.
    */
   async findById(id: string): Promise<User | undefined> {
-    const row = await db.select().from(users).where(eq(users.id, id)).get()
-    return row ? this.map(row) : undefined
+    const row = await db.select().from(users).where(eq(users.id, id)).get();
+    return row ? this.map(row) : undefined;
   }
 
   /**
    * Find user by username.
    */
   async findByUsername(username: string): Promise<User | undefined> {
-    const row = await db.select().from(users).where(eq(users.username, username)).get()
-    return row ? this.map(row) : undefined
+    const row = await db.select().from(users).where(eq(users.username, username)).get();
+    return row ? this.map(row) : undefined;
   }
 
   /**
    * Find user by email.
    */
   async findByEmail(email: string): Promise<User | undefined> {
-    const row = await db.select().from(users).where(eq(users.email, email)).get()
-    return row ? this.map(row) : undefined
+    const row = await db.select().from(users).where(eq(users.email, email)).get();
+    return row ? this.map(row) : undefined;
   }
 
   /**
    * Mark user as verified.
    */
   async markVerified(id: string): Promise<void> {
-    const now = new Date()
-    await db.update(users)
-      .set({ verified: true, updatedAt: now })
-      .where(eq(users.id, id))
-      .run()
+    const now = new Date();
+    await db.update(users).set({ verified: true, updatedAt: now }).where(eq(users.id, id)).run();
   }
 
-    async isVerified(id: string): Promise<boolean> {
-    const row = db.select({ verified: users.verified }).from(users).where(eq(users.id, id)).get()
-    if (!row) return false
-    return Boolean(row.verified)
+  isVerified(id: string): boolean {
+    const row = db.select({ verified: users.verified }).from(users).where(eq(users.id, id)).get();
+    if (!row) return false;
+    return Boolean(row.verified);
   }
 
-    /**
+  /**
    * Delete a user and related records.
    *
    * IMPORTANT: currently this removes verificationTokens and the users row.
@@ -130,20 +134,20 @@ export class UserService {
    * If you prefer transactional deletion and your DB client supports transactions,
    * wrap these operations in a transaction.
    */
-  async delete(userId: string): Promise<void> {
+  delete(userId: string): void {
     try {
       // delete verification tokens for user
       try {
-        db.delete(verificationTokens).where(eq(verificationTokens.userId, userId)).run()
+        db.delete(verificationTokens).where(eq(verificationTokens.userId, userId)).run();
       } catch (err) {
-        console.warn('userService.delete: failed to delete verificationTokens for', userId, err)
+        console.warn("userService.delete: failed to delete verificationTokens for", userId, err);
       }
       // delete the user row
-      db.delete(users).where(eq(users.id, userId)).run()
-      console.info(`userService.delete: removed user ${userId}`)
+      db.delete(users).where(eq(users.id, userId)).run();
+      console.info(`userService.delete: removed user ${userId}`);
     } catch (err) {
-      console.error('userService.delete: failed to remove user', userId, err)
-      throw err
+      console.error("userService.delete: failed to remove user", userId, err);
+      throw err;
     }
   }
 
@@ -152,10 +156,7 @@ export class UserService {
    */
   async updatePassword(userId: string, newPassword: string): Promise<void> {
     const hashedPassword = this.hashPassword(newPassword);
-    await db.update(users)
-      .set({ password: hashedPassword })
-      .where(eq(users.id, userId))
-      .run();
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId)).run();
   }
 
   /**
@@ -164,16 +165,16 @@ export class UserService {
    */
   async updateUsername(userId: string, newUsername: string): Promise<{ username: string; usernameChangedAt: Date }> {
     const user = await this.findById(userId);
-    if (!user) throw new Error('User not found');
+    if (!user) throw new Error("User not found");
 
-    if (typeof newUsername !== 'string' || newUsername.trim().length < USERNAME_MIN_LEN) {
+    if (typeof newUsername !== "string" || newUsername.trim().length < USERNAME_MIN_LEN) {
       throw new Error(`用户名至少 ${USERNAME_MIN_LEN} 个字符`);
     }
     if (newUsername.trim().length > USERNAME_MAX_LEN) {
       throw new Error(`用户名最多 ${USERNAME_MAX_LEN} 个字符`);
     }
     if (!USERNAME_PATTERN.test(newUsername.trim())) {
-      throw new Error('用户名只允许字母、数字、点号和短杠');
+      throw new Error("用户名只允许字母、数字、点号和短杠");
     }
 
     // 频率检查
@@ -188,11 +189,12 @@ export class UserService {
     // 重名检查
     const existing = await this.findByUsername(newUsername.trim());
     if (existing && existing.id !== userId) {
-      throw new Error('该用户名已被使用');
+      throw new Error("该用户名已被使用");
     }
 
     const now = new Date();
-    await db.update(users)
+    await db
+      .update(users)
       .set({ username: newUsername.trim(), usernameChangedAt: now, updatedAt: now })
       .where(eq(users.id, userId))
       .run();
@@ -203,7 +205,7 @@ export class UserService {
   /**
    * Map raw DB row to User.
    */
-  private map(row: any): User {
+  private map(row: InferSelectModel<typeof users>): User {
     return {
       id: row.id,
       username: row.username,
@@ -212,16 +214,17 @@ export class UserService {
       verified: Boolean(row.verified),
       createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
       updatedAt: row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt),
-      usernameChangedAt: row.usernameChangedAt instanceof Date
-        ? row.usernameChangedAt
-        : row.usernameChangedAt != null
-        ? new Date(row.usernameChangedAt)
-        : null,
-    }
+      usernameChangedAt:
+        row.usernameChangedAt instanceof Date
+          ? row.usernameChangedAt
+          : row.usernameChangedAt != null
+            ? new Date(row.usernameChangedAt)
+            : null,
+    };
   }
 }
 
 /**
  * Singleton instance of UserService
  */
-export const userService = new UserService()
+export const userService = new UserService();

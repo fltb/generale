@@ -21,7 +21,11 @@ export const Overlay: Component<OverlayProps> = (props) => {
     ]
       .filter(Boolean)
       .join(" ");
-  return <div {...rest} class={cls()}>{local.children}</div>;
+  return (
+    <div {...rest} class={cls()}>
+      {local.children}
+    </div>
+  );
 };
 
 /**

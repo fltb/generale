@@ -17,26 +17,20 @@ export const DEFAULT_TILE_COLOR_NUMBER = 0xffffff;
 export const DEFAULT_PLAYER_COLOR_CSS = "#cccccc";
 
 /** 把可能为 number / 历史字符串 enum 名 / undefined 的颜色归一化为数字 */
-export function tileColorNumber(
-  c: number | string | undefined,
-  fallback = DEFAULT_TILE_COLOR_NUMBER,
-): number {
+export function tileColorNumber(c: number | string | undefined, fallback = DEFAULT_TILE_COLOR_NUMBER): number {
   if (typeof c === "number") return c;
   if (typeof c === "string") {
-    const num = (PlayerColor as any)[c];
+    const num = (PlayerColor as unknown as Record<string, number>)[c];
     if (typeof num === "number") return num;
   }
   return fallback;
 }
 
 /** 把颜色归一化为 css `#rrggbb` 字符串（玩家列表色块用） */
-export function playerColorCss(
-  c: number | string | undefined,
-  fallback = DEFAULT_PLAYER_COLOR_CSS,
-): string {
+export function playerColorCss(c: number | string | undefined, fallback = DEFAULT_PLAYER_COLOR_CSS): string {
   if (c == null) return fallback;
   if (typeof c === "number") return `#${c.toString(16).padStart(6, "0")}`;
-  const num = (PlayerColor as any)[c];
+  const num = (PlayerColor as unknown as Record<string, number>)[c];
   if (typeof num === "number") return `#${num.toString(16).padStart(6, "0")}`;
   return fallback;
 }

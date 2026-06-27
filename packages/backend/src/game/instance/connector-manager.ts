@@ -1,5 +1,5 @@
-import type { PlayerId } from '@generale/types';
-import type { StateSyncState } from './state-sync';
+import type { PlayerId } from "@generale/types";
+import type { StateSyncState } from "./state-sync";
 
 interface DisplaceableConnector {
   send(payload: unknown): void;
@@ -11,12 +11,16 @@ interface DisplaceableConnector {
  * 清理旧 connector 的状态，并向旧端发送 DISPLACED 通知后关闭。
  * RoomInstance / GameInstance / 未来游戏 Instance 复用同一套逻辑。
  */
-export function displaceConnector<C extends DisplaceableConnector>(
+export function displaceConnector<
+  C extends DisplaceableConnector,
+  S extends object,
+  D extends { lastConfirmedOp: number },
+>(
   pid: PlayerId,
   newConnector: C,
   connectors: Map<PlayerId, C>,
-  stateSync: StateSyncState<any>,
-  syncData: Map<PlayerId, { lastConfirmedOp: number }>,
+  stateSync: StateSyncState<S>,
+  syncData: Map<PlayerId, D>,
   customEventType: unknown,
   displacedPayloadType: unknown,
 ): C | undefined {
@@ -31,8 +35,14 @@ export function displaceConnector<C extends DisplaceableConnector>(
         type: customEventType,
         payload: { type: displacedPayloadType },
       });
-    } catch { /* ignore */ }
-    try { stale.close(); } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
+    try {
+      stale.close();
+    } catch {
+      /* ignore */
+    }
   }
 
   return stale;

@@ -1,7 +1,7 @@
 // src/hooks/useWebsocket.tsx
-import { createContext, useContext, JSX, onCleanup } from "solid-js";
-import { ClientConnectionManager, SubConnectorClient } from "~/ws/manager";
+import { createContext, type JSX, onCleanup, useContext } from "solid-js";
 import type { WSOpenPayloadBase } from "~/ws/manager";
+import { ClientConnectionManager, type SubConnectorClient } from "~/ws/manager";
 
 type WSManager<T extends WSOpenPayloadBase> = ClientConnectionManager<T>;
 
@@ -13,16 +13,16 @@ type WSManager<T extends WSOpenPayloadBase> = ClientConnectionManager<T>;
  * We do NOT read or place sid/token into the WebSocket URL. The browser will send
  * the httpOnly cookie automatically during the WebSocket handshake.
  */
-const WSContext = createContext<{ manager: WSManager<any> | null } | undefined>(
-  undefined,
-);
+// Context erases the OpenPayload generic due to contravariance; caller useWS<T>() casts on retrieval.
+// biome-ignore lint/suspicious/noExplicitAny: cannot express "ClientConnectionManager for any OpenPayload" without any
+const WSContext = createContext<{ manager: WSManager<any> | null } | undefined>(undefined);
 
-export function WebSocketProvider<
-  T extends WSOpenPayloadBase = WSOpenPayloadBase,
->(props: { url?: string; autoConnect?: boolean; children?: JSX.Element }) {
-  const url =
-    props.url ??
-    `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+export function WebSocketProvider<T extends WSOpenPayloadBase = WSOpenPayloadBase>(props: {
+  url?: string;
+  autoConnect?: boolean;
+  children?: JSX.Element;
+}) {
+  const url = props.url ?? `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 
   const manager = new ClientConnectionManager<T>(url);
 
@@ -34,11 +34,7 @@ export function WebSocketProvider<
     manager.close();
   });
 
-  return (
-    <WSContext.Provider value={{ manager }}>
-      {props.children}
-    </WSContext.Provider>
-  );
+  return <WSContext.Provider value={{ manager }}>{props.children}</WSContext.Provider>;
 }
 
 /**
@@ -55,11 +51,10 @@ export function useWS<T extends WSOpenPayloadBase = WSOpenPayloadBase>() {
  * - domain: string domain name
  * - opts.autoOpen: whether to automatically request open to server
  */
-export function useSubConnector<
-  CEvt = any,
-  SEvt = any,
-  Ctx extends WSOpenPayloadBase = WSOpenPayloadBase,
->(domain: string, opts?: { autoOpen?: boolean; context?: Partial<Ctx> }) {
+export function useSubConnector<CEvt = unknown, SEvt = unknown, Ctx extends WSOpenPayloadBase = WSOpenPayloadBase>(
+  domain: string,
+  opts?: { autoOpen?: boolean; context?: Partial<Ctx> },
+) {
   const manager = useWS<Ctx>();
 
   const sub = manager.getOrCreateSub<CEvt, SEvt>(domain);

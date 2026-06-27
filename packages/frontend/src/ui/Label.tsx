@@ -1,6 +1,6 @@
-import { type Component, type JSX, splitProps, Show } from "solid-js";
+import { type Component, type JSX, Show, splitProps } from "solid-js";
 
-export interface LabelProps extends JSX.HTMLAttributes<HTMLLabelElement> {
+export interface LabelProps extends JSX.HTMLAttributes<HTMLDivElement> {
   text?: string;
   alt?: string;
 }
@@ -9,14 +9,14 @@ export const Label: Component<LabelProps> = (props) => {
   const [local, rest] = splitProps(props, ["text", "alt", "class"]);
   const cls = () => ["label", local.class ?? ""].filter(Boolean).join(" ");
   return (
-    <label {...rest} class={cls()}>
+    <div {...rest} class={cls()}>
       <Show when={local.text}>
         <span class="label-text">{local.text}</span>
       </Show>
       <Show when={local.alt}>
         <span class="label-text-alt">{local.alt}</span>
       </Show>
-    </label>
+    </div>
   );
 };
 

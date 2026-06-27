@@ -1,11 +1,11 @@
-import { createSignal, createEffect, onMount, onCleanup } from "solid-js";
 import {
   type Coordinates,
-  type SyncedGameState,
   type PlayerOperation,
   PlayerOperationType,
+  type SyncedGameState,
   TileType,
 } from "@generale/types";
+import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 
 type MapData = SyncedGameState["map"];
 
@@ -77,7 +77,7 @@ export function useMapInput(params: UseMapInputParams) {
     const op: PlayerOperation = {
       type: PlayerOperationType.Move,
       payload: { from, to, percentage },
-    } as any;
+    };
     params.onOperationQueued?.(op);
   };
 

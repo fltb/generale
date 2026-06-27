@@ -1,15 +1,16 @@
 // src/hooks/useLobbyRealtime.ts
-import { createEffect, createMemo, on, onCleanup } from "solid-js";
-import { useSubConnector, useWS } from "~/hooks/useWebsocket";
-import { useQueryClient } from "@tanstack/solid-query";
+
 import type { ListGamesQuery } from "@generale/types";
-import { buildListQueryFromFilters } from "~/hooks/useGameListQuery";
 import {
-  LobbyClientEventType,
-  LobbyServerMessageType,
   type LobbyClientEvent,
+  LobbyClientEventType,
   type LobbyMessage,
+  LobbyServerMessageType,
 } from "@generale/types";
+import { useQueryClient } from "@tanstack/solid-query";
+import { createEffect, createMemo, on, onCleanup } from "solid-js";
+import { buildListQueryFromFilters } from "~/hooks/useGameListQuery";
+import { useSubConnector, useWS } from "~/hooks/useWebsocket";
 import type { WSOpenPayloadBase } from "~/ws/manager";
 
 function stableStringify(v: unknown) {
@@ -37,10 +38,7 @@ interface UseLobbyRealtimeOptions {
  *  - whenever filters change, the hook sends `set-filters` to update server-side filtering
  *  - cache patches only apply to query entries whose raw filters match the current ones
  */
-export function useLobbyRealtime(
-  filtersAccessor: () => Partial<ListGamesQuery>,
-  options?: UseLobbyRealtimeOptions
-) {
+export function useLobbyRealtime(filtersAccessor: () => Partial<ListGamesQuery>, options?: UseLobbyRealtimeOptions) {
   const qc = useQueryClient();
   const wsMgr = useWS();
 
@@ -60,14 +58,13 @@ export function useLobbyRealtime(
       limit: options?.limit,
       sortBy: options?.sortBy,
       sortOrder: options?.sortOrder,
-    })
+    }),
   );
 
-  const sub = useSubConnector<
-    LobbyClientEvent,
-    LobbyMessage,
-    { filters?: ListGamesQuery } & WSOpenPayloadBase
-  >("lobby-games", { autoOpen: true, context: { filters: serverFilters() } });
+  const sub = useSubConnector<LobbyClientEvent, LobbyMessage, { filters?: ListGamesQuery } & WSOpenPayloadBase>(
+    "lobby-games",
+    { autoOpen: true, context: { filters: serverFilters() } as { filters?: ListGamesQuery } & WSOpenPayloadBase },
+  );
 
   // queryKey shape from useGameListQuery: ["games", filtersAccessor(), offset, limit, sortBy, sortOrder]
   function isGamesQueryKey(queryKey: unknown): queryKey is unknown[] {
@@ -82,11 +79,7 @@ export function useLobbyRealtime(
     return qc
       .getQueryCache()
       .getAll()
-      .filter(
-        (q) =>
-          isGamesQueryKey(q.queryKey) &&
-          queryKeyMatchesCurrentFilters(q.queryKey as unknown[])
-      );
+      .filter((q) => isGamesQueryKey(q.queryKey) && queryKeyMatchesCurrentFilters(q.queryKey as unknown[]));
   }
 
   let patchFailureTimer: number | undefined;
@@ -98,17 +91,17 @@ export function useLobbyRealtime(
     }, 120);
   }
 
-  function applyListSnapshotToCache(list: any[]) {
+  function applyListSnapshotToCache(list: unknown[]) {
     for (const q of getMatchingGamesQueries()) {
       qc.setQueryData(q.queryKey, () => list);
     }
   }
 
-  function patchCreated(created: any) {
+  function patchCreated(created: { id: string }) {
     const queries = getMatchingGamesQueries();
     let patched = false;
     for (const q of queries) {
-      const data = qc.getQueryData(q.queryKey) as any[] | undefined;
+      const data = qc.getQueryData(q.queryKey) as Array<{ id: string }> | undefined;
       if (!Array.isArray(data)) continue;
       if (data.some((d) => d.id === created.id)) {
         patched = true;
@@ -120,11 +113,11 @@ export function useLobbyRealtime(
     if (!patched) safeInvalidateAllGamesDebounced();
   }
 
-  function patchUpdated(updated: any) {
+  function patchUpdated(updated: { id: string }) {
     const queries = getMatchingGamesQueries();
     let patched = false;
     for (const q of queries) {
-      const data = qc.getQueryData(q.queryKey) as any[] | undefined;
+      const data = qc.getQueryData(q.queryKey) as Array<{ id: string }> | undefined;
       if (!Array.isArray(data)) continue;
       const idx = data.findIndex((d) => d.id === updated.id);
       if (idx < 0) continue;
@@ -140,7 +133,7 @@ export function useLobbyRealtime(
     const queries = getMatchingGamesQueries();
     let patched = false;
     for (const q of queries) {
-      const data = qc.getQueryData(q.queryKey) as any[] | undefined;
+      const data = qc.getQueryData(q.queryKey) as Array<{ id: string }> | undefined;
       if (!Array.isArray(data)) continue;
       const next = data.filter((d) => d.id !== gameId);
       if (next.length === data.length) continue;
@@ -203,8 +196,8 @@ export function useLobbyRealtime(
           payload: { filters },
         });
       },
-      { defer: true }
-    )
+      { defer: true },
+    ),
   );
 
   onCleanup(() => {

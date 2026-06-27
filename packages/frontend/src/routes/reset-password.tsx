@@ -1,14 +1,9 @@
-import { createSignal, createMemo, Show } from "solid-js";
+import type { ErrorResp, PasswordResetTokenRespBody, ResetPasswordReqBody } from "@generale/types/dist/api";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
-import { useNavigate, useSearchParams, A } from "@solidjs/router";
-
+import { createMemo, createSignal, Show } from "solid-js";
 import { resetPasswordApi } from "~/api/accountApi";
-import { ApiError } from "~/api/base";
-import type {
-  ResetPasswordReqBody,
-  PasswordResetTokenRespBody,
-  ErrorResp,
-} from "@generale/types/dist/api";
+import type { ApiError } from "~/api/base";
 
 export default function ResetPasswordPage() {
   const nav = useNavigate();
@@ -51,7 +46,9 @@ export default function ResetPasswordPage() {
           fallback={
             <div class="space-y-4">
               <div class="alert alert-success">{mutation.data?.message ?? "密码已重置"}</div>
-              <button class="btn btn-primary" onClick={() => nav("/login")}>去登录</button>
+              <button type="button" class="btn btn-primary" onClick={() => nav("/login")}>
+                去登录
+              </button>
             </div>
           }
         >
@@ -81,12 +78,12 @@ export default function ResetPasswordPage() {
               <p class="text-error text-sm">{localErr()}</p>
             </Show>
             <Show when={mutation.isError || mutation.data?.valid === false}>
-              <p class="text-error text-sm">
-                {mutation.error?.message ?? mutation.data?.message ?? "重置失败"}
-              </p>
+              <p class="text-error text-sm">{mutation.error?.message ?? mutation.data?.message ?? "重置失败"}</p>
             </Show>
             <p class="mt-2 text-sm">
-              <A href="/login" class="link">返回登录</A>
+              <A href="/login" class="link">
+                返回登录
+              </A>
             </p>
           </form>
         </Show>

@@ -8,9 +8,7 @@ export interface RangeProps extends JSX.InputHTMLAttributes<HTMLInputElement> {
 export const Range: Component<RangeProps> = (props) => {
   const [local, rest] = splitProps(props, ["variant", "class"]);
   const cls = () =>
-    ["range", local.variant === "primary" ? "range-primary" : "", local.class ?? ""]
-      .filter(Boolean)
-      .join(" ");
+    ["range", local.variant === "primary" ? "range-primary" : "", local.class ?? ""].filter(Boolean).join(" ");
   return <input type="range" {...rest} class={cls()} />;
 };
 

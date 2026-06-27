@@ -1,12 +1,13 @@
 // src/hooks/useChat.ts
-import { createSignal, onMount, onCleanup } from "solid-js";
+
 import type {
   ChatClientToServer,
-  ChatServerToClient,
   ChatMessage,
   ChatMessageScope,
   ChatSenderMeta,
+  ChatServerToClient,
 } from "@generale/types";
+import { createSignal, onCleanup, onMount } from "solid-js";
 import { useWS } from "~/hooks/useWebsocket";
 import type { SubConnectorClient } from "~/ws/manager";
 
@@ -20,12 +21,7 @@ export function useChat(options: {
   initialFetchLimit?: number;
   getOptimisticMeta?: () => ChatSenderMeta | undefined;
 }) {
-  const {
-    domain,
-    userId,
-    autoOpen = true,
-    initialFetchLimit = 30,
-  } = options;
+  const { domain, userId, autoOpen = true, initialFetchLimit = 30 } = options;
 
   const wsMgr = useWS();
 
@@ -103,7 +99,7 @@ export function useChat(options: {
       console.warn("[useChat] ensureSubAndAttach failed", e);
     }
 
-    if (sub && sub.ready) {
+    if (sub?.ready) {
       try {
         sub.send(obj);
       } catch (e) {
@@ -113,10 +109,10 @@ export function useChat(options: {
     } else {
       // try to nudge manager if socket connected but domain not opened
       try {
-        if (wsMgr && wsMgr.isConnected) {
-          wsMgr.openDomain(domain, { });
+        if (wsMgr?.isConnected) {
+          wsMgr.openDomain(domain, {});
         }
-      } catch (e) {
+      } catch (_e) {
         // ignore
       }
       pendingOut.push(obj);
@@ -125,16 +121,17 @@ export function useChat(options: {
 
   function _flushPendingOut() {
     while (pendingOut.length > 0) {
-      const p = pendingOut.shift()!;
+      const p = pendingOut.shift();
+      if (!p) break;
       try {
-        if (sub && sub.ready) {
+        if (sub?.ready) {
           sub.send(p);
         } else {
           // cannot send yet, put back and stop
           pendingOut.unshift(p);
           break;
         }
-      } catch (e) {
+      } catch (_e) {
         // put back and stop
         pendingOut.unshift(p);
         break;
@@ -150,7 +147,7 @@ export function useChat(options: {
     // request recent messages
     try {
       sub?.send({ type: "fetch_recent", limit: initialFetchLimit } as ChatClientToServer);
-    } catch (e) {
+    } catch (_e) {
       // if send fails we'll rely on flush later
     }
   }
@@ -175,14 +172,8 @@ export function useChat(options: {
 
         // 1️⃣ 先尝试匹配 optimistic（只对自己发的）
         for (const [tempId, optimistic] of optimisticMap.entries()) {
-          const scopeMatches = optimistic.scope
-            ? optimistic.scope === m.scope
-            : m.scope !== "team";
-          if (
-            optimistic.content === m.content &&
-            scopeMatches &&
-            m.playerId === userId
-          ) {
+          const scopeMatches = optimistic.scope ? optimistic.scope === m.scope : m.scope !== "team";
+          if (optimistic.content === m.content && scopeMatches && m.playerId === userId) {
             setMessages((cur) => {
               const idx = cur.findIndex((x) => x.id === tempId);
               if (idx >= 0) {
@@ -199,9 +190,7 @@ export function useChat(options: {
         }
 
         // 2️⃣ 非 optimistic：正常去重 append
-        setMessages((cur) =>
-          cur.some((x) => x.id === m.id) ? cur : [...cur, m]
-        );
+        setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]));
         break;
       }
       case "send_result": {
@@ -242,7 +231,7 @@ export function useChat(options: {
 
   async function connect() {
     try {
-      if (!wsMgr || !wsMgr.isConnected) {
+      if (!wsMgr?.isConnected) {
         wsMgr.connect(true);
       }
 
@@ -253,7 +242,7 @@ export function useChat(options: {
 
       if (autoOpen) {
         try {
-          wsMgr.openDomain(domain, { });
+          wsMgr.openDomain(domain, {});
         } catch (e) {
           console.warn("[useChat] openDomain threw", e);
         }
@@ -268,7 +257,7 @@ export function useChat(options: {
       if (sub) {
         try {
           sub.close();
-        } catch { }
+        } catch {}
         sub = null;
       }
       setConnected(false);
@@ -338,7 +327,7 @@ export function useChat(options: {
     try {
       sub?.close();
       sub = null;
-    } catch { }
+    } catch {}
     pendingOut.length = 0;
     optimisticMap.clear();
   });

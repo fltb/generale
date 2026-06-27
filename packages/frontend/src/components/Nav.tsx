@@ -1,8 +1,9 @@
 // src/components/Nav.tsx
-import { createSignal, createEffect, onCleanup, JSX, Show } from "solid-js";
+
 import { A, useNavigate } from "@solidjs/router";
-import { useAuth } from "~/hooks/useAuth";
+import { createEffect, createSignal, type JSX, onCleanup, Show } from "solid-js";
 import Avatar from "~/components/Avatar";
+import { useAuth } from "~/hooks/useAuth";
 import { MuteToggle } from "~/ui";
 
 /**
@@ -47,9 +48,7 @@ export default function Nav(): JSX.Element {
         {/* 左：Logo */}
         <div class="flex items-center space-x-3">
           <A href="/" class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-md bg-white/20 flex items-center justify-center text-xl font-bold">
-              G
-            </div>
+            <div class="w-8 h-8 rounded-md bg-white/20 flex items-center justify-center text-xl font-bold">G</div>
             <span class="font-semibold">General E</span>
           </A>
         </div>
@@ -60,17 +59,11 @@ export default function Nav(): JSX.Element {
           <MuteToggle />
 
           {/* 右侧导航 */}
-          <A
-            href="/about"
-            class="border-b-2 border-transparent hover:border-sky-400 px-2 py-1"
-          >
+          <A href="/about" class="border-b-2 border-transparent hover:border-sky-400 px-2 py-1">
             About
           </A>
 
-          <A
-            href="/maps"
-            class="border-b-2 border-transparent hover:border-sky-400 px-2 py-1"
-          >
+          <A href="/maps" class="border-b-2 border-transparent hover:border-sky-400 px-2 py-1">
             地图工坊
           </A>
 
@@ -80,10 +73,7 @@ export default function Nav(): JSX.Element {
               when={auth.user}
               fallback={
                 <div class="flex items-center gap-3">
-                  <A
-                    href="/login"
-                    class="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20"
-                  >
+                  <A href="/login" class="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20">
                     Login
                   </A>
                 </div>
@@ -91,12 +81,13 @@ export default function Nav(): JSX.Element {
             >
               <div class="flex items-center">
                 <button
+                  type="button"
                   id="nav-user-button"
                   onClick={() => setOpen(!open())}
                   class="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-white/10"
                 >
                   <Avatar
-                    src={(auth.user?.avatarThumbUrl ?? auth.user?.avatarUrl)!}
+                    src={auth.user?.avatarThumbUrl ?? auth.user?.avatarUrl ?? ""}
                     alt={auth.user?.displayName || auth.user?.username || auth.user?.email}
                     size={32}
                   />
@@ -110,14 +101,11 @@ export default function Nav(): JSX.Element {
                     open() ? "block" : "hidden"
                   }`}
                 >
-                  <A
-                    href="/profile"
-                    class="block px-4 py-2 text-sm hover:bg-sky-100"
-                    onClick={() => setOpen(false)}
-                  >
+                  <A href="/profile" class="block px-4 py-2 text-sm hover:bg-sky-100" onClick={() => setOpen(false)}>
                     Profile
                   </A>
                   <button
+                    type="button"
                     onClick={handleLogout}
                     class="w-full text-left px-4 py-2 text-sm hover:bg-sky-100"
                   >

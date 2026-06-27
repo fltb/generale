@@ -1,10 +1,6 @@
+import { type PreGameMapSetting, PreGameMapType, TileType } from "@generale/types";
 import { createSignal, For, Show } from "solid-js";
 import { PreGameMapSettingForm } from "../PreGameMapSettingForm";
-import {
-  PreGameMapType,
-  TileType,
-  type PreGameMapSetting,
-} from "@generale/types";
 
 export const TestPreGameMapSettingForm = () => {
   const defaultRandom: PreGameMapSetting = {
@@ -72,20 +68,44 @@ export const TestPreGameMapSettingForm = () => {
 
       <div class="flex items-center gap-3">
         <div>
-          <div>当前类型: <strong>{setting().type}</strong></div>
+          <div>
+            当前类型: <strong>{setting().type}</strong>
+          </div>
           <Show when={setting().type !== PreGameMapType.Imported}>
-            <div>尺寸: <strong>{(setting() as any).width} × {(setting() as any).height}</strong></div>
+            <div>
+              尺寸:{" "}
+              <strong>
+                {(setting() as any).width} × {(setting() as any).height}
+              </strong>
+            </div>
           </Show>
           <Show when={setting().type === PreGameMapType.Imported}>
-            <div>mapName: <strong>{(setting() as any).mapName}</strong></div>
+            <div>
+              mapName: <strong>{(setting() as any).mapName}</strong>
+            </div>
           </Show>
         </div>
 
         <div class="btn-group">
-          <button class="btn btn-sm" onClick={() => toRandom()}>切到 Random</button>
-          <button class="btn btn-sm" onClick={() => toCustom()}>切到 Custom</button>
-          <button class="btn btn-sm" onClick={() => toImported()}>切到 Imported</button>
-          <button class="btn btn-sm" onClick={() => { setSetting(defaultRandom); pushLog("重置为默认 Random"); }}>Reset</button>
+          <button type="button" class="btn btn-sm" onClick={() => toRandom()}>
+            切到 Random
+          </button>
+          <button type="button" class="btn btn-sm" onClick={() => toCustom()}>
+            切到 Custom
+          </button>
+          <button type="button" class="btn btn-sm" onClick={() => toImported()}>
+            切到 Imported
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm"
+            onClick={() => {
+              setSetting(defaultRandom);
+              pushLog("重置为默认 Random");
+            }}
+          >
+            Reset
+          </button>
         </div>
       </div>
 
@@ -96,8 +116,28 @@ export const TestPreGameMapSettingForm = () => {
       <div>
         <h3 class="font-semibold">快速操作</h3>
         <div class="flex gap-2 mt-2 flex-wrap">
-          <button class="btn btn-xs" onClick={() => handleChange({ type: PreGameMapType.Random, width: 16, height: 12, tileFrequency: {} })}>Tiny Random</button>
-          <button class="btn btn-xs" onClick={() => handleChange({ type: PreGameMapType.Custom, width: 100, height: 100, tileFrequency: {}, customData: "{}" } as any)}>Huge Custom</button>
+          <button
+            type="button"
+            class="btn btn-xs"
+            onClick={() => handleChange({ type: PreGameMapType.Random, width: 16, height: 12, tileFrequency: {} })}
+          >
+            Tiny Random
+          </button>
+          <button
+            type="button"
+            class="btn btn-xs"
+            onClick={() =>
+              handleChange({
+                type: PreGameMapType.Custom,
+                width: 100,
+                height: 100,
+                tileFrequency: {},
+                customData: "{}",
+              } as any)
+            }
+          >
+            Huge Custom
+          </button>
         </div>
       </div>
 
@@ -118,9 +158,7 @@ export const TestPreGameMapSettingForm = () => {
       <div>
         <h3 class="font-semibold">事件日志</h3>
         <div class="max-h-48 overflow-auto border rounded p-2 mt-2">
-          <For each={logs()}>
-            {(l) => <div class="text-xs truncate">{l}</div>}
-          </For>
+          <For each={logs()}>{(l) => <div class="text-xs truncate">{l}</div>}</For>
         </div>
       </div>
     </div>

@@ -1,19 +1,20 @@
-import { createSignal, createEffect, createMemo, onMount, onCleanup } from "solid-js";
 import {
-  type SyncedGameState,
+  type GameId,
+  type PlayerId,
+  type PlayerOperation,
   type SyncedGameClientActions,
   SyncedGameClientActionTypes,
+  type SyncedGameClientPlayerOperationPushAction,
+  type SyncedGameState,
   type SyncedPreGameServerEventPayload,
   SyncedPreGameServerEventPayloadType,
-  type PlayerOperation,
-  type PlayerId,
-  type GameId,
 } from "@generale/types";
+import { createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useSyncedState } from "~/hooks/useSyncedState";
+import { confirmDialog } from "~/ui/dialogs";
 import { makeEmptyGameState } from "./defaults";
 import { applyGameEventLocal } from "./gameReducer";
 import { computeEndgameResult } from "./selectors";
-import { confirmDialog } from "~/ui/dialogs";
 
 export interface UseGameSessionParams {
   domain: string;
@@ -65,11 +66,7 @@ export function useGameSession(params: UseGameSessionParams) {
     params.onDismissGameEnd?.();
   }
 
-  const synced = useSyncedState<
-    SyncedGameState,
-    SyncedGameClientActions,
-    SyncedPreGameServerEventPayload
-  >({
+  const synced = useSyncedState<SyncedGameState, SyncedGameClientActions, SyncedPreGameServerEventPayload>({
     domain: params.domain,
     initialState: emptyState,
     initialVersion: 0,
@@ -92,7 +89,10 @@ export function useGameSession(params: UseGameSessionParams) {
   // 自动重发 sync nudge —— 等价于用户手动刷新，把概率性卡进场救回来。地图一旦就绪就停。
   let resyncInterval: ReturnType<typeof setInterval> | null = null;
   function stopResyncWatchdog() {
-    if (resyncInterval) { clearInterval(resyncInterval); resyncInterval = null; }
+    if (resyncInterval) {
+      clearInterval(resyncInterval);
+      resyncInterval = null;
+    }
   }
   onCleanup(stopResyncWatchdog);
 
@@ -107,13 +107,16 @@ export function useGameSession(params: UseGameSessionParams) {
         // 看门狗：最多重试若干次，地图就绪即止
         let attempts = 0;
         resyncInterval = setInterval(() => {
-          const ready = ((mergedState()?.map?.width ?? 0) > 0);
-          if (ready || attempts >= 5) { stopResyncWatchdog(); return; }
+          const ready = (mergedState()?.map?.width ?? 0) > 0;
+          if (ready || attempts >= 5) {
+            stopResyncWatchdog();
+            return;
+          }
           attempts++;
           console.warn(`[game] map still empty after connect, resync attempt ${attempts}`);
           try {
             synced.dispatch({ type: SyncedGameClientActionTypes.CLEAN_ALL });
-          } catch { }
+          } catch {}
         }, 1000);
       }
     } catch (e) {
@@ -126,7 +129,10 @@ export function useGameSession(params: UseGameSessionParams) {
   function handleOperationQueued(op: PlayerOperation) {
     if (params.spectate) return;
     try {
-      synced.dispatch({ type: SyncedGameClientActionTypes.PUSH, payload: [op] } as any);
+      synced.dispatch({ type: SyncedGameClientActionTypes.PUSH, payload: [op] } as Omit<
+        SyncedGameClientPlayerOperationPushAction,
+        "optimisticId"
+      >);
     } catch (e) {
       console.warn("GameWithSync handleOperationQueued dispatch error", e, op);
     }
@@ -164,7 +170,7 @@ export function useGameSession(params: UseGameSessionParams) {
   onCleanup(() => {
     try {
       synced.disconnect();
-    } catch { }
+    } catch {}
   });
 
   const mergedState = () => {

@@ -1,9 +1,9 @@
-import { db } from '../db/client';
-import { profiles } from '../db/schema';
-import { eq } from 'drizzle-orm';
-import { mkdir, rm } from 'node:fs/promises';
-import { join } from 'node:path';
-import sharp from 'sharp';
+import { mkdir, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { eq } from "drizzle-orm";
+import sharp from "sharp";
+import { db } from "../db/client";
+import { profiles } from "../db/schema";
 
 /**
  * 头像物理存储目录。映射到 URL `/api/avatars/`（见 index.ts 静态托管挂载）。
@@ -13,16 +13,16 @@ import sharp from 'sharp';
  *   ./public/avatars/<userId>/original.webp  —— 原图（profile 页用）
  *   ./public/avatars/<userId>/thumb.webp     —— 缩略（Nav、PlayerList 等小尺寸场景用）
  */
-const AVATAR_DIR = './public/avatars';
-const AVATAR_URL_PREFIX = '/api/avatars';
+const AVATAR_DIR = "./public/avatars";
+const AVATAR_URL_PREFIX = "/api/avatars";
 
 /** 默认头像（用户未上传时返回这两个 URL，前端不需要做 fallback） */
-const DEFAULT_AVATAR_DIR = './public/avatars/default';
+const DEFAULT_AVATAR_DIR = "./public/avatars/default";
 export const DEFAULT_AVATAR_URL = `${AVATAR_URL_PREFIX}/default/original.webp`;
 export const DEFAULT_AVATAR_THUMB_URL = `${AVATAR_URL_PREFIX}/default/thumb.webp`;
 
 /** 允许的输入 MIME 白名单（sharp 自己也会拒非图片，但提前 reject 错误更友好） */
-const ALLOWED_INPUT_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const ALLOWED_INPUT_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 /** 单文件最大 4MB —— 比原来 2MB 放宽一点，因为后端会重压缩 */
 export const AVATAR_MAX_BYTES = 4 * 1024 * 1024;
@@ -36,7 +36,7 @@ const THUMB_SIZE = 128;
 const MAX_INPUT_DIMENSION = 8000;
 
 export class ProfileService {
-  async getProfile(userId: string) {
+  getProfile(userId: string) {
     return db.select().from(profiles).where(eq(profiles.userId, userId)).get();
   }
 
@@ -102,27 +102,23 @@ export class ProfileService {
       throw new Error(`Unsupported input mime: ${declaredMime}`);
     }
 
-    const input = Buffer.isBuffer(bytes)
-      ? bytes
-      : Buffer.from(bytes as ArrayBufferLike);
+    const input = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes as ArrayBufferLike);
 
     // 1) 探一下元数据，做维度上限校验（防解码炸弹）
     let meta: sharp.Metadata;
     try {
       meta = await sharp(input).metadata();
-    } catch (e: any) {
-      throw new Error(`Invalid image: ${e?.message ?? e}`);
+    } catch (e: unknown) {
+      throw new Error(`Invalid image: ${e instanceof Error ? e.message : String(e)}`);
     }
-    if (!meta.width || !meta.height) {
-      throw new Error('Invalid image: missing dimensions');
+    if (!(meta.width && meta.height)) {
+      throw new Error("Invalid image: missing dimensions");
     }
     if (meta.width > MAX_INPUT_DIMENSION || meta.height > MAX_INPUT_DIMENSION) {
-      throw new Error(
-        `Image dimensions too large: ${meta.width}x${meta.height} (max ${MAX_INPUT_DIMENSION})`,
-      );
+      throw new Error(`Image dimensions too large: ${meta.width}x${meta.height} (max ${MAX_INPUT_DIMENSION})`);
     }
     // sharp 解出来的 format 可以再校一遍，比 declaredMime 更可信
-    if (!meta.format || !['png', 'jpeg', 'webp'].includes(meta.format)) {
+    if (!(meta.format && ["png", "jpeg", "webp"].includes(meta.format))) {
       throw new Error(`Detected format not allowed: ${meta.format}`);
     }
 
@@ -132,7 +128,7 @@ export class ProfileService {
       sharp(input)
         .rotate()
         .resize(ORIGINAL_SIZE, ORIGINAL_SIZE, {
-          fit: 'cover',
+          fit: "cover",
           withoutEnlargement: true, // 不放大：小图保留原始分辨率
         })
         .webp({ quality: 90 })
@@ -140,7 +136,7 @@ export class ProfileService {
       sharp(input)
         .rotate()
         .resize(THUMB_SIZE, THUMB_SIZE, {
-          fit: 'cover',
+          fit: "cover",
           withoutEnlargement: false, // 缩略一律强制到 128，小图也放大
         })
         .webp({ quality: 80 })
@@ -150,12 +146,9 @@ export class ProfileService {
     // 3) 落地
     const userDir = join(AVATAR_DIR, userId);
     await mkdir(userDir, { recursive: true });
-    const originalPath = join(userDir, 'original.webp');
-    const thumbPath = join(userDir, 'thumb.webp');
-    await Promise.all([
-      Bun.write(originalPath, originalBuf as any),
-      Bun.write(thumbPath, thumbBuf as any),
-    ]);
+    const originalPath = join(userDir, "original.webp");
+    const thumbPath = join(userDir, "thumb.webp");
+    await Promise.all([Bun.write(originalPath, originalBuf), Bun.write(thumbPath, thumbBuf)]);
 
     // 4) URL 加 ?v=<ms> 缓存破
     const v = Date.now();
@@ -169,7 +162,7 @@ export class ProfileService {
   async deleteAvatar(userId: string): Promise<void> {
     const userDir = join(AVATAR_DIR, userId);
     await rm(userDir, { recursive: true, force: true });
-    await this.updateProfile(userId, { avatarUrl: '', avatarThumbUrl: '' });
+    await this.updateProfile(userId, { avatarUrl: "", avatarThumbUrl: "" });
   }
 
   /**
@@ -193,8 +186,8 @@ export class ProfileService {
     await mkdir(DEFAULT_AVATAR_DIR, { recursive: true });
 
     const variants: Array<{ filename: string; size: number; quality: number }> = [
-      { filename: 'original.webp', size: ORIGINAL_SIZE, quality: 90 },
-      { filename: 'thumb.webp', size: THUMB_SIZE, quality: 80 },
+      { filename: "original.webp", size: ORIGINAL_SIZE, quality: 90 },
+      { filename: "thumb.webp", size: THUMB_SIZE, quality: 80 },
     ];
 
     for (const v of variants) {
@@ -231,10 +224,8 @@ export class ProfileService {
   <!-- belt -->
   <rect x="4" y="13" width="8" height="1" fill="#ffd34d"/>
 </svg>`;
-      const buf = await sharp(Buffer.from(svg))
-        .webp({ quality: v.quality })
-        .toBuffer();
-      await Bun.write(path, buf as any);
+      const buf = await sharp(Buffer.from(svg)).webp({ quality: v.quality }).toBuffer();
+      await Bun.write(path, buf);
       console.info(`[ProfileService] default avatar generated: ${path}`);
     }
   }

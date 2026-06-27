@@ -1,7 +1,6 @@
-import { defineConfig } from '@rsbuild/core';
-import { pluginBabel } from '@rsbuild/plugin-babel';
-import { pluginSolid } from '@rsbuild/plugin-solid';
-import path from 'node:path';
+import { defineConfig } from "@rsbuild/core";
+import { pluginBabel } from "@rsbuild/plugin-babel";
+import { pluginSolid } from "@rsbuild/plugin-solid";
 
 export default defineConfig({
   plugins: [
@@ -13,8 +12,8 @@ export default defineConfig({
   ],
   source: {
     entry: {
-      index: './src/index.tsx'
-    }
+      index: "./src/index.tsx",
+    },
   },
   server: {
     host: "0.0.0.0",
@@ -33,11 +32,10 @@ export default defineConfig({
       "/api/ws": {
         target: "http://localhost:3000",
         ws: true,
-        changeOrigin: true
-      }
+        changeOrigin: true,
+      },
 
       // 如果你使用了 rsbuild HMR 的特殊路径并需要代理，也可以在这里添加 /rsbuild-hmr
-    }
+    },
   },
-
 });

@@ -1,8 +1,11 @@
 import {
-  type SyncedPreGameState,
+  PreGameMapType,
+  type PreGameCustomMapSetting,
+  type PreGameMapSetting,
+  type PreGameRandomMapSetting,
   type SyncedPreGameClientActions,
   SyncedPreGameClientActionTypes,
-  PreGameMapType,
+  type SyncedPreGameState,
 } from "@generale/types";
 import { makeEmptyRoom } from "./defaults";
 
@@ -16,11 +19,9 @@ import { makeEmptyRoom } from "./defaults";
  */
 export function applyPregameEventLocal(
   state: SyncedPreGameState | null,
-  action: SyncedPreGameClientActions | any,
+  action: SyncedPreGameClientActions,
 ): SyncedPreGameState {
-  const base: SyncedPreGameState = structuredClone(
-    state ?? { room: makeEmptyRoom(""), selfId: "" },
-  );
+  const base: SyncedPreGameState = structuredClone(state ?? { room: makeEmptyRoom(""), selfId: "" });
   const type = action.type;
 
   try {
@@ -28,7 +29,7 @@ export function applyPregameEventLocal(
       case SyncedPreGameClientActionTypes.READY: {
         const pid = base.selfId;
         if (base?.room?.players) {
-          const p = base.room.players.find((x: any) => x.id === pid);
+          const p = base.room.players.find((x) => x.id === pid);
           if (p && !p.isHost) p.ready = 1;
         }
         return base;
@@ -36,7 +37,7 @@ export function applyPregameEventLocal(
       case SyncedPreGameClientActionTypes.UNREADY: {
         const pid = base.selfId;
         if (base?.room?.players) {
-          const p = base.room.players.find((x: any) => x.id === pid);
+          const p = base.room.players.find((x) => x.id === pid);
           if (p && !p.isHost) p.ready = 0;
         }
         return base;
@@ -48,7 +49,7 @@ export function applyPregameEventLocal(
         return base;
       }
       case SyncedPreGameClientActionTypes.CHANGE_MAP: {
-        base.room.mapSetting = action.payload;
+        base.room.mapSetting = action.payload as PreGameMapSetting;
         return base;
       }
       case SyncedPreGameClientActionTypes.CHANGE_ROOM_TYPE: {
@@ -63,9 +64,9 @@ export function applyPregameEventLocal(
             height: 20,
             tileFrequency: {},
             sizeLabel: "medium",
-          } as any;
+          } as PreGameRandomMapSetting;
         } else {
-          const ms: any = base.room.mapSetting;
+          const ms = base.room.mapSetting as { width?: number; height?: number };
           const w = typeof ms?.width === "number" ? ms.width : 20;
           const h = typeof ms?.height === "number" ? ms.height : 20;
           base.room.mapSetting = {
@@ -74,7 +75,7 @@ export function applyPregameEventLocal(
             height: h,
             tileFrequency: {},
             customData: "",
-          } as any;
+          } as PreGameCustomMapSetting;
         }
         base.room.roomType = next;
         return base;
@@ -88,8 +89,8 @@ export function applyPregameEventLocal(
         // payload: { teamId, name }
         const { teamId, name } = action.payload ?? {};
         if (teamId && base.room.teams) {
-          const t = base.room.teams.find(tt => tt.id === teamId);
-          if (t && typeof name === 'string') t.name = name.slice(0, 60);
+          const t = base.room.teams.find((tt) => tt.id === teamId);
+          if (t && typeof name === "string") t.name = name.slice(0, 60);
         }
         return base;
       }
@@ -98,9 +99,9 @@ export function applyPregameEventLocal(
         const { teamId } = action.payload ?? {};
         if (teamId && base.room.teams) {
           // Only remove if no members here (local check). Server will authoritative decide.
-          const memberCount = base.room.players.filter(p => p.teamId === teamId).length;
+          const memberCount = base.room.players.filter((p) => p.teamId === teamId).length;
           if (memberCount === 0) {
-            base.room.teams = base.room.teams.filter(t => t.id !== teamId);
+            base.room.teams = base.room.teams.filter((t) => t.id !== teamId);
             base.room.teamCount = base.room.teams.length;
           }
         }

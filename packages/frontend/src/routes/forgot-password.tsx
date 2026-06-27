@@ -1,14 +1,9 @@
-import { createSignal, Show } from "solid-js";
-import { useMutation } from "@tanstack/solid-query";
+import type { ErrorResp, MessageResp, RequestPasswordResetReqBody } from "@generale/types/dist/api";
 import { A, useNavigate } from "@solidjs/router";
-
+import { useMutation } from "@tanstack/solid-query";
+import { createSignal, Show } from "solid-js";
 import { forgotPasswordApi } from "~/api/accountApi";
-import { ApiError } from "~/api/base";
-import type {
-  RequestPasswordResetReqBody,
-  MessageResp,
-  ErrorResp,
-} from "@generale/types/dist/api";
+import type { ApiError } from "~/api/base";
 
 export default function ForgotPasswordPage() {
   const nav = useNavigate();
@@ -32,14 +27,14 @@ export default function ForgotPasswordPage() {
         when={!mutation.isSuccess}
         fallback={
           <div class="space-y-4">
-            <div class="alert alert-success">
-              {mutation.data?.message ?? "如果该邮箱已注册，我们已发送重置链接"}
-            </div>
+            <div class="alert alert-success">{mutation.data?.message ?? "如果该邮箱已注册，我们已发送重置链接"}</div>
             <p class="text-sm opacity-70">
               查看你的邮箱（包括垃圾邮件），点击邮件里的链接设置新密码。链接 10 分钟内有效。
             </p>
             <div class="flex gap-2">
-              <button class="btn btn-ghost btn-sm" onClick={() => nav("/login")}>返回登录</button>
+              <button type="button" class="btn btn-ghost btn-sm" onClick={() => nav("/login")}>
+                返回登录
+              </button>
             </div>
           </div>
         }
@@ -61,7 +56,9 @@ export default function ForgotPasswordPage() {
             <p class="text-error text-sm">{mutation.error?.message ?? "发送失败"}</p>
           </Show>
           <p class="mt-2 text-sm">
-            <A href="/login" class="link">返回登录</A>
+            <A href="/login" class="link">
+              返回登录
+            </A>
           </p>
         </form>
       </Show>

@@ -1,13 +1,13 @@
-import { createMemo } from "solid-js";
 import {
-  GamePhase,
-  PreGamePlayerStatus,
   type ChatMessage,
   type ChatMessageScope,
   type ChatSenderMeta,
+  GamePhase,
   type PreGamePlayerInfo,
+  PreGamePlayerStatus,
   type PreGameRoomState,
 } from "@generale/types";
+import { createMemo } from "solid-js";
 import { useChat } from "~/hooks/useChat";
 
 export interface UseChatSessionParams {
@@ -22,13 +22,13 @@ export interface UseChatSessionParams {
 
 export function useChatSession(params: UseChatSessionParams) {
   const selfPlayer = createMemo<PreGamePlayerInfo | undefined>(() =>
-    params.room?.players.find(p => p.id === params.userId)
+    params.room?.players.find((p) => p.id === params.userId),
   );
 
   const selfMeta = createMemo<ChatSenderMeta | undefined>(() => {
     const player = selfPlayer();
     if (!player) return undefined;
-    const team = params.room?.teams.find(t => t.id === player.teamId);
+    const team = params.room?.teams.find((t) => t.id === player.teamId);
     return {
       teamId: player.teamId,
       teamName: team?.name ?? player.teamId,
@@ -56,9 +56,7 @@ export function useChatSession(params: UseChatSessionParams) {
 
   const canTeamChat = createMemo(() => {
     const meta = selfMeta();
-    return meta?.teamMode === "team"
-      && meta?.presence === "game"
-      && !!meta.teamId;
+    return meta?.teamMode === "team" && meta?.presence === "game" && !!meta.teamId;
   });
 
   function parseOutgoing(raw: string): { content: string; scope?: ChatMessageScope } | null {
@@ -67,7 +65,7 @@ export function useChatSession(params: UseChatSessionParams) {
     const match = /^\/team(?:\s+|$)([\s\S]*)$/i.exec(value);
     if (!match) return { content: value };
     const content = (match[1] ?? "").trim();
-    if (!content || !canTeamChat()) return null;
+    if (!(content && canTeamChat())) return null;
     return { content, scope: "team" };
   }
 
@@ -89,7 +87,6 @@ export function useChatSession(params: UseChatSessionParams) {
         return "旁观者";
       case "room":
         return params.phase === GamePhase.INGAME ? "房间内" : undefined;
-      case "game":
       default:
         return undefined;
     }

@@ -1,13 +1,9 @@
 // src/components/chat/ChatPanel.tsx
-import { type Component, For, Show, createSignal, createEffect, createMemo } from "solid-js";
+
+import { type ChatMessage, GamePhase, PreGamePlayerStatus, type PreGameRoomState } from "@generale/types";
+import { type Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { useChatSession } from "~/game/useChatSession";
-import { Button, Badge, Panel, Textarea } from "~/ui";
-import {
-  GamePhase,
-  PreGamePlayerStatus,
-  type ChatMessage,
-  type PreGameRoomState,
-} from "@generale/types";
+import { Badge, Button, Panel, Textarea } from "~/ui";
 
 export interface ChatPanelProps {
   domain: string;
@@ -27,22 +23,20 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
   const chat = useChatSession({
     domain: props.domain,
     userId: props.userId,
-    get phase() { return props.phase; },
-    get selfStatus() { return props.selfStatus; },
-    get room() { return props.room; },
+    get phase() {
+      return props.phase;
+    },
+    get selfStatus() {
+      return props.selfStatus;
+    },
+    get room() {
+      return props.room;
+    },
     autoOpen: props.autoOpen ?? true,
     initialFetchLimit: props.initialFetchLimit ?? 30,
   });
 
-  const {
-    messages,
-    connected,
-    loadingHistory,
-    hasMoreHistory,
-    fetchMoreHistory,
-    connect,
-    disconnect,
-  } = chat;
+  const { messages, connected, loadingHistory, hasMoreHistory, fetchMoreHistory, connect, disconnect } = chat;
 
   const [input, setInput] = createSignal("");
   let listEl: HTMLDivElement | undefined;
@@ -64,9 +58,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
   });
 
   const connectionBadge = createMemo(() =>
-    connected()
-      ? { label: "在线", variant: "success" as const }
-      : { label: "离线", variant: "outline" as const }
+    connected() ? { label: "在线", variant: "success" as const } : { label: "离线", variant: "outline" as const },
   );
 
   // ---- send ----
@@ -104,8 +96,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
     if (!listEl) return;
     const last = current[current.length - 1];
     if (!last) return;
-    const distanceFromBottom =
-      listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
+    const distanceFromBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
     if (distanceFromBottom < 80 || last.playerId === props.userId) {
       listEl.scrollTop = listEl.scrollHeight;
     }
@@ -161,18 +152,12 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
       >
         <Show
           when={messages().length > 0}
-          fallback={
-            <div class="flex h-full items-center justify-center text-sm opacity-60">
-              暂无消息
-            </div>
-          }
+          fallback={<div class="flex h-full items-center justify-center text-sm opacity-60">暂无消息</div>}
         >
           <div class="flex flex-col gap-2">
             <For each={messages()}>
               {(m: ChatMessage) => (
-                <div
-                  class={`text-sm ${m.playerId === props.userId ? "text-primary" : ""}`}
-                >
+                <div class={`text-sm ${m.playerId === props.userId ? "text-primary" : ""}`}>
                   <div class="flex items-center gap-1.5">
                     <div class="w-16 shrink-0 text-xs opacity-60">
                       {new Date(m.timestamp).toLocaleTimeString([], {
@@ -181,13 +166,23 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
                       })}
                     </div>
                     <Show when={m.scope === "team"}>
-                      <Badge variant="success" class="badge-xs">小队</Badge>
+                      <Badge variant="success" class="badge-xs">
+                        小队
+                      </Badge>
                     </Show>
                     <Show when={chat.teamLabel(m)}>
-                      {(team) => <Badge variant="outline" class="badge-xs">{team()}</Badge>}
+                      {(team) => (
+                        <Badge variant="outline" class="badge-xs">
+                          {team()}
+                        </Badge>
+                      )}
                     </Show>
                     <Show when={chat.presenceLabel(m)}>
-                      {(presence) => <Badge variant="info" class="badge-xs">{presence()}</Badge>}
+                      {(presence) => (
+                        <Badge variant="info" class="badge-xs">
+                          {presence()}
+                        </Badge>
+                      )}
                     </Show>
                     <Show when={chat.colorHex(m)}>
                       {(color) => (
@@ -206,22 +201,12 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
                         </span>
                       }
                     >
-                      {(avatar) => (
-                        <img
-                          src={avatar()}
-                          alt=""
-                          class="h-5 w-5 shrink-0 rounded object-cover"
-                        />
-                      )}
+                      {(avatar) => <img src={avatar()} alt="" class="h-5 w-5 shrink-0 rounded object-cover" />}
                     </Show>
-                    <div class="min-w-0 truncate font-medium">
-                      {chat.messageDisplayName(m)}
-                    </div>
+                    <div class="min-w-0 truncate font-medium">{chat.messageDisplayName(m)}</div>
                     {/* <div class="shrink-0 text-xs opacity-50">#{m.playerId}</div> */}
                   </div>
-                  <div class="ml-16 whitespace-pre-wrap wrap-break-word text-base-content">
-                    {m.content}
-                  </div>
+                  <div class="ml-16 whitespace-pre-wrap wrap-break-word text-base-content">{m.content}</div>
                 </div>
               )}
             </For>
@@ -235,24 +220,15 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
           class="textarea-sm min-h-16 flex-1 resize-none"
           placeholder={
             props.placeholder ??
-            (chat.canTeamChat()
-              ? "输入消息，/team 小队聊天"
-              : "输入消息，Enter 发送，Shift+Enter 换行")
+            (chat.canTeamChat() ? "输入消息，/team 小队聊天" : "输入消息，Enter 发送，Shift+Enter 换行")
           }
           value={input()}
           maxLength={500}
           disabled={!connected()}
-          onInput={(e) =>
-            setInput((e.target as HTMLTextAreaElement).value)
-          }
+          onInput={(e) => setInput((e.target as HTMLTextAreaElement).value)}
           onKeyDown={onKey}
         />
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={!connected() || input().trim().length === 0}
-          onClick={doSend}
-        >
+        <Button size="sm" variant="primary" disabled={!connected() || input().trim().length === 0} onClick={doSend}>
           发送
         </Button>
       </div>

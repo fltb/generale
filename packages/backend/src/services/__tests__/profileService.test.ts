@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ProfileService } from '../profileService';
-import { db } from '../../db/client';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { db } from "../../db/client";
+import { ProfileService } from "../profileService";
 
 // Mock the db client
-vi.mock('../../db/client', () => ({
+vi.mock("../../db/client", () => ({
   db: {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
@@ -16,14 +16,23 @@ vi.mock('../../db/client', () => ({
   },
 }));
 
-describe('ProfileService', () => {
+describe("ProfileService", () => {
   let profileService: ProfileService;
-  const mockDb = db as any;
+  const mockDb = db as unknown as {
+    select: ReturnType<typeof vi.fn>;
+    from: ReturnType<typeof vi.fn>;
+    where: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+    insert: ReturnType<typeof vi.fn>;
+    values: ReturnType<typeof vi.fn>;
+    onConflictDoUpdate: ReturnType<typeof vi.fn>;
+    run: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     profileService = new ProfileService();
     vi.clearAllMocks();
-    
+
     // Reset the fluent API mock chain for insert/update
     const mockRun = vi.fn();
     const mockOnConflict = vi.fn(() => ({ run: mockRun }));
@@ -31,10 +40,10 @@ describe('ProfileService', () => {
     mockDb.insert.mockImplementation(() => ({ values: mockValues }));
   });
 
-  const userId = 'user-abc';
+  const userId = "user-abc";
 
-  it('should get a user profile', async () => {
-    const profileData = { userId, avatarUrl: 'http://avatar.com/img.png', bio: 'My bio' };
+  it("should get a user profile", async () => {
+    const profileData = { userId, avatarUrl: "http://avatar.com/img.png", bio: "My bio" };
     mockDb.get.mockResolvedValue(profileData);
 
     const profile = await profileService.getProfile(userId);
@@ -45,14 +54,14 @@ describe('ProfileService', () => {
     expect(profile).toEqual(profileData);
   });
 
-  it('should return undefined if profile does not exist', async () => {
+  it("should return undefined if profile does not exist", async () => {
     mockDb.get.mockResolvedValue(undefined);
     const profile = await profileService.getProfile(userId);
     expect(profile).toBeUndefined();
   });
 
-  it.skip('should update avatar using upsert logic', async () => {
-    const avatarUrl = 'http://new.avatar.com/pic.jpg';
+  it.skip("should update avatar using upsert logic", async () => {
+    const avatarUrl = "http://new.avatar.com/pic.jpg";
     await profileService.updateAvatar(userId, avatarUrl);
 
     const mockValuesCall = mockDb.insert().values;
@@ -66,10 +75,10 @@ describe('ProfileService', () => {
     expect(mockOnConflictCall.mock.results[0].value.run).toHaveBeenCalled();
   });
 
-  it.skip('should update bio using upsert logic', async () => {
-    const bio = 'A new exciting bio.';
+  it.skip("should update bio using upsert logic", async () => {
+    const bio = "A new exciting bio.";
     await profileService.updateBio(userId, bio);
-    
+
     const mockValuesCall = mockDb.insert().values;
     const mockOnConflictCall = mockValuesCall.mock.results[0].value.onConflictDoUpdate;
 
@@ -81,8 +90,8 @@ describe('ProfileService', () => {
     expect(mockOnConflictCall.mock.results[0].value.run).toHaveBeenCalled();
   });
 
-  it.skip('should update the entire profile with partial data', async () => {
-    const updates = { bio: 'A full update', avatarUrl: 'http://full.update/img.png' };
+  it.skip("should update the entire profile with partial data", async () => {
+    const updates = { bio: "A full update", avatarUrl: "http://full.update/img.png" };
     await profileService.updateProfile(userId, updates);
 
     const mockValuesCall = mockDb.insert().values;

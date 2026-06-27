@@ -1,11 +1,11 @@
-import { createSignal, createEffect, createMemo, onCleanup } from "solid-js";
-import { prepareConnectApi } from "~/api/gameApi";
 import {
   GamePhase,
   PreGamePlayerStatus,
-  SyncedPreGameServerEventPayloadType,
   type PreGameRoomState,
+  SyncedPreGameServerEventPayloadType,
 } from "@generale/types";
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import { prepareConnectApi } from "~/api/gameApi";
 import type { RoomWithSyncProps } from "~/components/room/Room";
 
 /**
@@ -58,20 +58,16 @@ export function useRoomSession(gameId: () => string | undefined) {
   const [hasPassword, setHasPassword] = createSignal<boolean | undefined>(undefined);
 
   // 密码状态
-  const [roomPassword, setRoomPassword] = createSignal<string | null>(
-    sessionStorage.getItem('room-invite-pw') ?? null,
-  );
-  const wrongPwFlag = sessionStorage.getItem('room-wrong-pw');
-  if (wrongPwFlag) sessionStorage.removeItem('room-wrong-pw');
+  const [roomPassword, setRoomPassword] = createSignal<string | null>(sessionStorage.getItem("room-invite-pw") ?? null);
+  const wrongPwFlag = sessionStorage.getItem("room-wrong-pw");
+  if (wrongPwFlag) sessionStorage.removeItem("room-wrong-pw");
   const [wrongPassword, setWrongPassword] = createSignal(!!wrongPwFlag);
 
-  const needsPassword = createMemo(() =>
-    hasPassword() === true && !roomPassword(),
-  );
+  const needsPassword = createMemo(() => hasPassword() === true && !roomPassword());
 
   function setPassword(pw: string | null) {
-    if (pw) sessionStorage.setItem('room-invite-pw', pw);
-    else sessionStorage.removeItem('room-invite-pw');
+    if (pw) sessionStorage.setItem("room-invite-pw", pw);
+    else sessionStorage.removeItem("room-invite-pw");
     setRoomPassword(pw);
     setWrongPassword(false);
   }
@@ -90,17 +86,17 @@ export function useRoomSession(gameId: () => string | undefined) {
     try {
       const resp = await prepareConnectApi(id);
       if (!resp?.success) {
-        setError((resp as any)?.error ?? "Connect failed");
+        setError((resp as unknown as { error?: string })?.error ?? "Connect failed");
         return;
       }
 
       const data = resp.data;
 
       // player info
-      setPlayerId(prev => (prev !== data.playerId ? data.playerId : prev));
+      setPlayerId((prev) => (prev !== data.playerId ? data.playerId : prev));
 
       // authoritative phase
-      setPhase(prev => (prev !== data.phase ? data.phase : prev));
+      setPhase((prev) => (prev !== data.phase ? data.phase : prev));
 
       setHasPassword(!!data.hasPassword);
 
@@ -113,12 +109,12 @@ export function useRoomSession(gameId: () => string | undefined) {
       // fall back to primary.
       if (dRoom) {
         if (roomDomain() !== dRoom) setRoomDomain(dRoom);
-      } else if (dPrimary && dPrimary.startsWith('room-')) {
+      } else if (dPrimary?.startsWith("room-")) {
         if (roomDomain() !== dPrimary) setRoomDomain(dPrimary);
       }
 
       // Update game domain only if primary is actually a game-* domain
-      if (data.phase === GamePhase.INGAME && dPrimary && dPrimary.startsWith('game-')) {
+      if (data.phase === GamePhase.INGAME && dPrimary && dPrimary.startsWith("game-")) {
         if (gameDomain() !== dPrimary) setGameDomain(dPrimary);
       }
 
@@ -127,8 +123,9 @@ export function useRoomSession(gameId: () => string | undefined) {
 
       // IMPORTANT: do not clear roomDomain when entering INGAME.
       // We intentionally keep it so RoomWithSync can remain connected.
-    } catch (err: any) {
-      setError(err?.message ?? String(err));
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e?.message ?? String(err));
     } finally {
       setLoading(false);
     }
@@ -177,7 +174,7 @@ export function useRoomSession(gameId: () => string | undefined) {
          * 我们需要再次请求连接信息以拿到 game-* domain。
          */
         setStartedThisSession(true); // 标记为全新开局 -> 放倒计时
-        await new Promise(res => setTimeout(res, 1000));
+        await new Promise((res) => setTimeout(res, 1000));
         await refreshConnectionInfo();
         break;
       }
@@ -215,13 +212,12 @@ export function useRoomSession(gameId: () => string | undefined) {
   /**
    * 单一真源：现在该不该把 GameWithSync 放在屏幕上？
    */
-  const showingGameUI = createMemo(() =>
-    phase() === GamePhase.INGAME
-    && (
-      selfStatus() === PreGamePlayerStatus.Playing
-      || selfStatus() === PreGamePlayerStatus.Spectating
-      || gameJustEnded()
-    )
+  const showingGameUI = createMemo(
+    () =>
+      phase() === GamePhase.INGAME &&
+      (selfStatus() === PreGamePlayerStatus.Playing ||
+        selfStatus() === PreGamePlayerStatus.Spectating ||
+        gameJustEnded()),
   );
 
   return {

@@ -1,6 +1,6 @@
+import { TileType } from "@generale/types";
 import { createSignal, For, Show } from "solid-js";
 import { PreGameRoomStateFrom } from "../StateForm";
-import { TileType } from "@generale/types";
 
 export const TestPreGameRoomStateFrom = () => {
   // 初始 gameSetting 测试数据
@@ -17,8 +17,7 @@ export const TestPreGameRoomStateFrom = () => {
   const [state, setState] = createSignal(initial);
   const [logs, setLogs] = createSignal<string[]>([]);
 
-  const pushLog = (s: string) =>
-    setLogs((prev) => [`${new Date().toLocaleTimeString()} - ${s}`, ...prev]);
+  const pushLog = (s: string) => setLogs((prev) => [`${new Date().toLocaleTimeString()} - ${s}`, ...prev]);
 
   // 传给子组件的 onChange：记录并同步本地 state（模拟父组件处理）
   const handleChange = (next: typeof initial) => {
@@ -48,7 +47,7 @@ export const TestPreGameRoomStateFrom = () => {
 
   const randomize = () => {
     const rnd = Math.round(Math.random() * 20) / 10;
-    setSpeed(0.5 + rnd % 3);
+    setSpeed(0.5 + (rnd % 3));
     setAfk(Math.floor(Math.random() * 30));
     pushLog("随机化设置");
   };
@@ -59,38 +58,65 @@ export const TestPreGameRoomStateFrom = () => {
 
       <div class="flex items-center gap-3">
         <div>
-          <div>speed: <strong>{state().speed}</strong></div>
-          <div>afkThreshold: <strong>{state().afkThreshold}</strong></div>
+          <div>
+            speed: <strong>{state().speed}</strong>
+          </div>
+          <div>
+            afkThreshold: <strong>{state().afkThreshold}</strong>
+          </div>
         </div>
 
-        <button class="btn btn-sm" onClick={() => setState(initial)}>重置为初始</button>
-        <button class="btn btn-sm" onClick={() => randomize()}>随机化</button>
+        <button type="button" class="btn btn-sm" onClick={() => setState(initial)}>
+          重置为初始
+        </button>
+        <button type="button" class="btn btn-sm" onClick={() => randomize()}>
+          随机化
+        </button>
       </div>
 
       <div class="border p-4 rounded">
-        <PreGameRoomStateFrom
-          state={state()}
-          onChange={(s) => handleChange(s)}
-        />
+        <PreGameRoomStateFrom state={state()} onChange={(s) => handleChange(s)} />
       </div>
 
       <div>
         <h3 class="font-semibold">快速操作（直接调用 onChange 的等价操作）</h3>
         <div class="flex gap-2 mt-2 flex-wrap">
-          <button class="btn btn-xs" onClick={() => setSpeed(0.5)}>speed = 0.5</button>
-          <button class="btn btn-xs" onClick={() => setSpeed(3)}>speed = 3</button>
-          <button class="btn btn-xs" onClick={() => setAfk(0)}>afk = 0</button>
-          <button class="btn btn-xs" onClick={() => setAfk(60)}>afk = 60</button>
+          <button type="button" class="btn btn-xs" onClick={() => setSpeed(0.5)}>
+            speed = 0.5
+          </button>
+          <button type="button" class="btn btn-xs" onClick={() => setSpeed(3)}>
+            speed = 3
+          </button>
+          <button type="button" class="btn btn-xs" onClick={() => setAfk(0)}>
+            afk = 0
+          </button>
+          <button type="button" class="btn btn-xs" onClick={() => setAfk(60)}>
+            afk = 60
+          </button>
 
-          <button class="btn btn-xs" onClick={() => changeTile(TileType.Plain, "duration", (state().tileGrow[TileType.Plain]?.duration ?? 0) + 1)}>
+          <button
+            type="button"
+            class="btn btn-xs"
+            onClick={() =>
+              changeTile(TileType.Plain, "duration", (state().tileGrow[TileType.Plain]?.duration ?? 0) + 1)
+            }
+          >
             PLAIN duration +1
           </button>
-          <button class="btn btn-xs" onClick={() => changeTile(TileType.Plain, "growth", (state().tileGrow[TileType.Plain]?.growth ?? 0) + 1)}>
+          <button
+            type="button"
+            class="btn btn-xs"
+            onClick={() => changeTile(TileType.Plain, "growth", (state().tileGrow[TileType.Plain]?.growth ?? 0) + 1)}
+          >
             PLAIN growth +1
           </button>
 
-          <button class="btn btn-xs" onClick={() => changeTile(TileType.Barracks, "duration", 0)}>BARRACKS duration = 0</button>
-          <button class="btn btn-xs" onClick={() => changeTile(TileType.Mountain, "growth", 5)}>MOUNTAIN growth = 5</button>
+          <button type="button" class="btn btn-xs" onClick={() => changeTile(TileType.Barracks, "duration", 0)}>
+            BARRACKS duration = 0
+          </button>
+          <button type="button" class="btn btn-xs" onClick={() => changeTile(TileType.Mountain, "growth", 5)}>
+            MOUNTAIN growth = 5
+          </button>
         </div>
       </div>
 
@@ -116,9 +142,7 @@ export const TestPreGameRoomStateFrom = () => {
             <div class="text-sm opacity-60">尚无事件，操作组件或点击快速操作后会在这里记录日志。</div>
           </Show>
 
-          <For each={logs()}>
-            {(l) => <div class="text-xs truncate">{l}</div>}
-          </For>
+          <For each={logs()}>{(l) => <div class="text-xs truncate">{l}</div>}</For>
         </div>
       </div>
     </div>

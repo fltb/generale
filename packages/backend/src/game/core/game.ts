@@ -1,8 +1,14 @@
-import { GameState, PlayerActionQueues, PlayerOperationType, TileType, MaskedGameState, PlayerStatus, PlayerId } from "@generale/types";
-import { autoJudge, handleMove, isAdjacentToPlayer, updateGameState } from "./game-utils";
-import { GameStatus } from "@generale/types";
-
-
+import {
+  type GameState,
+  GameStatus,
+  type MaskedGameState,
+  type PlayerActionQueues,
+  type PlayerId,
+  PlayerOperationType,
+  PlayerStatus,
+  TileType,
+} from "@generale/types";
+import { autoJudge, handleMove, updateGameState } from "./game-utils";
 
 /**
  * 进度推进函数
@@ -10,69 +16,67 @@ import { GameStatus } from "@generale/types";
  * @param queues 本 tick 各玩家操作队列
  * @returns 新的 state 和剩余队列
  */
-export function tick(
-    state: GameState,
-    queues: PlayerActionQueues
-): { state: GameState; queue: PlayerActionQueues } {
-    if (state.status === GameStatus.Ended) {
-        return { state: structuredClone(state), queue: {} };
+export function tick(state: GameState, queues: PlayerActionQueues): { state: GameState; queue: PlayerActionQueues } {
+  if (state.status === GameStatus.Ended) {
+    return { state: structuredClone(state), queue: {} };
+  }
+  // 深拷贝保证纯函数
+  const newState: GameState = structuredClone(state);
+  const newQueues: PlayerActionQueues = {};
+
+  for (const [pid, ops] of Object.entries(queues)) {
+    // Using optional chaining ?. for a cleaner check
+    if (newState.players[pid]?.status !== PlayerStatus.Playing) {
+      newQueues[pid] = [];
+      continue;
     }
-    // 深拷贝保证纯函数
-    const newState: GameState = structuredClone(state);
-    const newQueues: PlayerActionQueues = {};
-
-    for (const [pid, ops] of Object.entries(queues)) {
-        // Using optional chaining ?. for a cleaner check
-        if (newState.players[pid]?.status !== PlayerStatus.Playing) {
-            newQueues[pid] = []; 
-            continue;
-        }
-        if (ops.length === 0) {
-            newQueues[pid] = ops;
-            continue;
-        }
-
-        const op = ops[0];
-        // FIX (for errors on lines 30, 32, 36): Add a guard. If the ops array was somehow
-        // modified to be empty, this prevents 'op' from being undefined.
-        if (!op) {
-            continue;
-        }
-
-        let ok = false;
-        switch (op.type) { // This access is now safe
-            case PlayerOperationType.Move:
-                ok = handleMove(newState, pid, op.payload);
-                break;
-            // case … 以后扩展
-            default:
-                // This access is now safe
-                throw new Error(`Unknown op type ${op.type} of op ${op}`)
-        }
-
-        // 更新最后活跃 tick
-        // FIX: Add a check to ensure the player still exists before updating them,
-        // as they might have been defeated during this tick's operations.
-        const player = newState.players[pid];
-        if (ok && player) {
-            player.lastActiveTick = newState.tick;
-        }
-
-        // 不管成功失败都丢掉队头那一条：
-        // - 成功：自然消费
-        // - 失败：废 op 单独丢弃，不连坐后面合法的 op
-        //
-        // 之前的实现是失败时把整条队列清空（`ok ? slice(1) : []`），导致
-        // "第一下因为 cursor 默认 (1,1) 或 throne 兵力还=1 失败" 就把用户
-        // 后续排好的几下也一起带走，UX 上表现为"第一下移动概率被丢弃"。
-        newQueues[pid] = ops.slice(1);
+    if (ops.length === 0) {
+      newQueues[pid] = ops;
+      continue;
     }
 
-    updateGameState(newState);
-    autoJudge(newState);
-    return { state: newState, queue: newQueues };
+    const op = ops[0];
+    // FIX (for errors on lines 30, 32, 36): Add a guard. If the ops array was somehow
+    // modified to be empty, this prevents 'op' from being undefined.
+    if (!op) {
+      continue;
+    }
+
+    let ok = false;
+    switch (
+      op.type // This access is now safe
+    ) {
+      case PlayerOperationType.Move:
+        ok = handleMove(newState, pid, op.payload);
+        break;
+      // case … 以后扩展
+      default:
+        // This access is now safe
+        throw new Error(`Unknown op type ${op.type} of op ${op}`);
+    }
+
+    // 更新最后活跃 tick
+    // FIX: Add a check to ensure the player still exists before updating them,
+    // as they might have been defeated during this tick's operations.
+    const player = newState.players[pid];
+    if (ok && player) {
+      player.lastActiveTick = newState.tick;
+    }
+
+    // 不管成功失败都丢掉队头那一条：
+    // - 成功：自然消费
+    // - 失败：废 op 单独丢弃，不连坐后面合法的 op
+    //
+    // 之前的实现是失败时把整条队列清空（`ok ? slice(1) : []`），导致
+    // "第一下因为 cursor 默认 (1,1) 或 throne 兵力还=1 失败" 就把用户
+    // 后续排好的几下也一起带走，UX 上表现为"第一下移动概率被丢弃"。
+    newQueues[pid] = ops.slice(1);
+  }
+
+  updateGameState(newState);
+  autoJudge(newState);
+  return { state: newState, queue: newQueues };
 }
-
 
 /**
  * 生成单个玩家视角的战雾快照
@@ -110,7 +114,9 @@ export function mask(state: GameState, playerId: PlayerId): MaskedGameState {
         const ny = cy + dy;
         const nx = cx + dx;
         if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
-          visible[ny]![nx] = true;
+          const visibleRow = visible[ny];
+          if (!visibleRow) continue;
+          visibleRow[nx] = true;
         }
       }
     }
@@ -119,7 +125,7 @@ export function mask(state: GameState, playerId: PlayerId): MaskedGameState {
   // 一次遍历：对所有被玩家或队友拥有的格子，标记自身及邻居为可见
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const tile = state.map.tiles[y]![x]!;
+      const tile = state.map.tiles[y]?.[x];
       if (!tile) continue;
 
       // 属于玩家本人
@@ -138,8 +144,10 @@ export function mask(state: GameState, playerId: PlayerId): MaskedGameState {
   // 最后一次遍历：把不可见格子替换为 Fog（只改 copy.map）
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      if (!visible[y]![x]!) {
-        copy.map.tiles[y]![x] = {
+      if (!visible[y]?.[x]) {
+        const copyRow = copy.map.tiles[y];
+        if (!copyRow) continue;
+        copyRow[x] = {
           type: TileType.Fog,
           ownerId: null,
           army: 0,

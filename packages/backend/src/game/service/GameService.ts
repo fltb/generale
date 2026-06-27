@@ -1,32 +1,42 @@
 import {
-  PlayerCore, TeamCore, TeamId, GameMap, PlayerStatus, SyncedGameState, PreGameMapType,
-  PlayerId,
-  GameId,
-  PreGameRoomState,
-  GameState,
-  GameStatus,
-  SyncedGameClientActions,
-  SyncedGameServerEvent,
-  SyncedPreGameClientActions,
-  SyncedPreGameServerEvent,
-  ChatClientToServer,
-  ChatServerToClient,
-  GameSettings,
+  type ChatClientToServer,
+  type ChatServerToClient,
+  type GameId,
+  type GameInfoSuccessResp,
+  type GameMap,
   GamePhase,
+  type GameSettings,
+  type GameState,
+  GameStatus,
+  type PlayerCore,
+  type PlayerId,
+  PlayerStatus,
   PRESET_SIZES,
+  PreGameMapType,
   PreGamePlayerStatus,
-  PreGameTeamMode,
-} from '@generale/types';
-import { RoomInstance } from '../instance/RoomInstance';
-import { GameInstance, GameInstanceSettings } from '../instance/GameInstance';
-import { GameChatInstance } from '../instance/GameChatInstance';
-import { RoomUpdateFilter } from './units/RoomUpdateFilter';
-import { buildGameInfo } from './units/GameInfoPresenter';
-import { registerDomainHandler, unregisterDomainHandler, DomainHandler, SubConnector } from '../../plugins/websocket';
-import { generateMap } from '../core/map-gen';
-import { GameInfoSuccessResp } from '@generale/types';
-
-
+  type PreGameRoomState,
+  type PreGameTeamMode,
+  type SyncedGameClientActions,
+  type SyncedGameServerEvent,
+  type SyncedGameState,
+  type SyncedPreGameClientActions,
+  type SyncedPreGameServerEvent,
+  type TeamCore,
+  type TeamId,
+} from "@generale/types";
+import type { GameEndResult } from "../instance/GameInstance";
+import {
+  type DomainHandler,
+  registerDomainHandler,
+  type SubConnector,
+  unregisterDomainHandler,
+} from "../../plugins/websocket";
+import { generateMap } from "../core/map-gen";
+import { GameChatInstance } from "../instance/GameChatInstance";
+import { GameInstance, type GameInstanceSettings } from "../instance/GameInstance";
+import { RoomInstance } from "../instance/RoomInstance";
+import { buildGameInfo } from "./units/GameInfoPresenter";
+import { RoomUpdateFilter } from "./units/RoomUpdateFilter";
 
 /**
  * GameService 配置
@@ -48,19 +58,20 @@ export type GameServiceConfig = {
   customMapId?: string;
   // optional: raw incoming gameSettings (from create request). Prefer normalized mapSize in gameConfig.mapSizeNormalized below
   gameSettings?: Partial<GameInstanceSettings>;
-} & ({
-  // discriminant if provided
-  type: "custom";
-  // if caller provided numeric map size, place here; prefer numeric for runtime
-  mapSize: { width: number; height: number };
-
-} | {
-  // discriminant if provided
-  type: "standard";
-  // if caller provided numeric map size, place here; prefer numeric for runtime
-  mapSize: "small" | "medium" | "large";
-
-})
+} & (
+  | {
+      // discriminant if provided
+      type: "custom";
+      // if caller provided numeric map size, place here; prefer numeric for runtime
+      mapSize: { width: number; height: number };
+    }
+  | {
+      // discriminant if provided
+      type: "standard";
+      // if caller provided numeric map size, place here; prefer numeric for runtime
+      mapSize: "small" | "medium" | "large";
+    }
+);
 export type ConnectionInfo = {
   phase: GamePhase;
   domains: { primary: string; room?: string; chat: string };
@@ -69,15 +80,15 @@ export type ConnectionInfo = {
 
 export type ConnectionResult =
   | { success: true; data: ConnectionInfo }
-  | { success: false; reason: 'NOT_AUTHORIZED' | 'GAME_UNAVAILABLE' | 'INVALID_STATE'; message: string; };
+  | { success: false; reason: "NOT_AUTHORIZED" | "GAME_UNAVAILABLE" | "INVALID_STATE"; message: string };
 
-  /**
-   * GameService - 游戏总管理服务
-   * 管理游戏的各个阶段和实例，协调 WebSocket sub-connector
-   */
-  export class GameService {
-    private gameId: GameId;
-    private phase: GamePhase = GamePhase.PREGAME;
+/**
+ * GameService - 游戏总管理服务
+ * 管理游戏的各个阶段和实例，协调 WebSocket sub-connector
+ */
+export class GameService {
+  private gameId: GameId;
+  private phase: GamePhase = GamePhase.PREGAME;
 
   // 各阶段实例
   private roomInstance: RoomInstance | null = null;
@@ -87,9 +98,8 @@ export type ConnectionResult =
   // 配置
   private config: GameServiceConfig;
 
-  // 事件回调
   private onGameStartCallback?: () => void;
-  private onGameEndCallback?: (result: any) => void;
+  private onGameEndCallback?: (result: GameEndResult) => void;
   private onDisbandCallback?: () => void;
 
   private roomUpdateEmitter?: (gameId: GameId) => void;
@@ -113,13 +123,13 @@ export type ConnectionResult =
    */
   private registerDomainHandlers(): void {
     // 注册 room 域名处理器
-    registerDomainHandler('room-' + this.gameId, this.createRoomDomainHandler());
+    registerDomainHandler(`room-${this.gameId}`, this.createRoomDomainHandler());
 
     // 注册 game 域名处理器
-    registerDomainHandler('game-' + this.gameId, this.createGameDomainHandler());
+    registerDomainHandler(`game-${this.gameId}`, this.createGameDomainHandler());
 
     // 注册 chat 域名处理器
-    registerDomainHandler('chat-' + this.gameId, this.createChatDomainHandler());
+    registerDomainHandler(`chat-${this.gameId}`, this.createChatDomainHandler());
   }
 
   /**
@@ -142,15 +152,14 @@ export type ConnectionResult =
       const { userid, username } = ctx;
 
       if (!userid) {
-        connector.close(4001, 'Missing userid');
+        connector.close(4001, "Missing userid");
         return;
       }
 
       if (!username) {
-        connector.close(4001, 'Missing username');
+        connector.close(4001, "Missing username");
         return;
       }
-
 
       // 检查阶段是否允许 room 连接
       // if (this.phase !== GamePhase.PREGAME) {
@@ -160,7 +169,7 @@ export type ConnectionResult =
 
       // room domain 在 PREGAME 与 INGAME 期间都允许连接，为了方便恢复房间
       if (this.phase === GamePhase.DISBANDED) {
-        connector.close(4004, 'Game disbanded');
+        connector.close(4004, "Game disbanded");
         return;
       }
 
@@ -171,7 +180,7 @@ export type ConnectionResult =
 
       // 将玩家添加到 RoomInstance
       if (this.roomInstance) {
-        console.debug(`[GameService]: Adding player: ${userid} ${username} to roomInstance`)
+        console.debug(`[GameService]: Adding player: ${userid} ${username} to roomInstance`);
         const result = this.roomInstance.addPlayer(
           {
             id: userid,
@@ -183,7 +192,7 @@ export type ConnectionResult =
           connector,
         );
         if (!result.success) {
-          connector.close(4003, result.message || 'Failed to add to room');
+          connector.close(4003, result.message || "Failed to add to room");
           return;
         }
       }
@@ -204,29 +213,29 @@ export type ConnectionResult =
       const { userid, username } = ctx;
 
       if (!userid) {
-        connector.close(4001, 'Missing userid');
+        connector.close(4001, "Missing userid");
         return;
       }
 
       if (!username) {
-        connector.close(4001, 'Missing username');
+        connector.close(4001, "Missing username");
         return;
       }
 
       // 检查阶段是否允许 game 连接
       if (this.phase !== GamePhase.INGAME) {
-        connector.close(4002, 'Invalid phase for game');
+        connector.close(4002, "Invalid phase for game");
         return;
       }
 
       if (!this.gameInstance) {
-        connector.close(4002, 'No game instance');
+        connector.close(4002, "No game instance");
         return;
       }
 
       // 区分玩家 / 观战者：以 RoomInstance 中的 status 为准
       const roomState = this.roomInstance?.getState();
-      const playerEntry = roomState?.players.find(p => p.id === userid);
+      const playerEntry = roomState?.players.find((p) => p.id === userid);
       const isSpectator = playerEntry?.status === PreGamePlayerStatus.Spectating;
 
       if (isSpectator) {
@@ -255,18 +264,18 @@ export type ConnectionResult =
       const { userid, username } = ctx;
 
       if (!userid) {
-        connector.close(4001, 'Missing userid');
+        connector.close(4001, "Missing userid");
         return;
       }
 
       if (!username) {
-        connector.close(4001, 'Missing username');
+        connector.close(4001, "Missing username");
         return;
       }
 
       // Chat 在所有阶段都可用（除了 DISBANDED）
       if (this.phase === GamePhase.DISBANDED) {
-        connector.close(4004, 'Game disbanded');
+        connector.close(4004, "Game disbanded");
         return;
       }
 
@@ -294,32 +303,32 @@ export type ConnectionResult =
     console.log(`[GameService ${this.gameId}] Room initialized`);
   }
 
-  private resolveMapDimensions(): { width: number; height: number; sizeLabel?: 'small' | 'medium' | 'large' } {
+  private resolveMapDimensions(): { width: number; height: number; sizeLabel?: "small" | "medium" | "large" } {
     const ms = this.config.mapSize;
-    if (ms && typeof ms === 'object') {
+    if (ms && typeof ms === "object") {
       return {
         width: Math.max(10, Math.min(500, Math.floor(ms.width))),
         height: Math.max(10, Math.min(500, Math.floor(ms.height))),
       };
     }
-    if (ms && typeof ms === 'string') {
-      const dims = PRESET_SIZES[ms as 'small' | 'medium' | 'large'];
-      return { width: dims.width, height: dims.height, sizeLabel: ms as 'small' | 'medium' | 'large' };
+    if (ms && typeof ms === "string") {
+      const dims = PRESET_SIZES[ms as "small" | "medium" | "large"];
+      return { width: dims.width, height: dims.height, sizeLabel: ms as "small" | "medium" | "large" };
     }
     return { width: 20, height: 20 };
   }
 
   private buildInitialRoomState(): PreGameRoomState {
     const { width, height, sizeLabel } = this.resolveMapDimensions();
-    const isStandard = this.config.type === 'standard';
-    const teamMode: PreGameTeamMode = this.config.teamMode ?? 'ffa';
+    const isStandard = this.config.type === "standard";
+    const teamMode: PreGameTeamMode = this.config.teamMode ?? "ffa";
     const hasCustomMap = !isStandard && !!this.config.customMapId;
 
     return {
       gameId: this.gameId,
-      roomType: isStandard ? 'standard' : 'custom',
+      roomType: isStandard ? "standard" : "custom",
       teamMode,
-      hostId: '',
+      hostId: "",
       players: [],
       gameSetting: {
         speed: 1.0,
@@ -334,13 +343,13 @@ export type ConnectionResult =
         afkThreshold: 30,
       },
       mapSetting: {
-        type: hasCustomMap ? PreGameMapType.Imported : (isStandard ? PreGameMapType.Random : PreGameMapType.Custom),
+        type: hasCustomMap ? PreGameMapType.Imported : isStandard ? PreGameMapType.Random : PreGameMapType.Custom,
         width,
         height,
         tileFrequency: {},
         ...(isStandard && sizeLabel ? { sizeLabel } : {}),
         ...(hasCustomMap ? { customMapId: this.config.customMapId } : {}),
-      } as PreGameRoomState['mapSetting'],
+      } as PreGameRoomState["mapSetting"],
       teams: [],
       teamCount: 0,
       playerLimit: this.config.maxPlayers ?? 8,
@@ -349,12 +358,16 @@ export type ConnectionResult =
   }
 
   private wireRoomInstance() {
-    this.roomInstance!.onDisband(() => this.disbandGame());
-    this.roomInstance!.onStartGame(this.startGame.bind(this));
+    this.roomInstance?.onDisband(() => this.disbandGame());
+    this.roomInstance?.onStartGame(this.startGame.bind(this));
   }
 
   private emitRoomUpdated() {
-    try { this.roomUpdateEmitter?.(this.gameId); } catch (err) { console.error('[GameService] emitRoomUpdated', err); }
+    try {
+      this.roomUpdateEmitter?.(this.gameId);
+    } catch (err) {
+      console.error("[GameService] emitRoomUpdated", err);
+    }
   }
 
   public setRoomUpdateEmitter(cb: (gameId: GameId) => void) {
@@ -401,7 +414,7 @@ export type ConnectionResult =
           status: PlayerStatus.Playing,
         };
       }
-      teams[p.teamId]!.memberIds.push(p.id);
+      teams[p.teamId]?.memberIds.push(p.id);
     }
 
     // 直接透传 RoomGameSetting（已兼容 GameSettings）
@@ -431,12 +444,12 @@ export type ConnectionResult =
           };
           return acc;
         },
-        {} as SyncedGameState["playerDisplay"]
-      )
-    }
+        {} as SyncedGameState["playerDisplay"],
+      ),
+    };
 
     // 创建 GameInstance
-    const playerIds = Array.from(roomState.players.map(p => p.id));
+    const playerIds = Array.from(roomState.players.map((p) => p.id));
     this.gameInstance = new GameInstance(initialGameState, gameInstanceSettings, playerIds);
     this.phase = GamePhase.INGAME;
     this.gameInstance.onEndGame(this.endGame.bind(this));
@@ -447,10 +460,7 @@ export type ConnectionResult =
     console.log(`[GameService ${this.gameId}] Game started with ${playerIds.length} players`);
   }
 
-  /**
-   * 结束游戏
-   */
-  public endGame(result?: any): void {
+  public endGame(result?: GameEndResult): void {
     // 清理 tick timer
     this.gameInstance?.stopTicking();
 
@@ -462,7 +472,7 @@ export type ConnectionResult =
     console.log(`[GameService ${this.gameId}] Ending game...`, result);
 
     // 调用结束回调（保留给上层使用，例如统计）
-    this.onGameEndCallback?.(result);
+    if (result) this.onGameEndCallback?.(result);
 
     // 清理游戏实例（销毁内部资源）
     if (this.gameInstance) {
@@ -501,7 +511,9 @@ export type ConnectionResult =
     // 通知 manager 房间已变更（从 INGAME -> PREGAME）
     this.emitRoomUpdated();
 
-    console.log(`[GameService ${this.gameId}] Game ended and room restored to room with ${this.roomInstance.getState().players.length} players`);
+    console.log(
+      `[GameService ${this.gameId}] Game ended and room restored to room with ${this.roomInstance.getState().players.length} players`,
+    );
   }
 
   public forceDispose(): void {
@@ -556,7 +568,7 @@ export type ConnectionResult =
    * 获取玩家列表。
    */
   public getPlayers(): PlayerId[] {
-    return this.roomInstance?.getState().players.map(p => p.id) ?? [];
+    return this.roomInstance?.getState().players.map((p) => p.id) ?? [];
   }
 
   /**
@@ -567,13 +579,10 @@ export type ConnectionResult =
     if (this.phase === GamePhase.INGAME && this.gameInstance) {
       return !!this.gameInstance.getState().players[playerId];
     }
-    return this.roomInstance?.getState().players.some(p => p.id === playerId) ?? false;
+    return this.roomInstance?.getState().players.some((p) => p.id === playerId) ?? false;
   }
 
-  /**
-   * 获取游戏状态（用于调试）
-   */
-  public getGameState(): any {
+  public getGameState(): unknown {
     return {
       gameId: this.gameId,
       phase: this.phase,
@@ -593,10 +602,7 @@ export type ConnectionResult =
     this.onGameStartCallback = callback;
   }
 
-  /**
-   * 设置游戏结束回调
-   */
-  public onGameEnd(callback: (result: any) => void): void {
+  public onGameEnd(callback: (result: GameEndResult) => void): void {
     this.onGameEndCallback = callback;
   }
 
@@ -621,7 +627,7 @@ export type ConnectionResult =
     switch (phase) {
       case GamePhase.PREGAME:
         if (this.getPlayerCount() >= (this.config.maxPlayers ?? 8)) {
-          return { success: false, reason: 'GAME_UNAVAILABLE', message: 'Game is full. Cannot connect.' };
+          return { success: false, reason: "GAME_UNAVAILABLE", message: "Game is full. Cannot connect." };
         }
 
         primary = `room-${this.gameId}`;
@@ -635,7 +641,7 @@ export type ConnectionResult =
           primary = `game-${this.gameId}`;
           break;
         }
-        const roomSelf = this.roomInstance?.getState().players.find(p => p.id === playerId);
+        const roomSelf = this.roomInstance?.getState().players.find((p) => p.id === playerId);
         if (roomSelf?.status === PreGamePlayerStatus.Spectating) {
           primary = `game-${this.gameId}`;
         } else {
@@ -648,8 +654,8 @@ export type ConnectionResult =
       case GamePhase.DISBANDED:
         return {
           success: false,
-          reason: 'GAME_UNAVAILABLE',
-          message: 'Game has been disbanded'
+          reason: "GAME_UNAVAILABLE",
+          message: "Game has been disbanded",
         };
     }
 
@@ -657,8 +663,8 @@ export type ConnectionResult =
     if (primary === null) {
       return {
         success: false,
-        reason: 'INVALID_STATE',
-        message: `Game is in a state (${phase}) that cannot be connected to.`
+        reason: "INVALID_STATE",
+        message: `Game is in a state (${phase}) that cannot be connected to.`,
       };
     }
 
@@ -672,16 +678,16 @@ export type ConnectionResult =
         domains: {
           primary,
           room: `room-${this.gameId}`,
-          chat: `chat-${this.gameId}`
+          chat: `chat-${this.gameId}`,
         },
-      }
+      },
     };
   }
 
   public getGameInfo(): GameInfoSuccessResp["data"] {
     return buildGameInfo({
       gameId: this.gameId,
-      roomName: this.config.roomName ?? '',
+      roomName: this.config.roomName ?? "",
       phase: this.phase,
       maxPlayers: this.config.maxPlayers ?? 8,
       roomType: this.config.type,

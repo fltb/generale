@@ -22,10 +22,7 @@ export class ApiError<E = ErrorResp> extends Error {
  *   T - 成功返回类型
  *   E - 错误返回类型（默认使用 @generale/types 的 ErrorResp）
  */
-export async function api<T = any, E = ErrorResp>(
-  path: string,
-  opts: RequestInit = {}
-): Promise<T> {
+export async function api<T = unknown, E = ErrorResp>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     credentials: "include",
     headers: {
@@ -36,7 +33,7 @@ export async function api<T = any, E = ErrorResp>(
   });
 
   const text = await res.text();
-  let parsed: any = undefined;
+  let parsed: unknown;
   try {
     parsed = text ? JSON.parse(text) : undefined;
   } catch {
@@ -47,7 +44,7 @@ export async function api<T = any, E = ErrorResp>(
   if (!res.ok) {
     // 尝试把后端的 error payload 解析为 E（例如 ErrorResp）
     const errData = (parsed as E) ?? ({} as E);
-    const message = (errData && (errData as any).error) ?? res.statusText ?? "Request failed";
+    const message = (errData && (errData as { error?: string }).error) ?? res.statusText ?? "Request failed";
     throw new ApiError<E>(message, res.status, errData);
   }
 

@@ -1,26 +1,26 @@
+import type { ChatSenderMeta } from "@generale/types";
 import {
-  PlayerId,
-  PreGameRoomState,
-  SyncedPreGameClientActions,
-  SyncedPreGameServerEvent,
+  PlayerColor,
+  type PlayerId,
+  PRESET_SIZES,
+  PreGameMapType,
+  PreGamePlayerStatus,
+  type PreGameRoomState,
+  type PreGameRoomType,
+  type PreGameStandardSizeLabel,
+  type PreGameTeamMode,
+  type ServerSyncConnector,
+  type SyncedPreGameClientActions,
   SyncedPreGameClientActionTypes,
+  type SyncedPreGameServerEvent,
+  SyncedPreGameServerEventPayloadType,
   SyncedPreGameServerEventType,
   SyncedPreGameServerStateUpdatePayloadType,
-  ServerSyncConnector,
-  SyncedPreGameState,
-  PlayerColor,
-  SyncedPreGameServerEventPayloadType,
-  TeamId,
-  PreGameMapType,
-  PRESET_SIZES,
-  PreGameStandardSizeLabel,
-  PreGameRoomType,
-  PreGameTeamMode,
-  PreGamePlayerStatus,
-} from '@generale/types';
-import type { ChatSenderMeta } from '@generale/types';
-import { StateSyncState } from './state-sync';
-import { displaceConnector as displace } from './connector-manager';
+  type SyncedPreGameState,
+  type TeamId,
+} from "@generale/types";
+import { displaceConnector as displace } from "./connector-manager";
+import { StateSyncState } from "./state-sync";
 
 // 类型别名，便于引用
 export type RoomServerConnector = ServerSyncConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>;
@@ -31,8 +31,7 @@ export type RoomServerConnector = ServerSyncConnector<SyncedPreGameClientActions
  * 在 PREGAME 阶段承担完整交互；INGAME 期间 suspend 锁定，但保持连接和名册服务；
  * 游戏结束后 resume 恢复交互。始终是玩家信息和鉴权的唯一数据源。
  */
-import { IBaseInstance, IRoomRoster } from './interface';
-
+import type { IBaseInstance, IRoomRoster } from "./interface";
 
 export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, SyncedPreGameServerEvent>, IRoomRoster {
   private state: PreGameRoomState;
@@ -66,9 +65,15 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   /** 房主断线计时器：超时后自动转让 */
   private hostReclaimTimer: ReturnType<typeof setTimeout> | undefined = undefined;
 
-  public getPassword(): string | undefined { return this.roomPassword; }
-  public setPassword(pw?: string): void { this.roomPassword = pw ?? undefined; }
-  public setCreatorId(id: PlayerId): void { this.creatorId = id; }
+  public getPassword(): string | undefined {
+    return this.roomPassword;
+  }
+  public setPassword(pw?: string): void {
+    this.roomPassword = pw ?? undefined;
+  }
+  public setCreatorId(id: PlayerId): void {
+    this.creatorId = id;
+  }
 
   private clearHostReclaimTimer() {
     if (this.hostReclaimTimer) {
@@ -81,11 +86,11 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     this.clearHostReclaimTimer();
     this.hostReclaimTimer = setTimeout(() => {
       this.hostReclaimTimer = undefined;
-      const host = this.state.players.find(p => p.isHost);
+      const host = this.state.players.find((p) => p.isHost);
       if (host && host.status === PreGamePlayerStatus.Disconnected) {
         console.debug(`[RoomInstance] Host ${pid} reclaim timeout, auto-transferring`);
         this.autoTransferHost();
-        this.state.players = this.state.players.filter(p => p.id !== pid);
+        this.state.players = this.state.players.filter((p) => p.id !== pid);
         if (this.state.players.length === 0) {
           console.debug("[RoomInstance] last player (host) removed after reclaim, auto destroy");
           this.destroy();
@@ -117,18 +122,18 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       conn.onOpen(() => this.sendState(pid, true));
       conn.onDisconnect(() => this.handleDisconnect(pid, conn));
       conn.onReconnect(() => this.sendState(pid, true));
-      conn.onClientMessage(evt => this.handleClientAction(pid, evt));
+      conn.onClientMessage((evt) => this.handleClientAction(pid, evt));
       conn.onClose(() => this.handleDisconnect(pid, conn));
     }
   }
 
   /** Helper: create a new team id (unique) */
   private createTeamId(proposed?: TeamId): TeamId {
-    if (proposed && !this.state.teams.find(t => t.id === proposed)) return proposed;
+    if (proposed && !this.state.teams.find((t) => t.id === proposed)) return proposed;
     // find next free teamN
     while (true) {
       const id: TeamId = `team${this.nextTeamSeq++}`;
-      if (!this.state.teams.find(t => t.id === id)) return id;
+      if (!this.state.teams.find((t) => t.id === id)) return id;
     }
   }
 
@@ -147,11 +152,13 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       this.state.teamCount = this.state.teams.length;
       return id;
     }
-    const found = this.state.teams.find(t => t.id === teamId);
+    const found = this.state.teams.find((t) => t.id === teamId);
     if (found) return found.id;
 
     // PROTECTION: do NOT silently create when client asked for an unknown team.
-    console.warn(`[RoomInstance] ensureTeamExists: proposed teamId "${teamId}" not found. refusing to create implicitly.`);
+    console.warn(
+      `[RoomInstance] ensureTeamExists: proposed teamId "${teamId}" not found. refusing to create implicitly.`,
+    );
     return null;
   }
 
@@ -170,7 +177,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       if (p.teamId) counts.set(p.teamId, (counts.get(p.teamId) ?? 0) + 1);
     }
     // filter out empty teams
-    const newTeams = this.state.teams.filter(t => (counts.get(t.id) ?? 0) > 0);
+    const newTeams = this.state.teams.filter((t) => (counts.get(t.id) ?? 0) > 0);
     // ensure min teams
     while (newTeams.length < this.MIN_TEAMS) {
       const id = this.createTeamId();
@@ -191,7 +198,9 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   private clearPerConnectionState(pid: PlayerId) {
     const conn = this.connectors.get(pid);
     if (conn) {
-      try { conn.close(); } catch { }
+      try {
+        conn.close();
+      } catch {}
       this.connectors.delete(pid);
     }
     this.stateSync.clear(pid);
@@ -213,7 +222,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       return;
     }
 
-    const player = this.state.players.find(p => p.id === pid);
+    const player = this.state.players.find((p) => p.id === pid);
     if (!player) {
       this.clearPerConnectionState(pid);
       return;
@@ -259,10 +268,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
    * - KICK_PLAYER / START_GAME 等只允许在 PREGAME（!suspended）期间
    */
   private actionAllowed(player: { status: PreGamePlayerStatus }, evtType: SyncedPreGameClientActionTypes): boolean {
-    if (
-      player.status === PreGamePlayerStatus.Playing ||
-      player.status === PreGamePlayerStatus.Disconnected
-    ) {
+    if (player.status === PreGamePlayerStatus.Playing || player.status === PreGamePlayerStatus.Disconnected) {
       // 这些玩家应通过 game 域操作，不允许在 pregame 域改任何东西
       return false;
     }
@@ -313,7 +319,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
   private handleClientAction(pid: PlayerId, evt: SyncedPreGameClientActions) {
     if (this.destroyed) return;
-    const player = this.state.players.find(p => p.id === pid);
+    const player = this.state.players.find((p) => p.id === pid);
     if (!player) return;
 
     // 幂等乐观编号判断
@@ -322,13 +328,16 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       synced = { lastConfirmedOp: -1 };
       this.syncData.set(pid, synced);
     }
-    if (typeof evt.optimisticId === 'number' && synced.lastConfirmedOp >= evt.optimisticId) {
+    if (typeof evt.optimisticId === "number" && synced.lastConfirmedOp >= evt.optimisticId) {
       return;
     }
 
     if (!this.actionAllowed(player, evt.type)) {
-      console.debug(`[RoomInstance] action rejected (status=${player.status}, suspended=${this.suspended}) from ${pid}:`, evt.type);
-      if (typeof evt.optimisticId === 'number') {
+      console.debug(
+        `[RoomInstance] action rejected (status=${player.status}, suspended=${this.suspended}) from ${pid}:`,
+        evt.type,
+      );
+      if (typeof evt.optimisticId === "number") {
         synced.lastConfirmedOp = evt.optimisticId;
       }
       return;
@@ -338,49 +347,67 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
     switch (evt.type) {
       case SyncedPreGameClientActionTypes.READY:
-        this.setReady(pid, true); break;
+        this.setReady(pid, true);
+        break;
       case SyncedPreGameClientActionTypes.UNREADY:
-        this.setReady(pid, false); break;
+        this.setReady(pid, false);
+        break;
       case SyncedPreGameClientActionTypes.CHANGE_SETTING:
-        this.changeSetting(pid, evt.payload); break;
+        this.changeSetting(pid, evt.payload);
+        break;
       case SyncedPreGameClientActionTypes.CHANGE_MAP:
-        this.changeMap(pid, evt.payload); break;
+        this.changeMap(pid, evt.payload);
+        break;
       case SyncedPreGameClientActionTypes.CHANGE_ROOM_TYPE:
-        this.changeRoomType(pid, evt.payload.roomType); break;
+        this.changeRoomType(pid, evt.payload.roomType);
+        break;
       case SyncedPreGameClientActionTypes.CHANGE_TEAM_MODE:
-        this.changeTeamMode(pid, evt.payload.teamMode); break;
+        this.changeTeamMode(pid, evt.payload.teamMode);
+        break;
       case SyncedPreGameClientActionTypes.CHANGE_TEAM:
-        this.changeTeam(pid, evt.payload.teamId, evt.payload.playerId); break;
+        this.changeTeam(pid, evt.payload.teamId, evt.payload.playerId);
+        break;
       case SyncedPreGameClientActionTypes.KICK_PLAYER:
         // KICK 只在 PREGAME（非 suspended）期间允许，且目标必须是 Lobby 玩家
-        this.kickPlayer(pid, evt.payload.playerId); break;
+        this.kickPlayer(pid, evt.payload.playerId);
+        break;
       case SyncedPreGameClientActionTypes.LEAVE_ROOM:
-        this.removePlayer(pid); break;
+        this.removePlayer(pid);
+        break;
       case SyncedPreGameClientActionTypes.START_GAME:
-        this.tryStartGame(pid); break;
+        this.tryStartGame(pid);
+        break;
       case SyncedPreGameClientActionTypes.TRANSFER_HOST:
-        this.transferHost(pid, evt.payload.newHostId); break;
+        this.transferHost(pid, evt.payload.newHostId);
+        break;
       case SyncedPreGameClientActionTypes.DISBAND_ROOM:
-        this.disbandRoom(pid); break;
+        this.disbandRoom(pid);
+        break;
       case SyncedPreGameClientActionTypes.CREATE_TEAM:
-        this.createTeam(pid, evt.payload.name); break;
+        this.createTeam(pid, evt.payload.name);
+        break;
       case SyncedPreGameClientActionTypes.RENAME_TEAM:
-        this.renameTeam(pid, evt.payload.teamId, evt.payload.name); break;
+        this.renameTeam(pid, evt.payload.teamId, evt.payload.name);
+        break;
       case SyncedPreGameClientActionTypes.DELETE_TEAM:
-        this.deleteTeam(pid, evt.payload.teamId); break;
+        this.deleteTeam(pid, evt.payload.teamId);
+        break;
       case SyncedPreGameClientActionTypes.ENTER_SPECTATE:
-        this.enterSpectate(pid); break;
+        this.enterSpectate(pid);
+        break;
       case SyncedPreGameClientActionTypes.LEAVE_SPECTATE:
-        this.leaveSpectate(pid); break;
+        this.leaveSpectate(pid);
+        break;
       case SyncedPreGameClientActionTypes.CHANGE_COLOR:
-        this.changeColor(pid, evt.payload.tileColor); break;
+        this.changeColor(pid, evt.payload.tileColor);
+        break;
       default:
         // ignore
         break;
     }
     this.version++;
     // 更新 lastConfirmedOp
-    if (typeof evt.optimisticId === 'number') {
+    if (typeof evt.optimisticId === "number") {
       synced.lastConfirmedOp = evt.optimisticId;
     }
     this.broadcastState();
@@ -388,19 +415,17 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
   /** 设置准备状态 */
   private setReady(pid: PlayerId, ready: boolean) {
-    console.log("set ready to", ready)
-    const p = this.state.players.find(p => p.id === pid);
+    console.log("set ready to", ready);
+    const p = this.state.players.find((p) => p.id === pid);
     if (p && !p.isHost) p.ready = ready ? 1 : 0;
   }
 
   /** 玩家选择自己的地块颜色（不能和已有玩家重复） */
   private changeColor(pid: PlayerId, tileColor: PlayerColor) {
-    const p = this.state.players.find(p => p.id === pid);
+    const p = this.state.players.find((p) => p.id === pid);
     if (!p) return;
     // 检查颜色是否已被其他人使用
-    const taken = this.state.players.some(
-      other => other.id !== pid && other.tileColor === tileColor,
-    );
+    const taken = this.state.players.some((other) => other.id !== pid && other.tileColor === tileColor);
     if (taken) return;
     p.tileColor = tileColor;
   }
@@ -414,7 +439,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
    */
   private enterSpectate(pid: PlayerId) {
     if (!this.suspended) return;
-    const p = this.state.players.find(p => p.id === pid);
+    const p = this.state.players.find((p) => p.id === pid);
     if (!p) return;
     if (p.status !== PreGamePlayerStatus.Lobby) return;
     p.status = PreGamePlayerStatus.Spectating;
@@ -427,7 +452,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
    * 任何时刻都可以退（包括游戏已结束的边界情况）。
    */
   private leaveSpectate(pid: PlayerId) {
-    const p = this.state.players.find(p => p.id === pid);
+    const p = this.state.players.find((p) => p.id === pid);
     if (!p) return;
     if (p.status !== PreGamePlayerStatus.Spectating) return;
     p.status = PreGamePlayerStatus.Lobby;
@@ -435,7 +460,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   }
 
   /** 修改房间设置（仅房主） */
-  private changeSetting(pid: PlayerId, patch: Partial<PreGameRoomState['gameSetting']>) {
+  private changeSetting(pid: PlayerId, patch: Partial<PreGameRoomState["gameSetting"]>) {
     if (pid !== this.state.hostId) return;
     Object.assign(this.state.gameSetting, patch);
   }
@@ -463,7 +488,11 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
         sizeLabel: defaultLabel,
       };
     } else {
-      const ms: any = this.state.mapSetting;
+      const ms = this.state.mapSetting as PreGameRoomState["mapSetting"] & {
+        width?: number;
+        height?: number;
+        customMapId?: string;
+      };
       const w = typeof ms?.width === "number" ? ms.width : 20;
       const h = typeof ms?.height === "number" ? ms.height : 20;
       this.state.mapSetting = {
@@ -473,7 +502,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
         tileFrequency: {},
         customData: "",
         ...(ms?.customMapId ? { customMapId: ms.customMapId } : {}),
-      } as PreGameRoomState['mapSetting'];
+      } as PreGameRoomState["mapSetting"];
     }
     this.state.roomType = next;
   }
@@ -530,17 +559,20 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
    *   其余字段（不同 map type / 自定义尺寸 / tileFrequency）一律拒绝。
    * custom 房间：原样写入。
    */
-  private changeMap(pid: PlayerId, mapSetting: PreGameRoomState['mapSetting']) {
+  private changeMap(pid: PlayerId, mapSetting: PreGameRoomState["mapSetting"]) {
     if (pid !== this.state.hostId) return;
 
     if (this.state.roomType === "standard") {
-      const incoming: any = mapSetting;
+      const incoming = mapSetting as PreGameRoomState["mapSetting"] & {
+        customMapId?: string;
+        sizeLabel?: PreGameStandardSizeLabel;
+      };
       if (incoming?.customMapId) {
         console.warn(`[RoomInstance] standard room rejects CHANGE_MAP with customMapId`);
         return;
       }
       const label = incoming?.sizeLabel as PreGameStandardSizeLabel | undefined;
-      if (!label || !(label in PRESET_SIZES)) {
+      if (!(label && label in PRESET_SIZES)) {
         console.warn(`[RoomInstance] standard room rejects CHANGE_MAP without valid sizeLabel:`, mapSetting);
         return;
       }
@@ -574,7 +606,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       console.warn(`[RoomInstance] Player ${pid} tried to change team for ${targetId} but is not host`);
       return;
     }
-    const target = this.state.players.find(p => p.id === targetId);
+    const target = this.state.players.find((p) => p.id === targetId);
     if (!target) {
       console.warn(`[RoomInstance] changeTeam: target ${targetId} not found`);
       return;
@@ -583,7 +615,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     // If teamId is falsy (empty string / undefined), interpret as "join default team"
     if (!teamId) {
       // prefer existing first team; if none, create one
-      const firstTeam = (this.state.teams && this.state.teams[0]) ? this.state.teams[0].id : this.ensureTeamExists();
+      const firstTeam = this.state.teams?.[0] ? this.state.teams[0].id : this.ensureTeamExists();
       if (!firstTeam) {
         // Shouldn't happen because ensureTeamExists() without param will create,
         // but guard anyway.
@@ -592,15 +624,14 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       }
       target.teamId = firstTeam;
       return;
-    } else {
-      // ensure team exists (DO NOT create if not found)
-      const realTeamId = this.ensureTeamExists(teamId);
-      if (!realTeamId) {
-        console.warn(`[RoomInstance] changeTeam: requested unknown team "${teamId}", rejected.`);
-        return;
-      }
-      target.teamId = realTeamId;
     }
+    // ensure team exists (DO NOT create if not found)
+    const realTeamId = this.ensureTeamExists(teamId);
+    if (!realTeamId) {
+      console.warn(`[RoomInstance] changeTeam: requested unknown team "${teamId}", rejected.`);
+      return;
+    }
+    target.teamId = realTeamId;
 
     // NOTE: 不在此处自动删除空队，保留空队以便后续加入或房主管理。
   }
@@ -617,7 +648,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   private renameTeam(pid: PlayerId, teamId: TeamId, name: string) {
     if (pid !== this.state.hostId) return;
 
-    const team = this.state.teams.find(t => t.id === teamId);
+    const team = this.state.teams.find((t) => t.id === teamId);
     if (!team) return;
 
     team.name = name;
@@ -629,11 +660,11 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     if (this.state.teams.length <= this.MIN_TEAMS) return;
 
     // 找到目标队伍
-    const team = this.state.teams.find(t => t.id === teamId);
+    const team = this.state.teams.find((t) => t.id === teamId);
     if (!team) return;
 
     // 把该队伍玩家移动到第一个队伍
-    const fallback = this.state.teams.find(t => t.id !== teamId);
+    const fallback = this.state.teams.find((t) => t.id !== teamId);
     if (!fallback) return;
 
     for (const p of this.state.players) {
@@ -642,10 +673,9 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       }
     }
 
-    this.state.teams = this.state.teams.filter(t => t.id !== teamId);
+    this.state.teams = this.state.teams.filter((t) => t.id !== teamId);
     this.state.teamCount = this.state.teams.length;
   }
-
 
   /** 踢人（仅房主，且只在 PREGAME 阶段、只能踢 Lobby 玩家） */
   private kickPlayer(requester: PlayerId, target: PlayerId) {
@@ -654,7 +684,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       console.warn(`[RoomInstance] kickPlayer rejected: game in progress`);
       return;
     }
-    const targetPlayer = this.state.players.find(p => p.id === target);
+    const targetPlayer = this.state.players.find((p) => p.id === target);
     if (!targetPlayer) return;
     if (targetPlayer.status !== PreGamePlayerStatus.Lobby) {
       console.warn(`[RoomInstance] kickPlayer rejected: target ${target} is ${targetPlayer.status}`);
@@ -670,18 +700,20 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     this.bannedUntil.set(target, until);
 
     // send kicked event (so client can show reason)
-    this.sendKickEvent(target, 'You have been kicked from the room.');
+    this.sendKickEvent(target, "You have been kicked from the room.");
 
     // ensure we close their connector and remove player
     try {
       const conn = this.connectors.get(target);
       if (conn) {
-        try { conn.close(4000, "kicked"); } catch { }
+        try {
+          conn.close(4000, "kicked");
+        } catch {}
       }
       // forceRemove=true: 已是 Lobby 玩家，无论 suspended 与否都直接移除
       this.removePlayer(target, true);
     } catch (e) {
-      console.warn('[RoomInstance] kickPlayer removal error', e);
+      console.warn("[RoomInstance] kickPlayer removal error", e);
     }
   }
 
@@ -690,8 +722,8 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       type: SyncedPreGameServerEventType.CUSTOM,
       payload: {
         type: SyncedPreGameServerEventPayloadType.KICKED,
-        reason
-      }
+        reason,
+      },
     });
   }
 
@@ -704,15 +736,15 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
    *
    * forceRemove=true 表示要彻底回收（resume 后清理 Disconnected、kick、destroy 等场景）
    */
-  private removePlayer(pid: PlayerId, forceRemove: boolean = false) {
+  private removePlayer(pid: PlayerId, forceRemove = false) {
     if (this.removing.has(pid)) return;
     this.removing.add(pid);
 
     try {
       const conn = this.connectors.get(pid);
-      const player = this.state.players.find(p => p.id === pid);
+      const player = this.state.players.find((p) => p.id === pid);
 
-      if (!conn && !player) return;
+      if (!(conn || player)) return;
 
       // Playing 玩家在非 force 路径下不要直接删 —— 走 handleDisconnect 转 Disconnected
       if (player && player.status === PreGamePlayerStatus.Playing && !forceRemove) {
@@ -727,27 +759,26 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
       if (player) {
         const leavingTeamId = player.teamId;
-        this.state.players = this.state.players.filter(p => p.id !== pid);
+        this.state.players = this.state.players.filter((p) => p.id !== pid);
         if (this.state.hostId === pid) {
           this.autoTransferHost();
         }
 
         // ffa：玩家走了顺手把他独占的队也回收（保留 MIN_TEAMS 兜底）
         if (this.state.teamMode === "ffa" && leavingTeamId) {
-          const stillUsed = this.state.players.some(p => p.teamId === leavingTeamId);
+          const stillUsed = this.state.players.some((p) => p.teamId === leavingTeamId);
           if (!stillUsed && this.state.teams.length > this.MIN_TEAMS) {
-            this.state.teams = this.state.teams.filter(t => t.id !== leavingTeamId);
+            this.state.teams = this.state.teams.filter((t) => t.id !== leavingTeamId);
             this.state.teamCount = this.state.teams.length;
           }
         }
 
         if (this.state.players.length === 0) {
-          console.debug("[RoomInstance] all players left, auto destroy")
+          console.debug("[RoomInstance] all players left, auto destroy");
           this.destroy();
           return;
-        } else {
-          this.broadcastState();
         }
+        this.broadcastState();
       }
     } finally {
       this.removing.delete(pid);
@@ -757,9 +788,11 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   /** 房主转让 */
   private transferHost(pid: PlayerId, newHostId: PlayerId) {
     if (pid !== this.state.hostId) return;
-    const newHost = this.state.players.find(p => p.id === newHostId);
+    const newHost = this.state.players.find((p) => p.id === newHostId);
     if (!newHost) return;
-    this.state.players.forEach(p => (p.isHost = false));
+    this.state.players.forEach((p) => {
+      p.isHost = false;
+    });
     newHost.isHost = true;
     newHost.ready = 1;
     this.state.hostId = newHostId;
@@ -771,8 +804,8 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     for (const p of this.state.players) p.isHost = false;
 
     const candidate =
-      this.state.players.find(p => p.status === PreGamePlayerStatus.Lobby) ??
-      this.state.players.find(p => p.status === PreGamePlayerStatus.Playing) ??
+      this.state.players.find((p) => p.status === PreGamePlayerStatus.Lobby) ??
+      this.state.players.find((p) => p.status === PreGamePlayerStatus.Playing) ??
       this.state.players[0];
 
     if (candidate) {
@@ -780,7 +813,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       candidate.ready = 1;
       this.state.hostId = candidate.id;
     } else {
-      this.state.hostId = '';
+      this.state.hostId = "";
     }
   }
 
@@ -795,14 +828,22 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
         type: SyncedPreGameServerEventType.CUSTOM,
         payload: {
           type: SyncedPreGameServerEventPayloadType.DISBANDED,
-          reason: 'Room has been disbanded.'
-        }
+          reason: "Room has been disbanded.",
+        },
       });
-      try { conn.close(); } catch (e) { /* ignore */ }
+      try {
+        conn.close();
+      } catch (_e) {
+        /* ignore */
+      }
     }
     // notify listeners
     for (const cb of this.onDisbandCallbacks) {
-      try { cb(); } catch (err) { console.error('[RoomInstance] onDisband callback error', err); }
+      try {
+        cb();
+      } catch (err) {
+        console.error("[RoomInstance] onDisband callback error", err);
+      }
     }
     this.onDisbandCallbacks = [];
 
@@ -829,8 +870,8 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
         type: SyncedPreGameServerEventType.CUSTOM,
         payload: {
           type: SyncedPreGameServerEventPayloadType.START_REJECTED,
-          reason: res.reason
-        }
+          reason: res.reason,
+        },
       });
       return;
     }
@@ -861,8 +902,8 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
         type: SyncedPreGameServerEventType.CUSTOM,
         payload: {
           type: SyncedPreGameServerEventPayloadType.START_REJECTED,
-          reason: '游戏启动失败，请重试'
-        }
+          reason: "游戏启动失败，请重试",
+        },
       });
       return;
     }
@@ -877,8 +918,8 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
         type: SyncedPreGameServerEventType.CUSTOM,
         payload: {
           type: SyncedPreGameServerEventPayloadType.GAME_STARTED,
-          startedAt
-        }
+          startedAt,
+        },
       });
     }
   }
@@ -903,14 +944,14 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
           },
         });
       } catch (e) {
-        console.warn('[RoomInstance] broadcastGameEnded send error', e);
+        console.warn("[RoomInstance] broadcastGameEnded send error", e);
       }
     }
   }
 
   /** 判断是否所有非房主都准备好且人数足够 */
-  private canStart(): { ok: false, reason: string } | { ok: true } {
-    const readyPlayers = this.state.players.filter(p => !p.isHost && p.ready === 1);
+  private canStart(): { ok: false; reason: string } | { ok: true } {
+    const readyPlayers = this.state.players.filter((p) => !p.isHost && p.ready === 1);
 
     // count non-empty teams via teams array
     const teamMemberCounts = new Map<string, number>();
@@ -918,7 +959,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     for (const p of this.state.players) {
       if (p.teamId) teamMemberCounts.set(p.teamId, (teamMemberCounts.get(p.teamId) ?? 0) + 1);
     }
-    const nonEmptyTeamCount = Array.from(teamMemberCounts.values()).filter(n => n > 0).length;
+    const nonEmptyTeamCount = Array.from(teamMemberCounts.values()).filter((n) => n > 0).length;
 
     if (this.state.players.length < 2) {
       return { ok: false, reason: "No enough players to start the game." };
@@ -937,31 +978,38 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     const conn = this.connectors.get(pid);
     if (!conn) return;
 
-    const foundSelf = this.state.players.find(p => p.id === pid);
+    const foundSelf = this.state.players.find((p) => p.id === pid);
     const curr: SyncedPreGameState = foundSelf
       ? { room: this.state, selfId: pid, self: foundSelf }
       : { room: this.state, selfId: pid };
 
     const confirmedOp = this.syncData.get(pid)?.lastConfirmedOp ?? 0;
-    this.stateSync.send(pid, forceSnapshot, curr, this.version, confirmedOp,
-      (state, ver, op) => conn.send({
-        type: SyncedPreGameServerEventType.STATE_UPDATE,
-        payload: {
-          type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
-          version: ver,
-          confirmedOp: op,
-          payload: state,
-        },
-      }),
-      (patches, ver, op) => conn.send({
-        type: SyncedPreGameServerEventType.STATE_UPDATE,
-        payload: {
-          type: SyncedPreGameServerStateUpdatePayloadType.PATCH,
-          version: ver,
-          confirmedOp: op,
-          payload: patches,
-        },
-      }),
+    this.stateSync.send(
+      pid,
+      forceSnapshot,
+      curr,
+      this.version,
+      confirmedOp,
+      (state, ver, op) =>
+        conn.send({
+          type: SyncedPreGameServerEventType.STATE_UPDATE,
+          payload: {
+            type: SyncedPreGameServerStateUpdatePayloadType.SNAPSHOT,
+            version: ver,
+            confirmedOp: op,
+            payload: state,
+          },
+        }),
+      (patches, ver, op) =>
+        conn.send({
+          type: SyncedPreGameServerEventType.STATE_UPDATE,
+          payload: {
+            type: SyncedPreGameServerStateUpdatePayloadType.PATCH,
+            version: ver,
+            confirmedOp: op,
+            payload: patches,
+          },
+        }),
     );
   }
 
@@ -972,7 +1020,11 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     }
     // after sending to all connectors, notify subscribers about a room-level update
     for (const cb of this.onStateChangeCallbacks) {
-      try { cb(this.state); } catch (err) { console.error('[RoomInstance] onStateChange callback error', err); }
+      try {
+        cb(this.state);
+      } catch (err) {
+        console.error("[RoomInstance] onStateChange callback error", err);
+      }
     }
   }
 
@@ -982,10 +1034,10 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     // 直接 find 会先命中字符串 key（"DarkSlateGray"），导致 tileColor 落库成字符串，
     // 前端 colorHex 拼出 `#DarkSlateGray` 这种非法 CSS，浏览器 silently 丢掉。
     // 必须过滤成纯数字数组。
-    const usedColors = this.state.players.map(p => p.tileColor);
-    const numericColors = Object.values(PlayerColor).filter(c => typeof c === 'number') as PlayerColor[];
-    const color = numericColors.find(c => !usedColors.includes(c));
-    return color ?? numericColors[0]!;
+    const usedColors = this.state.players.map((p) => p.tileColor);
+    const numericColors = Object.values(PlayerColor).filter((c) => typeof c === "number") as PlayerColor[];
+    const color = numericColors.find((c) => !usedColors.includes(c));
+    return color ?? numericColors[0] ?? PlayerColor.DarkSlateGray;
   }
 
   /** 主动销毁实例 */
@@ -994,22 +1046,31 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     this.destroyed = true;
     this.clearHostReclaimTimer();
     // 只有在显式 disband 或房间已无人时才通知 onDisband
-    const shouldNotifyDisband = this.disbanded || (Array.isArray(this.state.players) && this.state.players.length === 0);
+    const shouldNotifyDisband =
+      this.disbanded || (Array.isArray(this.state.players) && this.state.players.length === 0);
 
     if (shouldNotifyDisband) {
       for (const cb of this.onDisbandCallbacks) {
-        try { cb(); } catch (err) { console.error('[RoomInstance] onDisband callback error', err); }
+        try {
+          cb();
+        } catch (err) {
+          console.error("[RoomInstance] onDisband callback error", err);
+        }
       }
       this.onDisbandCallbacks = [];
       this.disbanded = true;
-      console.debug('[RoomInstance] notified onDisband callbacks during destroy');
+      console.debug("[RoomInstance] notified onDisband callbacks during destroy");
     } else {
       // 不将普通的 destroy 视为 disband —— 只是清理回调列表避免内存泄露
       this.onDisbandCallbacks = [];
-      console.debug('[RoomInstance] destroy without disband (normal lifecycle transition)');
+      console.debug("[RoomInstance] destroy without disband (normal lifecycle transition)");
     }
     for (const [_pid, conn] of this.connectors) {
-      try { conn.close(); } catch (e) { /* ignore */ }
+      try {
+        conn.close();
+      } catch (_e) {
+        /* ignore */
+      }
     }
     this.connectors.clear();
     this.state.players = [];
@@ -1039,9 +1100,9 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
   /** 获取聊天展示所需的发送者快照。 */
   public getPlayerChatMeta(playerId: PlayerId): ChatSenderMeta | null {
-    const player = this.state.players.find(p => p.id === playerId);
+    const player = this.state.players.find((p) => p.id === playerId);
     if (!player) return null;
-    const team = this.state.teams.find(t => t.id === player.teamId);
+    const team = this.state.teams.find((t) => t.id === player.teamId);
     const meta: ChatSenderMeta = {
       teamId: player.teamId,
       teamName: team?.name ?? player.teamId,
@@ -1062,14 +1123,14 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
   /** IRoomRoster: 获取用于队伍聊天的玩家列表。 */
   public getPlayersForTeamChat(): Array<{ id: PlayerId; teamId?: TeamId; status: string }> {
-    return this.state.players.map(p => ({
+    return this.state.players.map((p) => ({
       id: p.id,
       teamId: p.teamId,
       status: p.status,
     }));
   }
 
-  public canJoin(playerId: PlayerId, password?: string): { success: true } | { success: false, message: string } {
+  public canJoin(playerId: PlayerId, password?: string): { success: true } | { success: false; message: string } {
     if (this.destroyed) {
       const msg = `[RoomInstance] Cannot add player to destroyed instance`;
       console.warn(msg);
@@ -1086,15 +1147,20 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       return { success: false, message: `You were kicked. Please try again in ${remain} seconds.` };
     }
 
-    const existing = this.state.players.find(p => p.id === playerId);
+    const existing = this.state.players.find((p) => p.id === playerId);
     // 已存在玩家（任何状态：Lobby / Playing / Spectating / Disconnected）一律放行：
     if (existing) {
       return { success: true };
     }
 
     // password check — new players only; first player (host) skips
-    if (password !== undefined && this.roomPassword && password !== this.roomPassword && this.state.players.length > 0) {
-      return { success: false, message: 'Wrong password' };
+    if (
+      password !== undefined &&
+      this.roomPassword &&
+      password !== this.roomPassword &&
+      this.state.players.length > 0
+    ) {
+      return { success: false, message: "Wrong password" };
     }
 
     if (this.state.players.length >= this.state.playerLimit) {
@@ -1118,20 +1184,27 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
    * 不是基于旧基线算出来的、新 client 无法应用的 PATCH。
    */
   private displaceConnector(pid: PlayerId, connector: RoomServerConnector) {
-    displace(pid, connector, this.connectors, this.stateSync, this.syncData,
-      SyncedPreGameServerEventType.CUSTOM, SyncedPreGameServerEventPayloadType.DISPLACED);
+    displace(
+      pid,
+      connector,
+      this.connectors,
+      this.stateSync,
+      this.syncData,
+      SyncedPreGameServerEventType.CUSTOM,
+      SyncedPreGameServerEventPayloadType.DISPLACED,
+    );
 
     connector.onOpen(() => this.sendState(pid, true));
     connector.onDisconnect(() => this.handleDisconnect(pid, connector));
     connector.onReconnect(() => this.sendState(pid, true));
-    connector.onClientMessage(evt => this.handleClientAction(pid, evt));
+    connector.onClientMessage((evt) => this.handleClientAction(pid, evt));
     connector.onClose(() => this.handleDisconnect(pid, connector));
   }
   /** 动态添加玩家（用于 GameService） */
   public addPlayer(
     user: { id: PlayerId; name: string; displayName?: string; avatarThumbUrl?: string; password?: string },
     connector: RoomServerConnector,
-  ): { success: true } | { success: false, message: string } {
+  ): { success: true } | { success: false; message: string } {
     const playerId = user.id;
     const playerName = user.name;
     const displayName = user.displayName;
@@ -1143,7 +1216,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     }
 
     // —— 已存在玩家的二次接入：displacement 路径 ——
-    const existing = this.state.players.find(p => p.id === playerId);
+    const existing = this.state.players.find((p) => p.id === playerId);
     if (existing) {
       this.displaceConnector(playerId, connector);
       // 顺手刷新可能在 profile 改动过的展示字段（用户改昵称 / 换头像后再次接入）
@@ -1166,14 +1239,14 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     // 如果是第一个玩家，设为房主；如果有 creatorId 则必须匹配
     const isHost = this.state.players.length === 0;
     if (isHost && this.creatorId && playerId !== this.creatorId) {
-      return { success: false, message: 'Only the room creator can join as the first player' };
+      return { success: false, message: "Only the room creator can join as the first player" };
     }
     if (isHost) {
       this.state.hostId = playerId;
     }
 
     if (!this.state.teams) this.state.teams = [];
-    let defaultTeamId: TeamId | undefined = undefined;
+    let defaultTeamId: TeamId | undefined;
 
     if (this.state.teamMode === "ffa") {
       // ffa：每个玩家独占一支队伍
@@ -1188,7 +1261,10 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       this.state.teamCount = this.state.teams.length;
       defaultTeamId = newTeamId;
     } else {
-      defaultTeamId = (this.state.teams && this.state.teams[0]) ? this.state.teams[0].id : (this.ensureTeamExists() ?? undefined);
+      const firstTeam = this.state.teams[0];
+      const candidate = firstTeam?.id ?? this.ensureTeamExists();
+      if (!candidate) throw new Error("Unable to determine default team for new player");
+      defaultTeamId = candidate;
     }
 
     // 添加玩家到状态（默认 Lobby）
@@ -1199,7 +1275,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
       ...(avatarThumbUrl ? { avatarThumbUrl } : {}),
       isHost,
       ready: isHost ? 1 : 0,
-      teamId: defaultTeamId!,
+      teamId: defaultTeamId,
       tileColor: this.getAvailableTileColor(),
       status: PreGamePlayerStatus.Lobby,
     });
@@ -1211,14 +1287,16 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     connector.onOpen(() => this.sendState(playerId, true));
     connector.onDisconnect(() => this.handleDisconnect(playerId, connector));
     connector.onReconnect(() => this.sendState(playerId, true));
-    connector.onClientMessage(evt => this.handleClientAction(playerId, evt));
+    connector.onClientMessage((evt) => this.handleClientAction(playerId, evt));
     connector.onClose(() => this.handleDisconnect(playerId, connector));
 
     // 更新版本并广播状态
     this.version++;
     this.broadcastState();
 
-    console.log(`[RoomInstance] Player ${playerId} (${playerName}) added to room, isHost: ${isHost}, assignedTeam: ${defaultTeamId}`);
+    console.log(
+      `[RoomInstance] Player ${playerId} (${playerName}) added to room, isHost: ${isHost}, assignedTeam: ${defaultTeamId}`,
+    );
     return { success: true };
   }
   /** 移除玩家（用于 GameService） */
@@ -1242,11 +1320,11 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     // optional: avoid emitting onStateChangeCallbacks
     try {
       this.stateSync.clearAll();
-    } catch (e) {
+    } catch (_e) {
       // ignore
     }
     // keep current host fixed — no extra action needed, state.hostId 保持不变
-    console.debug('[RoomInstance] suspended: state locked, client modifications will be ignored.');
+    console.debug("[RoomInstance] suspended: state locked, client modifications will be ignored.");
   }
 
   public resume() {
@@ -1257,10 +1335,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     //    （Spectating 也是房间里的人，游戏结束后回归大厅；
     //    Playing 先归位是为了让 step 2 触发的 autoTransferHost 候选优先来自 Lobby）
     for (const p of this.state.players) {
-      if (
-        p.status === PreGamePlayerStatus.Playing ||
-        p.status === PreGamePlayerStatus.Spectating
-      ) {
+      if (p.status === PreGamePlayerStatus.Playing || p.status === PreGamePlayerStatus.Spectating) {
         p.status = PreGamePlayerStatus.Lobby;
         if (!p.isHost) p.ready = 0;
       }
@@ -1268,8 +1343,8 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
     // 2. 回收 Disconnected 玩家（游戏中断线没回来的）
     const toRecycle: PlayerId[] = this.state.players
-      .filter(p => p.status === PreGamePlayerStatus.Disconnected)
-      .map(p => p.id);
+      .filter((p) => p.status === PreGamePlayerStatus.Disconnected)
+      .map((p) => p.id);
     for (const pid of toRecycle) {
       console.debug(`[RoomInstance] resume: recycling Disconnected player ${pid}`);
       this.removePlayer(pid, /*forceRemove=*/ true);
@@ -1277,8 +1352,8 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
     // 3. host 兜底：若 host 已不在或没连接，再选一个
     const hostId = this.state.hostId;
-    const hostPlayer = this.state.players.find(p => p.id === hostId);
-    if (!hostPlayer || !this.connectors.has(hostId)) {
+    const hostPlayer = this.state.players.find((p) => p.id === hostId);
+    if (!(hostPlayer && this.connectors.has(hostId))) {
       console.debug(`[RoomInstance] resume: host ${hostId} unavailable -> autoTransfer`);
       this.autoTransferHost();
     }
@@ -1289,6 +1364,6 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     this.state.started = false;
     this.version++;
     this.broadcastState(true);
-    console.debug('[RoomInstance] resumed: state unlocked and snapshot broadcasted.');
+    console.debug("[RoomInstance] resumed: state unlocked and snapshot broadcasted.");
   }
 }

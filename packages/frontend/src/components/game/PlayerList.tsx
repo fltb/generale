@@ -1,6 +1,6 @@
-import { type Component, For, Show, createMemo } from "solid-js";
+import type { PlayerId, SyncedGameState } from "@generale/types";
 import { A } from "@solidjs/router";
-import { type SyncedGameState, type PlayerId } from "@generale/types";
+import { type Component, createMemo, For, Show } from "solid-js";
 import Avatar from "~/components/Avatar";
 import { playerSummaries } from "~/game/selectors";
 import { resolveDisplayNames } from "~/utils/playerDisplay";
@@ -18,14 +18,12 @@ export const PlayerList: Component<Props> = (props) => {
     playerSummaries(props.state?.(), {
       sortByArmy: props.sortByArmy,
       limit: props.limit,
-    })
+    }),
   );
 
   const names = createMemo(() => {
     const s = summaries();
-    return resolveDisplayNames(
-      s.map((p) => ({ id: p.id, name: p.name ?? p.id, displayName: p.displayName })),
-    );
+    return resolveDisplayNames(s.map((p) => ({ id: p.id, name: p.name ?? p.id, displayName: p.displayName })));
   });
 
   return (
@@ -54,7 +52,8 @@ export const PlayerList: Component<Props> = (props) => {
                 <Show when={!props.compact}>
                   <A
                     href={`/profile/${p.id}`}
-                    target="_blank" rel="noopener"
+                    target="_blank"
+                    rel="noopener"
                     class="shrink-0"
                     title={p.displayName ?? p.name}
                   >
@@ -66,7 +65,9 @@ export const PlayerList: Component<Props> = (props) => {
                   </A>
                 </Show>
                 <div class="min-w-0">
-                  <div class={`${props.compact ? "text-xs" : "text-sm"} font-medium truncate`}>{names().get(p.id) ?? p.displayName ?? p.name}</div>
+                  <div class={`${props.compact ? "text-xs" : "text-sm"} font-medium truncate`}>
+                    {names().get(p.id) ?? p.displayName ?? p.name}
+                  </div>
                   <div class={`${props.compact ? "text-[10px]" : "text-xs"} opacity-60`}>
                     {props.compact ? `${p.land}L·${p.army}A` : `land: ${p.land} · army: ${p.army}`}
                   </div>

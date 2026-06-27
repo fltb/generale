@@ -1,15 +1,10 @@
-import { createMemo, createEffect, createSignal, Show } from "solid-js";
-import { useSearchParams, useNavigate, A } from "@solidjs/router";
+import type { ConfirmEmailChangeReqBody, ErrorResp, MessageResp } from "@generale/types/dist/api";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
-
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { confirmEmailChangeApi } from "~/api/accountApi";
+import type { ApiError } from "~/api/base";
 import { useAuth } from "~/hooks/useAuth";
-import { ApiError } from "~/api/base";
-import type {
-  ConfirmEmailChangeReqBody,
-  MessageResp,
-  ErrorResp,
-} from "@generale/types/dist/api";
 
 /**
  * 邮箱变更确认页：用户从邮件点过来，URL 带 token。
@@ -27,7 +22,11 @@ export default function ConfirmEmailChangePage() {
     mutationFn: (body) => confirmEmailChangeApi(body),
     onSuccess: async () => {
       // 刷一遍 /me，让本地缓存里的 email 立刻同步；未登录就忽略
-      try { await auth.refresh(); } catch { /* ignore */ }
+      try {
+        await auth.refresh();
+      } catch {
+        /* ignore */
+      }
       setTimeout(() => nav("/profile"), 2000);
     },
   }));
@@ -53,13 +52,17 @@ export default function ConfirmEmailChangePage() {
           <div class="space-y-3">
             <div class="alert alert-success">{mutation.data?.message ?? "邮箱已更新"}</div>
             <p class="text-sm opacity-70">即将跳转到个人资料页...</p>
-            <A href="/profile" class="link">立即前往</A>
+            <A href="/profile" class="link">
+              立即前往
+            </A>
           </div>
         </Show>
         <Show when={mutation.isError}>
           <div class="space-y-3">
             <div class="alert alert-error">{mutation.error?.message ?? "确认失败"}</div>
-            <A href="/profile" class="link">返回个人资料</A>
+            <A href="/profile" class="link">
+              返回个人资料
+            </A>
           </div>
         </Show>
       </Show>

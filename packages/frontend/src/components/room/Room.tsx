@@ -1,18 +1,18 @@
-import { type Component, Show } from "solid-js";
-import {
-  type SyncedPreGameServerEventPayload,
-  type PreGameRoomState,
+import type {
+  GameId,
+  PlayerId,
   PreGamePlayerStatus,
-  type GameId,
-  type PlayerId,
+  PreGameRoomState,
+  SyncedPreGameServerEventPayload,
 } from "@generale/types";
-import { PreGameRoomStateFrom } from "./StateForm";
+import { type Component, Show } from "solid-js";
+import { makeEmptyRoom } from "~/game/defaults";
+import type { PregameController } from "~/game/usePreGameRoom";
+import { Alert, Button, Card, Panel, TakeoverOverlay } from "~/ui";
 import { PlayerList } from "./PlayerList";
 import { PreGameControls } from "./PreGameControls";
 import { PreGameMapSettingForm } from "./PreGameMapSettingForm";
-import type { PregameController } from "~/game/usePreGameRoom";
-import { makeEmptyRoom } from "~/game/defaults";
-import { Button, Card, Panel, Alert, TakeoverOverlay } from "~/ui";
+import { PreGameRoomStateFrom } from "./StateForm";
 
 export interface RoomWithSyncProps {
   ctrl: PregameController;
@@ -20,9 +20,7 @@ export interface RoomWithSyncProps {
   gameId: GameId;
   visible?: boolean;
   password?: string;
-  onStateUpdate?: (payload: {
-    event?: SyncedPreGameServerEventPayload;
-  }) => void;
+  onStateUpdate?: (payload: { event?: SyncedPreGameServerEventPayload }) => void;
   onSelfStatusChange?: (status: PreGamePlayerStatus) => void;
   onRoomStateChange?: (room: PreGameRoomState) => void;
   onGameEndedReceived?: () => void;
@@ -101,9 +99,9 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
                 variant="ghost"
                 onClick={() => {
                   const pw = props.password;
-                  const link = `${location.origin}/game/${encodeURIComponent(props.gameId)}${pw ? `?join=${encodeURIComponent(pw)}` : ''}`;
+                  const link = `${location.origin}/game/${encodeURIComponent(props.gameId)}${pw ? `?join=${encodeURIComponent(pw)}` : ""}`;
                   navigator.clipboard.writeText(link).then(() => {
-                    alert('邀请链接已复制到剪贴板');
+                    alert("邀请链接已复制到剪贴板");
                   });
                 }}
               >
@@ -147,8 +145,8 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
 
       <Panel title="房间设置" titleClass="text-lg font-semibold mb-2">
         <PreGameRoomStateFrom
-          state={room()?.gameSetting ?? (makeEmptyRoom().gameSetting)}
-          map={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
+          state={room()?.gameSetting ?? makeEmptyRoom().gameSetting}
+          map={room()?.mapSetting ?? makeEmptyRoom().mapSetting}
           onChange={(s) => ctrl.onSettingChange(s)}
         />
       </Panel>
@@ -161,13 +159,17 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
               active={(room()?.roomType ?? "standard") === "standard"}
               disabled={!isHost()}
               onClick={() => ctrl.onRoomTypeChange("standard")}
-            >Standard</Button>
+            >
+              Standard
+            </Button>
             <Button
               size="sm"
               active={(room()?.roomType ?? "standard") === "custom"}
               disabled={!isHost()}
               onClick={() => ctrl.onRoomTypeChange("custom")}
-            >Custom</Button>
+            >
+              Custom
+            </Button>
           </div>
           <span class="text-xs opacity-60">
             {(room()?.roomType ?? "standard") === "standard"
@@ -183,30 +185,31 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
               active={(room()?.teamMode ?? "ffa") === "ffa"}
               disabled={!isHost()}
               onClick={() => ctrl.onTeamModeChange("ffa")}
-            >单人</Button>
+            >
+              单人
+            </Button>
             <Button
               size="sm"
               active={(room()?.teamMode ?? "ffa") === "team"}
               disabled={!isHost()}
               onClick={() => ctrl.onTeamModeChange("team")}
-            >组队</Button>
+            >
+              组队
+            </Button>
           </div>
           <span class="text-xs opacity-60">
-            {(room()?.teamMode ?? "ffa") === "ffa"
-              ? "每人一队，前端隐藏队伍信息"
-              : "可自由组队、换队、重命名"}
+            {(room()?.teamMode ?? "ffa") === "ffa" ? "每人一队，前端隐藏队伍信息" : "可自由组队、换队、重命名"}
           </span>
         </div>
       </Panel>
 
       <Panel title="地图设置">
         <PreGameMapSettingForm
-          setting={room()?.mapSetting ?? (makeEmptyRoom().mapSetting)}
+          setting={room()?.mapSetting ?? makeEmptyRoom().mapSetting}
           roomType={room()?.roomType ?? "standard"}
           onChange={(next) => ctrl.onMapChange(next)}
         />
       </Panel>
-
 
       <Panel title="操作">
         <PreGameControls
@@ -219,7 +222,6 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
           onDisband={isHost() ? ctrl.onDisband : undefined}
         />
       </Panel>
-
     </div>
   );
 };

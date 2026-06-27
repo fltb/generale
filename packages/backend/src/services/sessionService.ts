@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto';
-import { db } from '../db/client';
-import { sessions } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { db } from "../db/client";
+import { sessions } from "../db/schema";
 
 export interface Session {
   id: string;
@@ -52,7 +52,11 @@ export class SessionService {
     const expiresAt = row.expiresAt instanceof Date ? row.expiresAt : new Date(row.expiresAt);
     if (expiresAt.getTime() <= Date.now()) {
       // 过期 → 顺手清掉
-      try { db.delete(sessions).where(eq(sessions.id, id)).run(); } catch { /* ignore */ }
+      try {
+        db.delete(sessions).where(eq(sessions.id, id)).run();
+      } catch {
+        /* ignore */
+      }
       return undefined;
     }
 
@@ -62,7 +66,7 @@ export class SessionService {
       db.update(sessions).set({ expiresAt: newExpiresAt }).where(eq(sessions.id, id)).run();
     } catch (err) {
       // 写失败不影响 read；记一行 log
-      console.warn('[sessionService.get] failed to slide expiresAt for', id, err);
+      console.warn("[sessionService.get] failed to slide expiresAt for", id, err);
     }
 
     return {

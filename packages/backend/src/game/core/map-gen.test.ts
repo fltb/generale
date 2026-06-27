@@ -1,12 +1,28 @@
-import { describe, expect, it } from 'vitest';
-import { generateMap } from './map-gen';
-import { PreGameMapType, TileType } from '@generale/types';
+import { PlayerColor, PreGameMapType, type PreGamePlayerInfo, PreGamePlayerReadyState, PreGamePlayerStatus, TileType } from "@generale/types";
+import { describe, expect, it } from "vitest";
+import { generateMap } from "./map-gen";
 
-describe('Map Generator', () => {
-  it('should generate a valid map for 2 players', async () => {
-    const players: any = [
-      { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
-      { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const }
+describe("Map Generator", () => {
+  it("should generate a valid map for 2 players", async () => {
+    const players: PreGamePlayerInfo[] = [
+      {
+        id: "player1",
+        name: "Player 1",
+        teamId: "team1",
+        isHost: true,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
+      {
+        id: "player2",
+        name: "Player 2",
+        teamId: "team2",
+        isHost: false,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
     ];
     const mapSetting = {
       type: PreGameMapType.Random as const,
@@ -17,9 +33,9 @@ describe('Map Generator', () => {
         [TileType.Mountain]: 0.2,
         [TileType.Swamp]: 0.1,
         [TileType.Barracks]: 0.2,
-      }
+      },
     };
-    const map = await generateMap(mapSetting, players as any);
+    const map = await generateMap(mapSetting, players);
     expect(map.width).toBe(10);
     expect(map.height).toBe(10);
     // 检查王座数量
@@ -28,7 +44,7 @@ describe('Map Generator', () => {
     const tileStats: Record<string, number> = {};
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        const tile = map.tiles[y]!![x]!;
+        const tile = map.tiles[y]?.[x]!;
         tileStats[tile.type] = (tileStats[tile.type] || 0) + 1;
         if (tile.type === TileType.Throne) throneCount++;
         if (tile.ownerId) playerTiles++;
@@ -41,12 +57,44 @@ describe('Map Generator', () => {
     expect(map.height).toBe(mapSetting.height);
   });
 
-  it('should generate a valid map for 4 players with correct distribution', async () => {
-    const players: any = [
-      { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
-      { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
-      { id: 'player3', name: 'Player 3', teamId: 'team3', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
-      { id: 'player4', name: 'Player 4', teamId: 'team4', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const }
+  it("should generate a valid map for 4 players with correct distribution", async () => {
+    const players: PreGamePlayerInfo[] = [
+      {
+        id: "player1",
+        name: "Player 1",
+        teamId: "team1",
+        isHost: true,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
+      {
+        id: "player2",
+        name: "Player 2",
+        teamId: "team2",
+        isHost: false,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
+      {
+        id: "player3",
+        name: "Player 3",
+        teamId: "team3",
+        isHost: false,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
+      {
+        id: "player4",
+        name: "Player 4",
+        teamId: "team4",
+        isHost: false,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
     ];
     const mapSetting = {
       type: PreGameMapType.Random as const,
@@ -57,9 +105,9 @@ describe('Map Generator', () => {
         [TileType.Mountain]: 0.2,
         [TileType.Swamp]: 0.1,
         [TileType.Barracks]: 0.2,
-      }
+      },
     };
-    const map = await generateMap(mapSetting, players as any);
+    const map = await generateMap(mapSetting, players);
     expect(map.width).toBe(12);
     expect(map.height).toBe(12);
     // 检查王座数量
@@ -69,7 +117,7 @@ describe('Map Generator', () => {
     const tileStats: Record<string, number> = {};
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        const tile = map.tiles[y]!![x]!;
+        const tile = map.tiles[y]?.[x]!;
         tileStats[tile.type] = (tileStats[tile.type] || 0) + 1;
         if (tile.type === TileType.Throne) throneCount++;
         if (tile.ownerId) {
@@ -91,13 +139,45 @@ describe('Map Generator', () => {
     // console.log('Player territories:', playerStats);
   });
 
-  it('visualize a 4-player map (console debug)', async () => {
+  it("visualize a 4-player map (console debug)", async () => {
     // 可选：仅用于调试
-    const players: any = [
-      { id: 'player1', name: 'Player 1', teamId: 'team1', isHost: true, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
-      { id: 'player2', name: 'Player 2', teamId: 'team2', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
-      { id: 'player3', name: 'Player 3', teamId: 'team3', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const },
-      { id: 'player4', name: 'Player 4', teamId: 'team4', isHost: false, isReady: true, ready: 1 as const, tileColor: 0xff0000 as const, status: 'Lobby' as const }
+    const players: PreGamePlayerInfo[] = [
+      {
+        id: "player1",
+        name: "Player 1",
+        teamId: "team1",
+        isHost: true,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
+      {
+        id: "player2",
+        name: "Player 2",
+        teamId: "team2",
+        isHost: false,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
+      {
+        id: "player3",
+        name: "Player 3",
+        teamId: "team3",
+        isHost: false,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
+      {
+        id: "player4",
+        name: "Player 4",
+        teamId: "team4",
+        isHost: false,
+        ready: PreGamePlayerReadyState.Ready,
+        tileColor: PlayerColor.Red,
+        status: PreGamePlayerStatus.Lobby,
+      },
     ];
     const mapSetting = {
       type: PreGameMapType.Random as const,
@@ -108,37 +188,37 @@ describe('Map Generator', () => {
         [TileType.Mountain]: 0.2,
         [TileType.Swamp]: 0.1,
         [TileType.Barracks]: 0.2,
-      }
+      },
     };
-    const map = await generateMap(mapSetting, players as any);
+    const map = await generateMap(mapSetting, players);
     const tileSymbols: Record<string, string> = {
-      [TileType.Plain]: '.',
-      [TileType.Mountain]: '^',
-      [TileType.Swamp]: '~',
-      [TileType.Barracks]: '#',
-      [TileType.Throne]: 'T',
-      [TileType.Fog]: '?'
+      [TileType.Plain]: ".",
+      [TileType.Mountain]: "^",
+      [TileType.Swamp]: "~",
+      [TileType.Barracks]: "#",
+      [TileType.Throne]: "T",
+      [TileType.Fog]: "?",
     };
     const playerColors: Record<string, string> = {
-      'player1': '1',
-      'player2': '2',
-      'player3': '3',
-      'player4': '4',
+      player1: "1",
+      player2: "2",
+      player3: "3",
+      player4: "4",
     };
     // 打印列号
-    let header = '   ';
+    let header = "   ";
     for (let x = 0; x < map.width; x++) {
       header += (x % 10).toString();
     }
     // eslint-disable-next-line no-console
     console.log(header);
     for (let y = 0; y < map.height; y++) {
-      let row = y.toString().padStart(2) + ' ';
+      let row = `${y.toString().padStart(2)} `;
       for (let x = 0; x < map.width; x++) {
-        const tile = map.tiles[y]!![x]!;
-        let symbol = tileSymbols[tile.type] || '?';
+        const tile = map.tiles[y]?.[x]!;
+        let symbol = tileSymbols[tile.type] || "?";
         if (tile.ownerId) {
-          symbol = playerColors[tile.ownerId] || 'X';
+          symbol = playerColors[tile.ownerId] || "X";
         }
         row += symbol;
       }
@@ -151,7 +231,7 @@ describe('Map Generator', () => {
     let totalPlayerTiles = 0;
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        const tile = map.tiles[y]!![x]!;
+        const tile = map.tiles[y]?.[x]!;
         tileStats[tile.type] = (tileStats[tile.type] || 0) + 1;
         if (tile.ownerId) {
           playerStats[tile.ownerId] = (playerStats[tile.ownerId] || 0) + 1;
@@ -160,11 +240,10 @@ describe('Map Generator', () => {
       }
     }
     // eslint-disable-next-line no-console
-    console.log('Tile distribution:', tileStats);
+    console.log("Tile distribution:", tileStats);
     // eslint-disable-next-line no-console
-    console.log('Player territories:', playerStats);
+    console.log("Player territories:", playerStats);
     // eslint-disable-next-line no-console
     console.log(`Total owned tiles: ${totalPlayerTiles}/${map.width * map.height}`);
   });
 });
-

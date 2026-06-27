@@ -17,9 +17,7 @@ export const Panel: Component<PanelProps> = (props) => {
   const [local, rest] = splitProps(props, ["title", "titleClass", "tone", "class", "children"]);
 
   const cls = () =>
-    ["card pixel-border", `bg-${local.tone ?? "base-200"}`, "p-4", local.class ?? ""]
-      .filter(Boolean)
-      .join(" ");
+    ["card pixel-border", `bg-${local.tone ?? "base-200"}`, "p-4", local.class ?? ""].filter(Boolean).join(" ");
 
   return (
     <div {...rest} class={cls()}>

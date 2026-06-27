@@ -1,7 +1,8 @@
 import {
-  type SyncedGameState,
   type SyncedGameClientActions,
   SyncedGameClientActionTypes,
+  type SyncedGameClientPlayerOperationPushAction,
+  type SyncedGameState,
 } from "@generale/types";
 
 /**
@@ -13,14 +14,11 @@ import {
  *
  * 纯函数，无 UI / 连接依赖。
  */
-export function applyGameEventLocal(
-  state: SyncedGameState,
-  action: SyncedGameClientActions,
-): SyncedGameState {
+export function applyGameEventLocal(state: SyncedGameState, action: SyncedGameClientActions): SyncedGameState {
   const base = structuredClone(state);
   switch (action.type) {
     case SyncedGameClientActionTypes.PUSH: {
-      const ops = (action as any).payload ?? [];
+      const ops = (action as SyncedGameClientPlayerOperationPushAction).payload ?? [];
       base.playerOperationQueue = [...(base.playerOperationQueue ?? []), ...ops];
       console.debug(`[game: apply useSynced]: push`, ops, base.playerOperationQueue);
       return base;

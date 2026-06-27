@@ -1,15 +1,8 @@
 // MapRenderTest.tsx
-import { createSignal, createMemo } from "solid-js";
-import type {
-  SyncedGameState,
-  PlayerOperation,
-} from "@generale/types";
-import {
-  TileType,
-  PlayerOperationType,
-  PlayerStatus,
-  GameStatus,
-} from "@generale/types";
+
+import type { PlayerOperation, SyncedGameState } from "@generale/types";
+import { GameStatus, PlayerOperationType, PlayerStatus, TileType } from "@generale/types";
+import { createMemo, createSignal } from "solid-js";
 import { MapRender } from "../MapRender";
 
 /**
@@ -54,18 +47,26 @@ const testGameState: SyncedGameState = {
   map: {
     width: 8,
     height: 6,
-    tiles: Array(6).fill(null).map((_, y) =>
-      Array(8).fill(null).map((_, x) => ({
-        // 这里使用 TileType 枚举值，保证类型正确
-        type:
-          Math.random() > 0.7 ? TileType.Mountain :
-          Math.random() > 0.6 ? TileType.Barracks :
-          Math.random() > 0.5 ? TileType.Throne : TileType.Plain,
-        ownerId: Math.random() > 0.5 ? (Math.random() > 0.5 ? "player1" : "player2") : null,
-        army: Math.floor(Math.random() * 20),
-        _internalCounter: 0,
-      }))
-    ),
+    tiles: Array(6)
+      .fill(null)
+      .map((_, _y) =>
+        Array(8)
+          .fill(null)
+          .map((_, _x) => ({
+            // 这里使用 TileType 枚举值，保证类型正确
+            type:
+              Math.random() > 0.7
+                ? TileType.Mountain
+                : Math.random() > 0.6
+                  ? TileType.Barracks
+                  : Math.random() > 0.5
+                    ? TileType.Throne
+                    : TileType.Plain,
+            ownerId: Math.random() > 0.5 ? (Math.random() > 0.5 ? "player1" : "player2") : null,
+            army: Math.floor(Math.random() * 20),
+            _internalCounter: 0,
+          })),
+      ),
   },
   playerDisplay: {
     player1: { tileColor: 0xff0000 },

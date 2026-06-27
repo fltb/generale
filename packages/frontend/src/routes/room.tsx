@@ -1,30 +1,19 @@
-import {
-  type Component,
-  createSignal,
-  Show,
-  Switch,
-  Match,
-} from "solid-js";
+import { GamePhase, PreGamePlayerStatus } from "@generale/types";
 import { useNavigate, useParams } from "@solidjs/router";
-
-import ConnectedRoom from "~/components/room/ConnectedRoom";
-import GameWithSync from "~/components/game/Game";
+import { type Component, createSignal, Match, Show, Switch } from "solid-js";
 import ChatPanel from "~/components/ChatPanel";
+import GameWithSync from "~/components/game/Game";
+import ConnectedRoom from "~/components/room/ConnectedRoom";
 import { useRoomSession } from "~/game/useRoomSession";
-import { Button, Card, Alert, Input } from "~/ui";
-
-import {
-  GamePhase,
-  PreGamePlayerStatus,
-} from "@generale/types";
+import { Alert, Button, Card, Input } from "~/ui";
 
 const RoomRoute: Component = () => {
   const params = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(window.location.search);
-  const joinPassword = searchParams.get('join');
+  const joinPassword = searchParams.get("join");
   if (joinPassword) {
-    sessionStorage.setItem('room-invite-pw', joinPassword);
+    sessionStorage.setItem("room-invite-pw", joinPassword);
     navigate(location.pathname, { replace: true });
   }
 
@@ -38,12 +27,7 @@ const RoomRoute: Component = () => {
         <Match when={!!session.error()}>
           <Alert variant="error" class="mb-4">
             <span>{session.error()}</span>
-            <Button
-              size="sm"
-              variant="ghost"
-              class="mt-2"
-              onClick={() => navigate("/")}
-            >
+            <Button size="sm" variant="ghost" class="mt-2" onClick={() => navigate("/")}>
               返回大厅
             </Button>
           </Alert>
@@ -57,26 +41,21 @@ const RoomRoute: Component = () => {
         <Match when={session.needsPassword()}>
           <Card class="p-6 max-w-md mx-auto mt-8">
             <h2 class="text-lg font-semibold mb-4">此房间为私有房间</h2>
-            <Show
-              when={session.wrongPassword()}
-              fallback={<p class="text-sm opacity-70 mb-4">需要输入密码才能加入</p>}
-            >
+            <Show when={session.wrongPassword()} fallback={<p class="text-sm opacity-70 mb-4">需要输入密码才能加入</p>}>
               <p class="text-error text-sm mb-4">密码错误，请重试</p>
             </Show>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const pw = ((e.target as HTMLFormElement).elements.namedItem('pw') as HTMLInputElement).value.trim();
-              if (pw) session.setPassword(pw);
-            }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const pw = ((e.target as HTMLFormElement).elements.namedItem("pw") as HTMLInputElement).value.trim();
+                if (pw) session.setPassword(pw);
+              }}
+            >
               <div class="flex items-center gap-2">
-                <Input
-                  bordered
-                  type="password"
-                  name="pw"
-                  placeholder="请输入房间密码"
-                  class="w-64"
-                />
-                <Button variant="primary" type="submit">加入房间</Button>
+                <Input bordered type="password" name="pw" placeholder="请输入房间密码" class="w-64" />
+                <Button variant="primary" type="submit">
+                  加入房间
+                </Button>
               </div>
             </form>
           </Card>
@@ -85,9 +64,9 @@ const RoomRoute: Component = () => {
         {/* ---------- INGAME (显示 game UI) ---------- */}
         <Match when={session.showingGameUI() && session.gameDomain() && session.playerId()}>
           <GameWithSync
-            domain={session.gameDomain()!}
-            gameId={params.id!}
-            playerId={session.playerId()!}
+            domain={session.gameDomain() as string}
+            gameId={params.id as string}
+            playerId={session.playerId() as string}
             spectate={session.selfStatus() === PreGamePlayerStatus.Spectating}
             freshStart={session.startedThisSession()}
             onStateUpdate={session.handleStateUpdate}
@@ -100,10 +79,7 @@ const RoomRoute: Component = () => {
         <Match when={session.phase() === GamePhase.ENDED}>
           <Card class="p-6">
             <div class="mb-4">游戏已结束</div>
-            <Button
-              variant="primary"
-              onClick={() => navigate("/")}
-            >
+            <Button variant="primary" onClick={() => navigate("/")}>
               返回大厅
             </Button>
           </Card>
@@ -116,9 +92,9 @@ const RoomRoute: Component = () => {
          --------------------------------------------------------- */}
       <Show when={session.roomDomain() && session.playerId() && !session.needsPassword()}>
         <ConnectedRoom
-          domain={session.roomDomain()!}
-          gameId={params.id!}
-          playerId={session.playerId()!}
+          domain={session.roomDomain() as string}
+          gameId={params.id as string}
+          playerId={session.playerId() as string}
           visible={!session.showingGameUI()}
           password={session.roomPassword() ?? undefined}
           onStateUpdate={session.handleStateUpdate}
@@ -154,20 +130,15 @@ const RoomRoute: Component = () => {
                     {session.phase() === GamePhase.INGAME ? "游戏中" : "准备阶段"}
                   </div>
                 </div>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => setChatVisible(false)}
-                  title="收起"
-                >
+                <Button size="xs" variant="ghost" onClick={() => setChatVisible(false)} title="收起">
                   收起
                 </Button>
               </div>
 
               <div class="p-2">
                 <ChatPanel
-                  domain={session.chatDomain()!}
-                  userId={session.playerId()!}
+                  domain={session.chatDomain() as string}
+                  userId={session.playerId() as string}
                   phase={session.phase()}
                   selfStatus={session.selfStatus()}
                   room={session.roomState()}

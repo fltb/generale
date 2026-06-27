@@ -1,9 +1,9 @@
 import {
-  type SyncedGameState,
   type PlayerId,
-  type PreGamePlayerInfo,
   PlayerStatus,
+  type PreGamePlayerInfo,
   PreGamePlayerStatus,
+  type SyncedGameState,
 } from "@generale/types";
 import { playerColorCss } from "~/utils/playerColor";
 
@@ -33,22 +33,17 @@ export interface PlayerSummaryOptions {
  * 把对局 state 汇总成玩家信息列表（含地块统计、颜色、排序、limit）。
  * 原先内联在 game/PlayerList.tsx。
  */
-export function playerSummaries(
-  s: SyncedGameState | undefined,
-  opts: PlayerSummaryOptions = {},
-): PlayerSummary[] {
+export function playerSummaries(s: SyncedGameState | undefined, opts: PlayerSummaryOptions = {}): PlayerSummary[] {
   if (!s) return [];
 
   const players = s.players ?? {};
   const playerDisplay = s.playerDisplay ?? {};
-  const tiles = (s.map && Array.isArray(s.map.tiles)) ? s.map.tiles : [];
+  const tiles = s.map && Array.isArray(s.map.tiles) ? s.map.tiles : [];
 
   // 1. 统计地块（只遍历一次）
   const landCounts: Record<string, number> = {};
-  for (let y = 0; y < tiles.length; y++) {
-    const row = tiles[y] ?? [];
-    for (let x = 0; x < row.length; x++) {
-      const t = row[x];
+  for (const row of tiles) {
+    for (const t of row) {
       if (!t) continue;
       const owner = t.ownerId;
       if (owner) landCounts[owner] = (landCounts[owner] ?? 0) + 1;
@@ -94,10 +89,7 @@ export interface EndgameResult {
  *  - 失败队伍列表（队员名字，按队伍分组）
  * 原先内联在 game/Game.tsx 的 endgameResult memo。
  */
-export function computeEndgameResult(
-  s: SyncedGameState | undefined,
-  selfPlayerId: PlayerId,
-): EndgameResult {
+export function computeEndgameResult(s: SyncedGameState | undefined, selfPlayerId: PlayerId): EndgameResult {
   const players = s?.players ?? {};
   const teams = s?.teams ?? {};
   const display = s?.playerDisplay ?? {};
@@ -113,21 +105,22 @@ export function computeEndgameResult(
 
   const teamLabel = (memberIds: PlayerId[]) =>
     memberIds
-      .map(id => display[id]?.name ?? id)
+      .map((id) => display[id]?.name ?? id)
       .filter(Boolean)
       .join("、");
 
-  const winnerTeam = Object.values(teams).find(
-    t => (t as any).status === PlayerStatus.Won
-  ) as { id: string; memberIds: PlayerId[] } | undefined;
-  const loserTeams = Object.values(teams).filter(
-    t => (t as any).status === PlayerStatus.Defeated
-  ) as Array<{ id: string; memberIds: PlayerId[] }>;
+  const winnerTeam = Object.values(teams).find((t) => t.status === PlayerStatus.Won) as
+    | { id: string; memberIds: PlayerId[] }
+    | undefined;
+  const loserTeams = Object.values(teams).filter((t) => t.status === PlayerStatus.Defeated) as Array<{
+    id: string;
+    memberIds: PlayerId[];
+  }>;
 
   return {
     selfOutcome,
     winnerLabel: winnerTeam ? teamLabel(winnerTeam.memberIds) : null,
-    loserLabels: loserTeams.map(t => teamLabel(t.memberIds)).filter(s => s.length > 0),
+    loserLabels: loserTeams.map((t) => teamLabel(t.memberIds)).filter((s) => s.length > 0),
   };
 }
 
@@ -136,5 +129,5 @@ export function computeEndgameResult(
  * 原先内联在 room/Room.tsx 的 gameInProgress。
  */
 export function isGameInProgress(players: PreGamePlayerInfo[] | undefined): boolean {
-  return (players ?? []).some(p => p.status === PreGamePlayerStatus.Playing);
+  return (players ?? []).some((p) => p.status === PreGamePlayerStatus.Playing);
 }

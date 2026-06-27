@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { SessionService } from '../sessionService';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SessionService } from "../sessionService";
 
-describe('SessionService', () => {
+describe("SessionService", () => {
   const ONE_DAY_SECONDS = 60 * 60 * 24;
   let sessionService: SessionService;
-  const userId = 'user-123';
+  const userId = "user-123";
 
   beforeEach(() => {
     // Use fake timers to control Date.now()
@@ -17,7 +17,7 @@ describe('SessionService', () => {
     vi.useRealTimers();
   });
 
-  it('should create a new session', () => {
+  it("should create a new session", () => {
     const session = sessionService.create(userId);
 
     expect(session).toBeDefined();
@@ -27,9 +27,9 @@ describe('SessionService', () => {
     expect(session.expiresAt.getTime()).toBe(Date.now() + ONE_DAY_SECONDS * 1000);
   });
 
-  it.skip('should get a valid session and renew it', () => {
+  it.skip("should get a valid session and renew it", () => {
     const session = sessionService.create(userId);
-    
+
     // Advance time by 1 hour
     vi.advanceTimersByTime(1000 * 60 * 60);
     const newExpectedExpiry = Date.now() + ONE_DAY_SECONDS * 1000;
@@ -41,31 +41,31 @@ describe('SessionService', () => {
     expect(retrievedSession?.expiresAt.getTime()).toBe(newExpectedExpiry);
   });
 
-  it('should return undefined for a non-existent session id', () => {
-    expect(sessionService.get('non-existent-id')).toBeUndefined();
+  it("should return undefined for a non-existent session id", () => {
+    expect(sessionService.get("non-existent-id")).toBeUndefined();
   });
 
-  it('should return undefined for null or undefined id', () => {
+  it("should return undefined for null or undefined id", () => {
     expect(sessionService.get(null)).toBeUndefined();
     expect(sessionService.get(undefined)).toBeUndefined();
   });
 
-  it.skip('should delete an expired session upon retrieval', () => {
+  it.skip("should delete an expired session upon retrieval", () => {
     const session = sessionService.create(userId);
 
     // Advance time just past the expiration date
     vi.advanceTimersByTime(ONE_DAY_SECONDS * 1000 + 1);
 
     expect(sessionService.get(session.id)).toBeUndefined();
-    
+
     // Verify it was actually removed internally
     // @ts-expect-error - Accessing private property for testing
     expect(sessionService.sessions.has(session.id)).toBe(false);
   });
 
-  it.skip('should delete a session by id', () => {
+  it.skip("should delete a session by id", () => {
     const session = sessionService.create(userId);
-    
+
     // Verify it exists first
     expect(sessionService.get(session.id)).toBeDefined();
 

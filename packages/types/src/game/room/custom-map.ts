@@ -1,4 +1,4 @@
-import type { TileType } from '../core-type';
+import type { TileType } from "../core-type";
 
 export interface CustomMapTile {
   /** terrain type */

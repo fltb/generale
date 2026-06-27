@@ -1,17 +1,17 @@
-import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
-import { swagger } from "@elysiajs/swagger";
 import { staticPlugin } from "@elysiajs/static";
-import { gameRoutes } from "./routes/game";
-import { mapRoutes } from "./routes/map";
-import { userRoutes } from "./routes/user";
-import { profileRoutes } from "./routes/profile";
+import { swagger } from "@elysiajs/swagger";
+import { Elysia } from "elysia";
+import { runMigrations } from "./db/migrate";
 import { authPlugin } from "./middleware/authPlugin";
 import { registerDomainHandler, websocketPlugin } from "./plugins/websocket";
+import { gameRoutes } from "./routes/game";
+import { mapRoutes } from "./routes/map";
+import { profileRoutes } from "./routes/profile";
+import { userRoutes } from "./routes/user";
 import { initEmailServiceWithEnv } from "./services/emailService";
 import { ProfileService } from "./services/profileService";
 import { sessionService } from "./services/sessionService";
-import { runMigrations } from "./db/migrate";
 
 await initEmailServiceWithEnv();
 await ProfileService.ensureDefaultAvatars();
@@ -26,7 +26,7 @@ await runMigrations();
     const removed = sessionService.pruneExpired();
     if (removed > 0) console.info(`[session] startup prune removed ${removed} expired sessions`);
   } catch (err) {
-    console.warn('[session] startup prune failed', err);
+    console.warn("[session] startup prune failed", err);
   }
   const SESSION_PRUNE_INTERVAL_MS = 60 * 60 * 1000; // 1h
   setInterval(() => {
@@ -34,7 +34,7 @@ await runMigrations();
       const removed = sessionService.pruneExpired();
       if (removed > 0) console.info(`[session] periodic prune removed ${removed} expired sessions`);
     } catch (err) {
-      console.warn('[session] periodic prune failed', err);
+      console.warn("[session] periodic prune failed", err);
     }
   }, SESSION_PRUNE_INTERVAL_MS);
 }
@@ -52,19 +52,21 @@ const app = new Elysia()
       .use(profileRoutes)
       .use(gameRoutes)
       .use(mapRoutes)
-      .use(swagger({
-        documentation: {
-          info: {
-            title: 'Generale Game API',
-            version: '1.0.0',
-            description: 'API for Generale multiplayer strategy game'
+      .use(
+        swagger({
+          documentation: {
+            info: {
+              title: "Generale Game API",
+              version: "1.0.0",
+              description: "API for Generale multiplayer strategy game",
+            },
+            tags: [
+              { name: "Game", description: "Game management endpoints" },
+              { name: "WebSocket", description: "Real-time game communication" },
+            ],
           },
-          tags: [
-            { name: 'Game', description: 'Game management endpoints' },
-            { name: 'WebSocket', description: 'Real-time game communication' }
-          ]
-        }
-      }))
+        }),
+      )
       .use(websocketPlugin)
       // 这里把 handler 改成 (ctx:any) -> 从 ctx.body 读取 domain
       .post("/test/register-domain", (ctx) => {
@@ -76,7 +78,10 @@ const app = new Elysia()
         registerDomainHandler(domain, (connector) => {
           // 在这里为 connector 注册回调（与 SubConnectorImpl 的方法名一致）
           connector.onOpen(() => {
-            console.log(`Test domain '${domain}' opened for connection: ${connector.getConnectionId()}`, connector.getContext && connector.getContext());
+            console.log(
+              `Test domain '${domain}' opened for connection: ${connector.getConnectionId()}`,
+              connector.getContext?.(),
+            );
           });
 
           // 服务器端收到客户端 message 时触发 onClientMessage 回调
@@ -84,14 +89,17 @@ const app = new Elysia()
             console.log(`Test domain '${domain}' received message from ${connector.getConnectionId()}:`, payload);
             // 直接通过 connector.send 回送（如果你的 SubConnectorImpl 有 send 方法）
             connector.send?.({
-              type: 'echo',
+              type: "echo",
               originalPayload: payload,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
             });
           });
 
           connector.onClose((code?: number, reason?: string) => {
-            console.log(`Test domain '${domain}' closed for connection: ${connector.getConnectionId()}`, { code, reason });
+            console.log(`Test domain '${domain}' closed for connection: ${connector.getConnectionId()}`, {
+              code,
+              reason,
+            });
           });
 
           connector.onDisconnect(() => {
@@ -106,13 +114,11 @@ const app = new Elysia()
         return { success: true, message: `Domain '${domain}' registered successfully` };
       })
       .get("/", () => ({ message: "Generale Game Server", version: "1.0.0" }))
-      .get("/health", () => ({ status: "ok", timestamp: new Date().toISOString() }))
+      .get("/health", () => ({ status: "ok", timestamp: new Date().toISOString() })),
   )
   .listen({
     port: process.env["PORT"] || 3000,
-    hostname: process.env["HOST"] || "0.0.0.0"
+    hostname: process.env["HOST"] || "0.0.0.0",
   });
 
-console.log(
-  `🦊 Generale Game Server is running at ${app.server?.hostname}:${app.server?.port}`
-);
+console.log(`🦊 Generale Game Server is running at ${app.server?.hostname}:${app.server?.port}`);

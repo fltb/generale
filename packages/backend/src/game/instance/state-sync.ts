@@ -1,5 +1,5 @@
-import { compare } from 'fast-json-patch';
-import type { Operation } from 'fast-json-patch';
+import type { Operation } from "fast-json-patch";
+import { compare } from "fast-json-patch";
 
 const MAX_PATCHES = 1000;
 
@@ -34,7 +34,8 @@ export class StateSyncState<TState extends object> {
       return;
     }
 
-    const prev = this.prevSentState.get(pid)!;
+    const prev = this.prevSentState.get(pid);
+    if (!prev) throw new Error(`Expected prevSentState for ${pid}`);
     const patches = compare(prev, current);
 
     if (patches.length > MAX_PATCHES) {

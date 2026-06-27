@@ -1,19 +1,20 @@
 // src/services/gameApi.ts
-import { api } from "./base";
+
 import type {
+  ConnectWsSuccessResp,
   CreateGameReqBody,
   CreateGameSuccessResp,
-  GameInfoSuccessResp,
-  ListGamesSuccessResp,
-  ConnectWsSuccessResp,
   ErrorResp,
-  ListGamesQuery
+  GameInfoSuccessResp,
+  ListGamesQuery,
+  ListGamesSuccessResp,
 } from "@generale/types/dist/api";
+import { api } from "./base";
 
 /**
  * POST /game/create
  */
-export async function createGameApi(payload: CreateGameReqBody): Promise<CreateGameSuccessResp> {
+export function createGameApi(payload: CreateGameReqBody): Promise<CreateGameSuccessResp> {
   return api<CreateGameSuccessResp, ErrorResp>("/api/game/create", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -23,7 +24,7 @@ export async function createGameApi(payload: CreateGameReqBody): Promise<CreateG
 /**
  * GET /game/info/:gameId
  */
-export async function getGameInfoApi(gameId: string): Promise<GameInfoSuccessResp> {
+export function getGameInfoApi(gameId: string): Promise<GameInfoSuccessResp> {
   return api<GameInfoSuccessResp, ErrorResp>(`/api/game/info/${encodeURIComponent(gameId)}`, {
     method: "GET",
   });
@@ -33,10 +34,15 @@ export async function getGameInfoApi(gameId: string): Promise<GameInfoSuccessRes
  * GET /game/list
  * Accepts an optional query object (ListGamesQuery)
  */
-export async function listGamesApi(query?: Partial<ListGamesQuery>): Promise<ListGamesSuccessResp> {
-  const qs = query ? "?" + new URLSearchParams(
-    Object.entries(query).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => [k, String(v)])
-  ).toString() : "";
+export function listGamesApi(query?: Partial<ListGamesQuery>): Promise<ListGamesSuccessResp> {
+  const qs = query
+    ? "?" +
+      new URLSearchParams(
+        Object.entries(query)
+          .filter(([, v]) => v !== undefined && v !== null)
+          .map(([k, v]) => [k, String(v)]),
+      ).toString()
+    : "";
   return api<ListGamesSuccessResp, ErrorResp>(`/api/game/list${qs}`, {
     method: "GET",
   });
@@ -46,9 +52,6 @@ export async function listGamesApi(query?: Partial<ListGamesQuery>): Promise<Lis
  * GET /game/connect/:gameId
  * NOTE: server returns domains/phase etc for websocket preparation
  */
-export async function prepareConnectApi(gameId: string): Promise<ConnectWsSuccessResp> {
-  return api<ConnectWsSuccessResp, ErrorResp>(
-    `/api/game/connect/${encodeURIComponent(gameId)}`,
-    { method: "GET" }
-  );
+export function prepareConnectApi(gameId: string): Promise<ConnectWsSuccessResp> {
+  return api<ConnectWsSuccessResp, ErrorResp>(`/api/game/connect/${encodeURIComponent(gameId)}`, { method: "GET" });
 }

@@ -1,4 +1,4 @@
-import { type Component } from "solid-js";
+import type { Component } from "solid-js";
 import { isMuted, toggleMuted } from "./sound";
 
 /** 音效开关（喇叭图标）。点击切换全局静音并持久化。 */

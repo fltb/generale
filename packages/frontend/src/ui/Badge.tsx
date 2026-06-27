@@ -1,13 +1,7 @@
 import { type Component, type JSX, splitProps } from "solid-js";
 
 /** Badge primitive —— daisyui `badge` 一族的薄封装。 */
-export type BadgeVariant =
-  | "neutral"
-  | "info"
-  | "success"
-  | "warning"
-  | "error"
-  | "outline";
+export type BadgeVariant = "neutral" | "info" | "success" | "warning" | "error" | "outline";
 
 export interface BadgeProps extends JSX.HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -25,9 +19,7 @@ const VARIANT_CLASS: Record<BadgeVariant, string> = {
 export const Badge: Component<BadgeProps> = (props) => {
   const [local, rest] = splitProps(props, ["variant", "class"]);
   const cls = () =>
-    ["badge pixel-border", VARIANT_CLASS[local.variant ?? "neutral"], local.class ?? ""]
-      .filter(Boolean)
-      .join(" ");
+    ["badge pixel-border", VARIANT_CLASS[local.variant ?? "neutral"], local.class ?? ""].filter(Boolean).join(" ");
   return <span {...rest} class={cls()} />;
 };
 

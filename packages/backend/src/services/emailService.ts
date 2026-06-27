@@ -1,7 +1,7 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 
 type EmailConfig = {
-  method: 'smtp';
+  method: "smtp";
   from: string;
   smtp: {
     host: string;
@@ -20,42 +20,40 @@ let transporter: nodemailer.Transporter;
 export async function initEmailServiceWithEnv() {
   try {
     // Validate required SMTP environment variables
-    const requiredVars = [
-      'EMAIL_FROM',
-      'SMTP_HOST',
-      'SMTP_PORT',
-      'SMTP_USER',
-      'SMTP_PASS',
-    ];
-    
+    const requiredVars = ["EMAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"];
+
     for (const varName of requiredVars) {
       if (!process.env[varName]) {
         throw new Error(`${varName} is required in environment`);
       }
     }
 
+    const EMAIL_FROM = process.env["EMAIL_FROM"] ?? "";
+    const SMTP_HOST = process.env["SMTP_HOST"] ?? "";
+    const SMTP_PORT = process.env["SMTP_PORT"] ?? "";
+    const SMTP_USER = process.env["SMTP_USER"] ?? "";
+    const SMTP_PASS = process.env["SMTP_PASS"] ?? "";
+
     await initEmailService({
-      method: 'smtp',
-      from: process.env['EMAIL_FROM']!,
+      method: "smtp",
+      from: EMAIL_FROM,
       smtp: {
-        host: process.env['SMTP_HOST']!,
-        port: parseInt(process.env['SMTP_PORT']!),
+        host: SMTP_HOST,
+        port: parseInt(SMTP_PORT, 10),
         secure: true,
         auth: {
-          user: process.env['SMTP_USER']!,
-          pass: process.env['SMTP_PASS']!
-        }
+          user: SMTP_USER,
+          pass: SMTP_PASS,
+        },
       },
-      proxy: process.env['HTTP_PROXY']!,
+      ...(process.env["HTTP_PROXY"] ? { proxy: process.env["HTTP_PROXY"] } : {}),
     });
-    
-    console.log('Email service init successfully via SMTP');
+
+    console.log("Email service init successfully via SMTP");
   } catch (error) {
-    console.error('Failed to init email service:', error);
+    console.error("Failed to init email service:", error);
   }
 }
-
-
 
 export async function initEmailService(config: EmailConfig) {
   transporter = nodemailer.createTransport({
@@ -64,9 +62,9 @@ export async function initEmailService(config: EmailConfig) {
     secure: true,
     auth: {
       user: config.smtp.auth.user,
-      pass: config.smtp.auth.pass
+      pass: config.smtp.auth.pass,
     },
-    proxy: config.proxy
+    proxy: config.proxy,
   });
 
   await transporter.verify();
@@ -78,14 +76,14 @@ export async function initEmailService(config: EmailConfig) {
  */
 export async function sendVerificationEmail(email: string, token: string) {
   if (!transporter) {
-    throw new Error('Email service not initialized');
+    throw new Error("Email service not initialized");
   }
   const url = `${frontendBase()}/verify-email?token=${encodeURIComponent(token)}`;
   console.debug(`sent verification link to ${email}: ${url}`);
   await transporter.sendMail({
-    from: process.env['EMAIL_FROM'],
+    from: process.env["EMAIL_FROM"],
     to: email,
-    subject: '请验证您的邮箱',
+    subject: "请验证您的邮箱",
     html: `
       <p>欢迎注册！点击下面链接完成邮箱验证（10 分钟内有效）：</p>
       <p><a href="${url}">${url}</a></p>
@@ -100,7 +98,7 @@ export async function sendVerificationEmail(email: string, token: string) {
  * FRONTEND_BASE_URL 环境变量。
  */
 function frontendBase(): string {
-  return process.env['FRONTEND_BASE_URL'] || 'http://localhost:5173';
+  return process.env["FRONTEND_BASE_URL"] || "http://localhost:5173";
 }
 
 /**
@@ -108,14 +106,14 @@ function frontendBase(): string {
  */
 export async function sendPasswordResetEmail(email: string, token: string) {
   if (!transporter) {
-    throw new Error('Email service not initialized');
+    throw new Error("Email service not initialized");
   }
   const url = `${frontendBase()}/reset-password?token=${encodeURIComponent(token)}`;
   console.debug(`sent password reset link to ${email}: ${url}`);
   await transporter.sendMail({
-    from: process.env['EMAIL_FROM'],
+    from: process.env["EMAIL_FROM"],
     to: email,
-    subject: '重置您的密码',
+    subject: "重置您的密码",
     html: `
       <p>有人申请重置该邮箱关联账号的密码。如非本人请忽略这封邮件。</p>
       <p>点击下面链接设置新密码（10 分钟内有效）：</p>
@@ -129,14 +127,14 @@ export async function sendPasswordResetEmail(email: string, token: string) {
  */
 export async function sendEmailChangeConfirmation(newEmail: string, token: string) {
   if (!transporter) {
-    throw new Error('Email service not initialized');
+    throw new Error("Email service not initialized");
   }
   const url = `${frontendBase()}/confirm-email-change?token=${encodeURIComponent(token)}`;
   console.debug(`sent email-change confirmation to ${newEmail}: ${url}`);
   await transporter.sendMail({
-    from: process.env['EMAIL_FROM'],
+    from: process.env["EMAIL_FROM"],
     to: newEmail,
-    subject: '确认邮箱变更',
+    subject: "确认邮箱变更",
     html: `
       <p>有人申请把账号绑定的邮箱改成这一个。</p>
       <p>点击下面链接完成变更（30 分钟内有效）：</p>
@@ -151,13 +149,13 @@ export async function sendEmailChangeConfirmation(newEmail: string, token: strin
  */
 export async function sendEmailChangeNotification(oldEmail: string, newEmail: string) {
   if (!transporter) {
-    throw new Error('Email service not initialized');
+    throw new Error("Email service not initialized");
   }
   console.debug(`sent email-change notification to ${oldEmail}, target: ${newEmail}`);
   await transporter.sendMail({
-    from: process.env['EMAIL_FROM'],
+    from: process.env["EMAIL_FROM"],
     to: oldEmail,
-    subject: '邮箱变更通知',
+    subject: "邮箱变更通知",
     html: `
       <p>您的账号申请把绑定邮箱改成 <b>${newEmail}</b>。</p>
       <p>如非本人操作，请尽快登录修改密码并联系管理员。</p>

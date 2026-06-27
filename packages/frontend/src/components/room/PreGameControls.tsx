@@ -21,31 +21,32 @@ export const PreGameControls: Component<PreGameControlsProps> = (props) => {
             variant={props.ready ? "success" : "primary"}
             onClick={() => {
               // 准备/取消准备各有专属音效
-              if (props.ready) sfx.unready(); else sfx.ready();
+              if (props.ready) sfx.unready();
+              else sfx.ready();
               // 交由父组件处理切换（父组件会 dispatch READY/UNREADY）
               props.onReadyToggle(!props.ready);
             }}
             disabled={props.started}
-            title={props.started ? "游戏已开始，无法改变准备" : (props.ready ? "取消准备" : "准备")}
+            title={props.started ? "游戏已开始，无法改变准备" : props.ready ? "取消准备" : "准备"}
           >
-            {props.ready ? '取消准备' : '准备'}
+            {props.ready ? "取消准备" : "准备"}
           </Button>
         </Show>
 
         <Show when={props.isHost}>
-          <Button
-            variant="accent"
-            onClick={() => props.onStartGame?.()}
-            disabled={props.started}
-          >
+          <Button variant="accent" onClick={() => props.onStartGame?.()} disabled={props.started}>
             开始游戏
           </Button>
         </Show>
 
-        <Button variant="ghost" onClick={() => props.onLeave?.()}>离开房间</Button>
+        <Button variant="ghost" onClick={() => props.onLeave?.()}>
+          离开房间
+        </Button>
 
         <Show when={props.isHost}>
-          <Button variant="error" onClick={() => props.onDisband?.()}>解散房间</Button>
+          <Button variant="error" onClick={() => props.onDisband?.()}>
+            解散房间
+          </Button>
         </Show>
       </div>
     </div>

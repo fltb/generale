@@ -14,7 +14,11 @@ export const Select: Component<SelectProps> = (props) => {
     ["select pixel-border", SIZE_CLASS[local.size ?? "md"], local.bordered ? "select-bordered" : "", local.class ?? ""]
       .filter(Boolean)
       .join(" ");
-  return <select {...rest} class={cls()}>{local.children}</select>;
+  return (
+    <select {...rest} class={cls()}>
+      {local.children}
+    </select>
+  );
 };
 
 export default Select;

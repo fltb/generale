@@ -1,4 +1,4 @@
-import { type Component, Show, createSignal, onMount, onCleanup } from "solid-js";
+import { type Component, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { sfx } from "./sound";
 
 /**

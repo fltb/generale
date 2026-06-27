@@ -1,23 +1,22 @@
-import { createSignal, createMemo, Show } from "solid-js";
-import { useNavigate } from "@solidjs/router";
-import { useMutation } from "@tanstack/solid-query";
-
-import { useAuth } from "~/hooks/useAuth";
-import { ProtectedRoute } from "~/components/ProtectedRoute";
-import Avatar from "~/components/Avatar";
-import { patchMyProfileApi, uploadMyAvatarApi } from "~/api/profileApi";
-import { changePasswordApi, changeEmailApi, changeUsernameApi } from "~/api/accountApi";
-import { ApiError } from "~/api/base";
 import type {
-  ProfileUpdateReqBody,
   AvatarUploadRespBody,
-  ChangePasswordReqBody,
   ChangeEmailReqBody,
+  ChangePasswordReqBody,
   ChangeUsernameReqBody,
   ChangeUsernameRespBody,
   ErrorResp,
   MessageResp,
+  ProfileUpdateReqBody,
 } from "@generale/types/dist/api";
+import { useNavigate } from "@solidjs/router";
+import { useMutation } from "@tanstack/solid-query";
+import { createMemo, createSignal, Show } from "solid-js";
+import { changeEmailApi, changePasswordApi, changeUsernameApi } from "~/api/accountApi";
+import type { ApiError } from "~/api/base";
+import { patchMyProfileApi, uploadMyAvatarApi } from "~/api/profileApi";
+import Avatar from "~/components/Avatar";
+import { ProtectedRoute } from "~/components/ProtectedRoute";
+import { useAuth } from "~/hooks/useAuth";
 
 const ACCEPTED_MIME = "image/png,image/jpeg,image/webp";
 
@@ -30,9 +29,7 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = createSignal<string | null>(null);
   const [bio, setBio] = createSignal<string | null>(null);
 
-  const effectiveDisplayName = createMemo(
-    () => displayName() ?? auth.user?.displayName ?? "",
-  );
+  const effectiveDisplayName = createMemo(() => displayName() ?? auth.user?.displayName ?? "");
   const effectiveBio = createMemo(() => bio() ?? auth.user?.bio ?? "");
 
   const [pendingFile, setPendingFile] = createSignal<File | null>(null);
@@ -49,11 +46,7 @@ export default function ProfilePage() {
     },
   }));
 
-  const uploadMutation = useMutation<
-    AvatarUploadRespBody,
-    ApiError<ErrorResp>,
-    File
-  >(() => ({
+  const uploadMutation = useMutation<AvatarUploadRespBody, ApiError<ErrorResp>, File>(() => ({
     mutationFn: (file) => uploadMyAvatarApi(file),
     onSuccess: async () => {
       await auth.refresh();
@@ -104,9 +97,7 @@ export default function ProfilePage() {
   }
 
   // 当前展示的头像 URL：优先用本地预览（新选了文件但还没上传），否则用 server 返回的 avatarUrl
-  const currentAvatarSrc = createMemo(
-    () => pendingPreviewUrl() ?? auth.user?.avatarUrl ?? null,
-  );
+  const currentAvatarSrc = createMemo(() => pendingPreviewUrl() ?? auth.user?.avatarUrl ?? null);
 
   // ===================== 改密码 =====================
   const [pwCurrent, setPwCurrent] = createSignal("");
@@ -117,14 +108,22 @@ export default function ProfilePage() {
   const pwMutation = useMutation<MessageResp, ApiError<ErrorResp>, ChangePasswordReqBody>(() => ({
     mutationFn: (body) => changePasswordApi(body),
     onSuccess: () => {
-      setPwCurrent(""); setPwNew(""); setPwConfirm("");
+      setPwCurrent("");
+      setPwNew("");
+      setPwConfirm("");
     },
   }));
 
   function submitPassword() {
     setPwLocalErr(null);
-    if (pwNew().length < 8) { setPwLocalErr("新密码至少 8 位"); return; }
-    if (pwNew() !== pwConfirm()) { setPwLocalErr("两次新密码不一致"); return; }
+    if (pwNew().length < 8) {
+      setPwLocalErr("新密码至少 8 位");
+      return;
+    }
+    if (pwNew() !== pwConfirm()) {
+      setPwLocalErr("两次新密码不一致");
+      return;
+    }
     pwMutation.mutate({ currentPassword: pwCurrent(), newPassword: pwNew() });
   }
 
@@ -135,12 +134,13 @@ export default function ProfilePage() {
   const emMutation = useMutation<MessageResp, ApiError<ErrorResp>, ChangeEmailReqBody>(() => ({
     mutationFn: (body) => changeEmailApi(body),
     onSuccess: () => {
-      setEmCurrent(""); setEmNew("");
+      setEmCurrent("");
+      setEmNew("");
     },
   }));
 
   function submitEmail() {
-    if (!emNew().trim() || !emCurrent()) return;
+    if (!(emNew().trim() && emCurrent())) return;
     emMutation.mutate({ currentPassword: emCurrent(), newEmail: emNew().trim() });
   }
 
@@ -170,20 +170,37 @@ export default function ProfilePage() {
   function submitUsername() {
     setUnLocalErr(null);
     const val = unInput().trim();
-    if (val.length < 3) { setUnLocalErr("用户名至少 3 个字符"); return; }
-    if (val.length > 50) { setUnLocalErr("用户名最多 50 个字符"); return; }
-    if (!/^[a-zA-Z0-9._-]+$/.test(val)) { setUnLocalErr("只允许字母、数字和 . _ -"); return; }
-    if (val === auth.user?.username) { setUnLocalErr("新用户名与当前相同"); return; }
+    if (val.length < 3) {
+      setUnLocalErr("用户名至少 3 个字符");
+      return;
+    }
+    if (val.length > 50) {
+      setUnLocalErr("用户名最多 50 个字符");
+      return;
+    }
+    if (!/^[a-zA-Z0-9._-]+$/.test(val)) {
+      setUnLocalErr("只允许字母、数字和 . _ -");
+      return;
+    }
+    if (val === auth.user?.username) {
+      setUnLocalErr("新用户名与当前相同");
+      return;
+    }
     unMutation.mutate({ username: val });
   }
 
   return (
     <ProtectedRoute>
-      <Show
-        when={!auth.isLoading}
-        fallback={<p class="p-4">加载中...</p>}
-      >
-        <Show when={auth.user} fallback={(() => { nav("/login"); return null; })() as any}>
+      <Show when={!auth.isLoading} fallback={<p class="p-4">加载中...</p>}>
+        <Show
+          when={auth.user}
+          fallback={
+            (() => {
+              nav("/login");
+              return null;
+            })() as unknown as Element
+          }
+        >
           <div class="container mx-auto p-6 max-w-2xl space-y-6">
             <h1 class="text-2xl font-bold">个人资料</h1>
 
@@ -191,11 +208,7 @@ export default function ProfilePage() {
             <section class="card bg-base-200 p-4 space-y-3">
               <h2 class="text-lg font-semibold">头像</h2>
               <div class="flex items-center gap-4">
-                <Avatar
-                  src={currentAvatarSrc()!}
-                  alt={auth.user?.displayName || auth.user?.username}
-                  size={96}
-                />
+                <Avatar src={currentAvatarSrc() ?? ""} alt={auth.user?.displayName || auth.user?.username} size={96} />
                 <div class="flex flex-col gap-2">
                   <input
                     type="file"
@@ -206,6 +219,7 @@ export default function ProfilePage() {
                   <div class="text-xs opacity-60">支持 PNG / JPG / WebP，上限 2 MB</div>
                   <div class="flex gap-2">
                     <button
+                      type="button"
                       class="btn btn-sm btn-primary"
                       disabled={!pendingFile() || uploadMutation.isPending}
                       onClick={submitAvatar}
@@ -214,6 +228,7 @@ export default function ProfilePage() {
                     </button>
                     <Show when={pendingFile()}>
                       <button
+                        type="button"
                         class="btn btn-sm btn-ghost"
                         onClick={() => {
                           const p = pendingPreviewUrl();
@@ -227,9 +242,7 @@ export default function ProfilePage() {
                     </Show>
                   </div>
                   <Show when={uploadMutation.isError}>
-                    <div class="text-error text-xs">
-                      {uploadMutation.error?.message ?? "上传失败"}
-                    </div>
+                    <div class="text-error text-xs">{uploadMutation.error?.message ?? "上传失败"}</div>
                   </Show>
                 </div>
               </div>
@@ -245,7 +258,9 @@ export default function ProfilePage() {
                     用户名
                     <Show when={auth.user?.usernameChangedAt}>
                       <span class="text-xs opacity-60 ml-1">
-                        （上次修改：{new Date(auth.user!.usernameChangedAt!).toLocaleDateString()}）
+                        （上次修改：
+                        {auth.user?.usernameChangedAt ? new Date(auth.user.usernameChangedAt).toLocaleDateString() : ""}
+                        ）
                       </span>
                     </Show>
                   </span>
@@ -258,12 +273,11 @@ export default function ProfilePage() {
                     disabled={!usernameCanChange().can}
                   />
                   <Show when={!usernameCanChange().can}>
-                    <span class="label-text-alt text-warning">
-                      {usernameCanChange().daysLeft} 天后可再次修改
-                    </span>
+                    <span class="label-text-alt text-warning">{usernameCanChange().daysLeft} 天后可再次修改</span>
                   </Show>
                 </label>
                 <button
+                  type="button"
                   class="btn btn-sm btn-primary shrink-0"
                   disabled={!usernameCanChange().can || unMutation.isPending || !unInput().trim()}
                   onClick={submitUsername}
@@ -278,9 +292,7 @@ export default function ProfilePage() {
                 <span class="text-error text-sm">{unLocalErr()}</span>
               </Show>
               <Show when={unMutation.isError}>
-                <span class="text-error text-sm">
-                  {unMutation.error?.message ?? "修改失败"}
-                </span>
+                <span class="text-error text-sm">{unMutation.error?.message ?? "修改失败"}</span>
               </Show>
 
               <p class="text-sm">
@@ -318,6 +330,7 @@ export default function ProfilePage() {
 
               <div class="flex gap-2 items-center">
                 <button
+                  type="button"
                   class="btn btn-primary"
                   disabled={patchMutation.isPending}
                   onClick={submitProfile}
@@ -328,9 +341,7 @@ export default function ProfilePage() {
                   <span class="text-success text-sm">已保存</span>
                 </Show>
                 <Show when={patchMutation.isError}>
-                  <span class="text-error text-sm">
-                    {patchMutation.error?.message ?? "保存失败"}
-                  </span>
+                  <span class="text-error text-sm">{patchMutation.error?.message ?? "保存失败"}</span>
                 </Show>
               </div>
             </section>
@@ -373,7 +384,7 @@ export default function ProfilePage() {
                 autocomplete="new-password"
               />
               <div class="flex gap-2 items-center">
-                <button class="btn btn-primary" disabled={pwMutation.isPending} onClick={submitPassword}>
+                <button type="button" class="btn btn-primary" disabled={pwMutation.isPending} onClick={submitPassword}>
                   {pwMutation.isPending ? "提交中..." : "更新密码"}
                 </button>
                 <Show when={pwMutation.isSuccess}>
@@ -410,7 +421,7 @@ export default function ProfilePage() {
                 autocomplete="current-password"
               />
               <div class="flex gap-2 items-center">
-                <button class="btn btn-primary" disabled={emMutation.isPending} onClick={submitEmail}>
+                <button type="button" class="btn btn-primary" disabled={emMutation.isPending} onClick={submitEmail}>
                   {emMutation.isPending ? "发送中..." : "发送确认邮件"}
                 </button>
                 <Show when={emMutation.isSuccess}>
@@ -424,7 +435,7 @@ export default function ProfilePage() {
 
             {/* ---------- 登出 ---------- */}
             <div class="flex justify-end">
-              <button class="btn btn-outline" onClick={auth.logout}>
+              <button type="button" class="btn btn-outline" onClick={auth.logout}>
                 退出登录
               </button>
             </div>
