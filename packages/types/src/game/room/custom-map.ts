@@ -1,12 +1,10 @@
-import type { TileType, PlayerId } from '../core-type';
+import type { TileType } from '../core-type';
 
 export interface CustomMapTile {
   /** terrain type */
   type: TileType;
-  /** initial army. 0 = neutral. positive = defendable, negative = speed boost */
+  /** initial army. 0 = neutral. positive = defendable. (Mountain/Fog tiles ignore this) */
   army: number;
-  /** ownerId for pre-placed thrones (used when type !== THRONE but pre-assigned) */
-  ownerId?: PlayerId;
 }
 
 /**

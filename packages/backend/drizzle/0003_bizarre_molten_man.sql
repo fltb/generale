@@ -1,0 +1,1 @@
+ALTER TABLE `custom_maps` ADD `has_custom_thumbnail` integer DEFAULT false NOT NULL;

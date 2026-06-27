@@ -81,6 +81,8 @@ export const gameSummaryRouteSchema = t.Object({
     hasPassword: t.Boolean(),
     type: t.Union([t.Literal("standard"), t.Literal("custom")]),    // 游戏模式 / 类型
     map: t.Optional(mapSizeSchema),        // 可改为更精确的 map schema / 字符串 / 对象
+    customMapId: t.Optional(t.String()),
+    customMapName: t.Optional(t.String()),
 });
 export type GameSummaryRoute = Static<typeof gameSummaryRouteSchema>;
 

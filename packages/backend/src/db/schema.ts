@@ -101,6 +101,7 @@ export const customMaps = sqliteTable('custom_maps', {
   isDraft: integer('is_draft', { mode: 'boolean' }).default(true).notNull(),
   usageCount: integer('usage_count').default(0).notNull(),
   tags: text('tags'), // JSON array
+  hasCustomThumbnail: integer('has_custom_thumbnail', { mode: 'boolean' }).default(false).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(CURRENT_TIMESTAMP)`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(CURRENT_TIMESTAMP)`),
 });

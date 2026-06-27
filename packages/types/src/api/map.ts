@@ -5,7 +5,6 @@ import { t, type Static } from 'elysia';
 const mapTileSchema = t.Object({
   type: t.String(),
   army: t.Number(),
-  ownerId: t.Optional(t.String()),
 });
 const mapTileRowSchema = t.Array(mapTileSchema, { minItems: 1 });
 const mapTilesSchema = t.Array(mapTileRowSchema, { minItems: 1 });
@@ -56,6 +55,7 @@ export const mapSumaryRespSchema = t.Object({
   tags: t.Array(t.String()),
   createdAt: t.Optional(t.String()),
   updatedAt: t.Optional(t.String()),
+  hasCustomThumbnail: t.Optional(t.Boolean()),
 });
 export type MapSumaryRespBody = Static<typeof mapSumaryRespSchema>;
 
@@ -63,6 +63,7 @@ export const mapDetailRespSchema = t.Composite([
   mapSumaryRespSchema,
   t.Object({
     tiles: mapTilesSchema,
+    hasDraft: t.Optional(t.Boolean()),
   }),
 ]);
 export type MapDetailRespBody = Static<typeof mapDetailRespSchema>;

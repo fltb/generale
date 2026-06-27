@@ -15,6 +15,20 @@
       "when": 1782359734266,
       "tag": "0001_cheerful_hellfire_club",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782538440634,
+      "tag": "0002_sparkling_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782544307080,
+      "tag": "0003_bizarre_molten_man",
+      "breakpoints": true
     }
   ]
 }
