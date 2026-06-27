@@ -22,3 +22,7 @@ export { sfx, isMuted, setMuted, toggleMuted } from "./sound";
 export { Confetti, type ConfettiProps } from "./Confetti";
 export { Countdown, type CountdownProps } from "./Countdown";
 export { MuteToggle } from "./MuteToggle";
+export { Collapse, CollapseTitle, CollapseContent, type CollapseProps } from "./Collapse";
+export { Tabs, Tab, type TabsProps, type TabProps } from "./Tabs";
+export { Checkbox, type CheckboxProps } from "./Checkbox";
+export { Label, LabelText, LabelTextAlt, type LabelProps } from "./Label";
