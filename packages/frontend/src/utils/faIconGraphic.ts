@@ -1,45 +1,29 @@
 import { icon as faIcon, type IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
-    faArrowRight,
-    faArrowLeft,
-    faArrowUp,
-    faArrowDown,
-    faCrown,
-    faHelmetSafety,
-    faMountain,
-    faWater,
+    faArrowRight, faArrowLeft, faArrowUp, faArrowDown,
+    faCrown, faHelmetSafety, faMountain, faWater,
 } from "@fortawesome/free-solid-svg-icons";
 
 import { Graphics, GraphicsContext } from "pixi.js";
 
 export const FA_ICON_MAP = {
-    faArrowRight,
-    faArrowLeft,
-    faArrowUp,
-    faArrowDown,
-    faCrown,
-    faHelmetSafety,
-    faMountain,
-    faWater
+    faArrowRight, faArrowLeft, faArrowUp, faArrowDown,
+    faCrown, faHelmetSafety, faMountain, faWater
 } as const;
 
 export type FaIconKey = keyof typeof FA_ICON_MAP;
 
-// --- helpers ---
 function colorHexToCss(hex: number) {
     return `#${hex.toString(16).padStart(6, "0")}`;
 }
 
-/** normalize SVG: set width/height and replace currentColor or missing fills */
 function normalizeSvg(svgRaw: string, sizePx: number, colorHex: number) {
     const color = colorHexToCss(colorHex);
     const doc = new DOMParser().parseFromString(svgRaw, "image/svg+xml");
     const svgEl = doc.querySelector("svg");
     if (!svgEl) return svgRaw;
-
     svgEl.setAttribute("width", String(Math.round(sizePx)));
     svgEl.setAttribute("height", String(Math.round(sizePx)));
-    // replace currentColor or missing fills on common shape elements
     svgEl.querySelectorAll("path, rect, circle, ellipse, polygon, polyline").forEach((el) => {
         const f = el.getAttribute("fill");
         if (!f || f === "currentColor") el.setAttribute("fill", color);
@@ -51,71 +35,46 @@ function normalizeSvg(svgRaw: string, sizePx: number, colorHex: number) {
     return new XMLSerializer().serializeToString(svgEl);
 }
 
-const gcCache = new Map<string, GraphicsContext>(); // GraphicsContext cache
-
 function makeGcKey(key: FaIconKey, px: number, colorHex: number) {
     return `gc:${key}:${px}:${colorHex.toString(16)}`;
 }
 
-/**
- * 返回 GraphicsContext 缓存，强制缩放到 px × px
- */
+/** 图标工厂 — 每个 PixiJS Application 实例应持有独立的工厂，避免跨会话缓存污染 */
+export function createIconFactory() {
+    const gcCache = new Map<string, GraphicsContext>();
 
+    function getGraphicsContext(key: FaIconKey, px: number, colorHex: number): GraphicsContext {
+        const cacheKey = makeGcKey(key, px, colorHex);
+        const hit = gcCache.get(cacheKey);
+        if (hit) return hit;
 
-export function getGraphicsContextFromFa(
-    key: FaIconKey,
-    px: number = 32,
-    colorHex: number = 0x000000
-): GraphicsContext {
-    const cacheKey = makeGcKey(key, px, colorHex);
-    const hit = gcCache.get(cacheKey);
-    if (hit) return hit;
+        const iconDef: IconDefinition = FA_ICON_MAP[key];
+        if (!iconDef) throw new Error(`Unknown FaIconKey: ${String(key)}`);
 
-    const iconDef: IconDefinition = FA_ICON_MAP[key];
-    if (!iconDef) throw new Error(`Unknown FaIconKey: ${String(key)}`);
-
-    const svgRaw: string = faIcon(iconDef).html[0];
-    const svg = normalizeSvg(svgRaw, px, colorHex);
-
-    const ctx = new GraphicsContext().svg(svg);
-
-    // 计算缩放比例使其适配目标尺寸
-    const maxSize = Math.max(ctx.bounds.width, ctx.bounds.height);
-    if (maxSize > 0) {
-        const scale = px / maxSize;
-        ctx.scale(scale);
+        const svgRaw: string = faIcon(iconDef).html[0];
+        const svg = normalizeSvg(svgRaw, px, colorHex);
+        const ctx = new GraphicsContext().svg(svg);
+        const maxSize = Math.max(ctx.bounds.width, ctx.bounds.height);
+        if (maxSize > 0) ctx.scale(px / maxSize);
+        gcCache.set(cacheKey, ctx);
+        return ctx;
     }
 
-    gcCache.set(cacheKey, ctx);
-    return ctx;
-}
-
-export function createScaledFaIcon(
-    key: FaIconKey,
-    sizePx: number = 32,
-    colorHex: number = 0x000000
-): Graphics {
-    // 注意：getGraphicsContextFromFa 的签名是 (key, px, colorHex)；
-    // 这里以前漏写了 sizePx，颜色被当作像素数传进去（0xff0000 -> px=16711680），
-    // SVG 被渲染到天文数字大小再被外层 scale.set 压回去，导致图标在视觉上消失。
-    const ctx = getGraphicsContextFromFa(key, sizePx, colorHex);
-    const graphics = new Graphics(ctx);
-
-    // 计算缩放比例
-    const bounds = graphics.getBounds();
-    const maxSize = Math.max(bounds.width, bounds.height);
-    if (maxSize > 0) {
-        const scale = sizePx / maxSize;
-        graphics.scale.set(scale);
-
-        // 设置锚点到中心
-        graphics.pivot.set(bounds.width / 2, bounds.height / 2);
+    function createScaledIcon(key: FaIconKey, sizePx: number, colorHex: number): Graphics {
+        const ctx = getGraphicsContext(key, sizePx, colorHex);
+        const graphics = new Graphics(ctx);
+        const bounds = graphics.getBounds();
+        const maxSize = Math.max(bounds.width, bounds.height);
+        if (maxSize > 0) {
+            graphics.scale.set(sizePx / maxSize);
+            graphics.pivot.set(bounds.width / 2, bounds.height / 2);
+        }
+        return graphics;
     }
 
-    return graphics;
+    function destroy() { gcCache.clear(); }
+
+    return { createScaledIcon, destroy };
 }
 
-/** destroy helpers */
-export function destroyGcCache() {
-    gcCache.clear();
-}
+export type IconFactory = ReturnType<typeof createIconFactory>;

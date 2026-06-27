@@ -10,7 +10,7 @@ import * as PIXI from "pixi.js";
 import type { Coordinates, Tile, SyncedGameState } from "@generale/types";
 import { TileType } from "@generale/types";
 import { tileColorNumber } from "~/utils/playerColor";
-import { type FaIconKey, createScaledFaIcon } from "~/utils/faIconGraphic";
+import { type FaIconKey, type IconFactory } from "~/utils/faIconGraphic";
 import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
 
 export interface MapTileProps {
@@ -19,7 +19,8 @@ export interface MapTileProps {
   size: number;
   playerDisplay: SyncedGameState["playerDisplay"];
   iconTextures: Record<TileType, FaIconKey | null>;
-  onClick?: (coord: Coordinates) => void; // 新增：点击回调
+  onClick?: (coord: Coordinates) => void;
+  iconFactory?: IconFactory;
 }
 
 export const MapTile: Component<MapTileProps> = (props) => {
@@ -82,7 +83,7 @@ export const MapTile: Component<MapTileProps> = (props) => {
 
     if (key) {
       const iconSize = Math.round(props.size * 0.6);
-      const scaledIcon = createScaledFaIcon(key, iconSize, DEFAULT_TILE_THEME.colors.tileIcon);
+      const scaledIcon = props.iconFactory!.createScaledIcon(key, iconSize, DEFAULT_TILE_THEME.colors.tileIcon);
       
       // 设置位置到瓦片中心
       scaledIcon.x = props.size / 2;

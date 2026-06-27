@@ -6,7 +6,7 @@ import type { SyncedGameState, Coordinates, PlayerOperation } from "@generale/ty
 import { PlayerOperationType, TileType } from "@generale/types";
 
 import { MapTile } from "./MapTile";
-import { type FaIconKey, createScaledFaIcon, destroyGcCache } from "~/utils/faIconGraphic";
+import { type FaIconKey, createIconFactory, type IconFactory } from "~/utils/faIconGraphic";
 import { DEFAULT_TILE_THEME, DIRECTION_ICON } from "~/game/render/tileTheme";
 import { useMapInput } from "~/game/render/useMapInput";
 
@@ -27,9 +27,7 @@ export interface MapRenderProps {
 type DirectionKey = keyof typeof DIRECTION_ICON;
 
 const OperationArrow: Component<{
-  op: PlayerOperation;
-  size: number;
-  z?: number;
+  op: PlayerOperation; size: number; z?: number; iconFactory?: IconFactory;
 }> = (props) => {
   const [g, setG] = createSignal<PIXI.Graphics | undefined>(undefined);
 
@@ -71,7 +69,7 @@ const OperationArrow: Component<{
     }
 
     const arrowSize = Math.min(24, props.size * 0.4);
-    const arrow = createScaledFaIcon(DIRECTION_ICON[dir], arrowSize, DEFAULT_TILE_THEME.colors.arrow);
+    const arrow = props.iconFactory!.createScaledIcon(DIRECTION_ICON[dir], arrowSize, DEFAULT_TILE_THEME.colors.arrow);
 
     const mx = (sx + ex) / 2;
     const my = (sy + ey) / 2;
@@ -93,9 +91,9 @@ const OperationArrow: Component<{
   return <P.Graphics ref={(inst) => { setG(inst); return () => setG(undefined); }} zIndex={props.z ?? 0} />;
 };
 
-export const MapRender: Component<MapRenderProps> = (props) => {
-  destroyGcCache();
-  onCleanup(() => destroyGcCache());
+  export const MapRender: Component<MapRenderProps> = (props) => {
+  const iconFactory = createIconFactory();
+  onCleanup(() => iconFactory.destroy());
 
   const TILE_SIZE = DEFAULT_TILE_THEME.tileSize;
   const map = createMemo(() => props.state?.map ?? { width: 0, height: 0, tiles: [] });
@@ -314,6 +312,7 @@ export const MapRender: Component<MapRenderProps> = (props) => {
                       size={TILE_SIZE}
                       playerDisplay={props.state.playerDisplay}
                       iconTextures={iconTextures()}
+                      iconFactory={iconFactory}
                       onClick={input.handleTileClick}
                     />
                   );
@@ -329,7 +328,7 @@ export const MapRender: Component<MapRenderProps> = (props) => {
         {/* ===== overlay layer: arrows / cursor / highlights ===== */}
         <P.Container name="overlayLayer">
           <For each={props.state.playerOperationQueue ?? []}>
-            {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} />}
+            {(op, i) => <OperationArrow op={op} size={TILE_SIZE} z={100 + i()} iconFactory={iconFactory} />}
           </For>
 
           <P.Graphics
