@@ -83,7 +83,7 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
     connector.onClientMessage((msg) => this.handleMessage(pid, msg));
     // 发送最近消息
     this.sendRecentMessages(pid, 30);
-    this.addSystemMessage(`${name} 加入了游戏`);
+    this.addSystemMessage("{name} joined the game", { name }, `${name} 加入了游戏`);
     return { success: true };
   }
 
@@ -92,7 +92,7 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
     this.connectors.get(pid)?.close();
     this.connectors.delete(pid);
     const name = this.playerNames.get(pid);
-    if (name) this.addSystemMessage(`${name} 离开了游戏`);
+    if (name) this.addSystemMessage("{name} left the game", { name }, `${name} 离开了游戏`);
     this.playerNames.delete(pid);
   }
 
@@ -149,7 +149,8 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
   }
 
   /** 添加系统消息 */
-  private addSystemMessage(content: string) {
+  private addSystemMessage(i18nKey: string, params?: Record<string, string>, fallbackContent?: string) {
+    const content = fallbackContent ?? i18nKey;
     const msg: ChatMessage = {
       id: this.generateMessageId(),
       playerId: "system" as PlayerId,
@@ -158,6 +159,8 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
       timestamp: Date.now(),
       type: "system",
       scope: "room",
+      i18nKey,
+      ...(params ? { i18nParams: params } : {}),
     };
     this.addMessage(msg);
     this.broadcastNewMessage(msg);

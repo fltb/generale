@@ -35,6 +35,6 @@ import ConfirmEmailChangePage from "../confirm-email-change";
 describe("ConfirmEmailChange route", () => {
   it("renders heading", () => {
     render(() => <ConfirmEmailChangePage />);
-    expect(screen.getByText("确认邮箱变更")).toBeInTheDocument();
+    expect(screen.getByText("Confirm Email Change")).toBeInTheDocument();
   });
 });

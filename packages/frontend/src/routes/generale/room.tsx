@@ -2,6 +2,7 @@ import { GamePhase, PreGamePlayerStatus } from "@generale/types";
 import { Title, Meta } from "@solidjs/meta";
 import { useNavigate, useParams } from "@solidjs/router";
 import { createEffect, type Component, createSignal, Match, Show, Switch } from "solid-js";
+import { useT } from "~/i18n/useT";
 import ChatPanel from "~/components/ChatPanel";
 import GameWithSync from "~/components/game/Game";
 import ConnectedRoom from "~/components/room/ConnectedRoom";
@@ -9,10 +10,12 @@ import { useRoomSession } from "~/game/useRoomSession";
 import bridge from "~/testBridge";
 import { Alert, Button, Card, Input } from "~/ui";
 import GeneraleLayout from "~/components/game/GeneraleLayout";
+import { ProtectedRoute } from "~/components/ProtectedRoute";
 
 const RoomRoute: Component = () => {
   const params = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const { t } = useT();
   const searchParams = new URLSearchParams(window.location.search);
   const joinPassword = searchParams.get("join");
   if (joinPassword) {
@@ -29,12 +32,13 @@ const RoomRoute: Component = () => {
   });
 
   return (
+    <ProtectedRoute>
     <GeneraleLayout>
       <main class="container mx-auto p-6">
-      <Title>Game Room — General E</Title>
-      <Meta name="description" content="Join or spectate a General E game room." />
-      <Meta property="og:title" content="Game Room — General E" />
-      <Meta property="og:description" content="Join or spectate a General E game room." />
+      <Title>{t("Game Room")} — {t("General E")}</Title>
+      <Meta name="description" content={t("Join or spectate a General E game room.")} />
+      <Meta property="og:title" content={`${t("Game Room")} — ${t("General E")}`} />
+      <Meta property="og:description" content={t("Join or spectate a General E game room.")} />
       <Meta property="og:image" content="/og-image.svg" />
       <Meta property="og:type" content="website" />
       <Switch>
@@ -42,21 +46,21 @@ const RoomRoute: Component = () => {
           <Alert variant="error" class="mb-4">
             <span>{session.error()}</span>
             <Button size="sm" variant="ghost" class="mt-2" onClick={() => navigate("/")}>
-              返回大厅
+              {t("Back to Lobby")}
             </Button>
           </Alert>
         </Match>
 
         <Match when={session.loading()}>
-          <Card class="p-4 mb-4">Preparing connection…</Card>
+          <Card class="p-4 mb-4">{t("Preparing connection...")}</Card>
         </Match>
 
         {/* 密码房间入口提示 */}
         <Match when={session.needsPassword()}>
           <Card class="p-6 max-w-md mx-auto mt-8">
-            <h2 class="text-lg font-semibold mb-4">此房间为私有房间</h2>
-            <Show when={session.wrongPassword()} fallback={<p class="text-sm opacity-70 mb-4">需要输入密码才能加入</p>}>
-              <p class="text-error text-sm mb-4">密码错误，请重试</p>
+            <h2 class="text-lg font-semibold mb-4">{t("Room requires password")}</h2>
+            <Show when={session.wrongPassword()} fallback={<p class="text-sm opacity-70 mb-4">{t("Password required")}</p>}>
+              <p class="text-error text-sm mb-4">{t("Wrong password, try again")}</p>
             </Show>
             <form
               onSubmit={(e) => {
@@ -66,9 +70,9 @@ const RoomRoute: Component = () => {
               }}
             >
               <div class="flex items-center gap-2">
-                <Input bordered type="password" name="pw" placeholder="请输入房间密码" class="w-64" />
+                <Input bordered type="password" name="pw" placeholder={t("Enter room password")} class="w-64" />
                 <Button variant="primary" type="submit">
-                  加入房间
+                  {t("Join")}
                 </Button>
               </div>
             </form>
@@ -92,9 +96,9 @@ const RoomRoute: Component = () => {
         {/* ---------- ENDED ---------- */}
         <Match when={session.phase() === GamePhase.ENDED}>
           <Card class="p-6">
-            <div class="mb-4">游戏已结束</div>
+            <div class="mb-4">{t("Game ended")}</div>
             <Button variant="primary" onClick={() => navigate("/")}>
-              返回大厅
+              {t("Back to Lobby")}
             </Button>
           </Card>
         </Match>
@@ -127,9 +131,9 @@ const RoomRoute: Component = () => {
               circle
               variant="primary"
               class="shadow-lg bg-primary/80 backdrop-blur-sm"
-              aria-label="打开聊天"
+              aria-label={t("Open chat")}
               onClick={() => setChatVisible(true)}
-              title="打开聊天"
+              title={t("Open chat")}
             >
               💬
             </Button>
@@ -139,13 +143,13 @@ const RoomRoute: Component = () => {
             <div class="w-[min(24rem,calc(100vw-2rem))] overflow-hidden bg-base-100/75 backdrop-blur-sm shadow-lg pixel-border">
               <div class="flex items-center justify-between gap-3 border-b border-base-300/50 p-2">
                 <div class="min-w-0">
-                  <div class="truncate text-sm font-medium">聊天</div>
+                  <div class="truncate text-sm font-medium">{t("Chat")}</div>
                   <div class="truncate text-xs opacity-60">
-                    {session.phase() === GamePhase.INGAME ? "游戏中" : "准备阶段"}
+                    {session.phase() === GamePhase.INGAME ? t("In Game") : t("Lobby")}
                   </div>
                 </div>
-                <Button size="xs" variant="ghost" onClick={() => setChatVisible(false)} title="收起">
-                  收起
+                <Button size="xs" variant="ghost" onClick={() => setChatVisible(false)} title={t("Collapse")}>
+                  {t("Collapse")}
                 </Button>
               </div>
 
@@ -166,6 +170,7 @@ const RoomRoute: Component = () => {
       </Show>
     </main>
     </GeneraleLayout>
+    </ProtectedRoute>
   );
 };
 

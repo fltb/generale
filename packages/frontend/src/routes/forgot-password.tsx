@@ -3,11 +3,13 @@ import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
 import { createSignal, Show } from "solid-js";
+import { useT } from "../i18n/useT";
 import { forgotPasswordApi } from "~/api/accountApi";
 import type { ApiError } from "~/api/base";
 
 export default function ForgotPasswordPage() {
   const nav = useNavigate();
+  const { t } = useT();
   const [email, setEmail] = createSignal("");
 
   const mutation = useMutation<MessageResp, ApiError<ErrorResp>, RequestPasswordResetReqBody>(() => ({
@@ -22,50 +24,50 @@ export default function ForgotPasswordPage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
-      <Title>Forgot Password — General E</Title>
-      <Meta name="description" content="Reset your password." />
-      <Meta property="og:title" content="Forgot Password — General E" />
-      <Meta property="og:description" content="Reset your password." />
+      <Title>{t("Forgot Password")} — {t("General E")}</Title>
+      <Meta name="description" content={t("Reset your password.")} />
+      <Meta property="og:title" content={`${t("Forgot Password")} — ${t("General E")}`} />
+      <Meta property="og:description" content={t("Reset your password.")} />
       <Meta property="og:image" content="/og-image.svg" />
       <Meta property="og:type" content="website" />
-      <h1 class="text-2xl mb-4">找回密码</h1>
+      <h1 class="text-2xl mb-4">{t("Reset your password")}</h1>
 
       <Show
         when={!mutation.isSuccess}
         fallback={
           <div class="space-y-4">
-            <div class="alert alert-success">{mutation.data?.message ?? "如果该邮箱已注册，我们已发送重置链接"}</div>
+            <div class="alert alert-success">{mutation.data?.message ?? t("Reset link sent")}</div>
             <p class="text-sm opacity-70">
-              查看你的邮箱（包括垃圾邮件），点击邮件里的链接设置新密码。链接 10 分钟内有效。
+              {t("Check your email (including spam) and click the link to set a new password. The link expires in 10 minutes.")}
             </p>
             <div class="flex gap-2">
               <button type="button" class="btn btn-ghost btn-sm" onClick={() => nav("/login")}>
-                返回登录
+                {t("Back to login")}
               </button>
             </div>
           </div>
         }
       >
         <form class="flex flex-col gap-2" onSubmit={submit}>
-          <p class="text-sm opacity-70">输入注册时使用的邮箱，我们会发送重置链接给你。</p>
+          <p class="text-sm opacity-70">{t("Enter the email you registered with and we'll send a reset link.")}</p>
           <input
             type="email"
             class="input input-bordered"
-            placeholder="邮箱"
+            placeholder={t("Email")}
             value={email()}
             onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
             required
           />
           <button class="btn btn-primary" type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? "发送中..." : "发送重置链接"}
+            {mutation.isPending ? t("Sending...") : t("Send reset link")}
           </button>
           <Show when={mutation.isError}>
-            <p class="text-error text-sm">{mutation.error?.message ?? "发送失败"}</p>
+            <p class="text-error text-sm">{mutation.error?.message ?? t("Sending failed")}</p>
           </Show>
           <p class="mt-2 text-sm">
-            <A href="/login" class="link">
-              返回登录
-            </A>
+              <A href="/login" class="link">
+                {t("Back to login")}
+              </A>
           </p>
         </form>
       </Show>

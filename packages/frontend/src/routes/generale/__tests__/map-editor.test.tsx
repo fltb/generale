@@ -3,12 +3,13 @@ import { render, screen } from "@solidjs/testing-library";
 
 vi.mock("@solidjs/meta", () => ({ Title: () => null, Meta: () => null }));
 
-vi.mock("~/hooks/useAuth", () => ({ useAuth: () => ({ user: null }) }));
+vi.mock("~/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "1" }, isLoading: false }) }));
 
 vi.mock("@solidjs/router", () => ({
   A: (props: any) => <a href={props.href}>{props.children}</a>,
   useLocation: () => ({ pathname: "/maps/editor" }),
   useParams: () => ({ id: "map-123" }),
+  useNavigate: () => vi.fn(),
 }));
 
 vi.mock("~/components/map-editor/MapEditor", () => ({

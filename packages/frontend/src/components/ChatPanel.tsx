@@ -202,7 +202,10 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
                     </Show>
                     <div class="min-w-0 truncate font-medium">{chat.messageDisplayName(m)}</div>
                   </div>
-                  <div class="ml-16 whitespace-pre-wrap wrap-break-word text-base-content">{m.content}</div>
+                  <div class="ml-16 whitespace-pre-wrap wrap-break-word text-base-content">
+                    {/* biome-ignore lint/suspicious/noExplicitAny: i18nKey is dynamic string, not a literal TranslationKey */}
+                    {m.i18nKey ? (t as any)(m.i18nKey, m.i18nParams) : m.content}
+                  </div>
                 </div>
               )}
             </For>

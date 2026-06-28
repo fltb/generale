@@ -23,7 +23,7 @@ import LoginPage from "../login";
 describe("Login route", () => {
   it("renders heading", () => {
     render(() => <LoginPage />);
-    expect(screen.getByText("账户")).toBeInTheDocument();
+    expect(screen.getByText("Account")).toBeInTheDocument();
   });
 
   it("renders login form by default", () => {
@@ -35,7 +35,7 @@ describe("Login route", () => {
 
   it("renders tab switcher", () => {
     render(() => <LoginPage />);
-    expect(screen.getAllByText("登录")).toHaveLength(2);
-    expect(screen.getByText("注册")).toBeInTheDocument();
+    expect(screen.getAllByText("Login")).toHaveLength(2);
+    expect(screen.getByText("Register")).toBeInTheDocument();
   });
 });

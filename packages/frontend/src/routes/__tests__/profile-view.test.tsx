@@ -45,7 +45,7 @@ import PublicProfilePage from "../profile-view";
 describe("ProfileView route", () => {
   it("renders back button", () => {
     render(() => <PublicProfilePage />);
-    expect(screen.getByText("← 返回")).toBeInTheDocument();
+    expect(screen.getByText("← Back")).toBeInTheDocument();
   });
 
   it("renders user display name", () => {

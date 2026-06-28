@@ -3,6 +3,7 @@ import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { useT } from "../i18n/useT";
 import type { ApiError } from "~/api/base";
 import { useAuth } from "~/hooks/useAuth";
 
@@ -13,6 +14,7 @@ import { useAuth } from "~/hooks/useAuth";
 export default function VerifyEmailPage() {
   const nav = useNavigate();
   const auth = useAuth();
+  const { t } = useT();
   const [searchParams] = useSearchParams<{ token?: string }>();
   const token = createMemo(() => (searchParams.token ?? "").trim());
   const [fired, setFired] = createSignal(false);
@@ -35,32 +37,32 @@ export default function VerifyEmailPage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
-      <Title>Verify Email — General E</Title>
-      <Meta name="description" content="Confirm your email address." />
-      <Meta property="og:title" content="Verify Email — General E" />
-      <Meta property="og:description" content="Confirm your email address." />
+      <Title>{t("Verify Email")} — {t("General E")}</Title>
+      <Meta name="description" content={t("Confirm your email address.")} />
+      <Meta property="og:title" content={`${t("Verify Email")} — ${t("General E")}`} />
+      <Meta property="og:description" content={t("Confirm your email address.")} />
       <Meta property="og:image" content="/og-image.svg" />
       <Meta property="og:type" content="website" />
-      <h1 class="text-2xl mb-4">邮箱验证</h1>
+      <h1 class="text-2xl mb-4">{t("Verify your email address")}</h1>
 
-      <Show when={token()} fallback={<div class="alert alert-error">链接缺少 token。</div>}>
+      <Show when={token()} fallback={<div class="alert alert-error">{t("Missing token in link.")}</div>}>
         <Show when={mutation.isPending}>
-          <div>正在验证...</div>
+          <div>{t("Verifying...")}</div>
         </Show>
         <Show when={mutation.isSuccess}>
           <div class="space-y-3">
-            <div class="alert alert-success">{mutation.data?.message ?? "邮箱验证成功"}</div>
-            <p class="text-sm opacity-70">即将跳转到登录页...</p>
+            <div class="alert alert-success">{mutation.data?.message ?? t("Email verified successfully")}</div>
+            <p class="text-sm opacity-70">{t("Redirecting to login page...")}</p>
             <A href="/login" class="link">
-              立即登录
+              {t("Login now")}
             </A>
           </div>
         </Show>
         <Show when={mutation.isError}>
           <div class="space-y-3">
-            <div class="alert alert-error">{mutation.error?.message ?? "验证失败"}</div>
+            <div class="alert alert-error">{mutation.error?.message ?? t("Verification failed")}</div>
             <A href="/login" class="link">
-              返回登录
+              {t("Back to login")}
             </A>
           </div>
         </Show>

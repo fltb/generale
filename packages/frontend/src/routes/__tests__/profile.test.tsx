@@ -57,12 +57,12 @@ import ProfilePage from "../profile";
 describe("Profile route", () => {
   it("renders profile heading", () => {
     render(() => <ProfilePage />);
-    expect(screen.getByText("个人资料")).toBeInTheDocument();
+    expect(screen.getAllByText("Profile").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders avatar section", () => {
     render(() => <ProfilePage />);
-    expect(screen.getByText("头像")).toBeInTheDocument();
+    expect(screen.getAllByText("Avatar").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders user email", () => {
@@ -72,6 +72,6 @@ describe("Profile route", () => {
 
   it("renders logout button", () => {
     render(() => <ProfilePage />);
-    expect(screen.getByText("退出登录")).toBeInTheDocument();
+    expect(screen.getByText("Logout")).toBeInTheDocument();
   });
 });

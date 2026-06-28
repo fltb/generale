@@ -33,6 +33,6 @@ import VerifyEmailPage from "../verify-email";
 describe("VerifyEmail route", () => {
   it("renders heading", () => {
     render(() => <VerifyEmailPage />);
-    expect(screen.getByText("邮箱验证")).toBeInTheDocument();
+    expect(screen.getByText("Verify your email address")).toBeInTheDocument();
   });
 });

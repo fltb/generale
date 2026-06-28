@@ -28,12 +28,12 @@ import ForgotPasswordPage from "../forgot-password";
 describe("ForgotPassword route", () => {
   it("renders heading and form", () => {
     render(() => <ForgotPasswordPage />);
-    expect(screen.getByText("找回密码")).toBeInTheDocument();
-    expect(screen.getByText("发送重置链接")).toBeInTheDocument();
+    expect(screen.getByText("Reset your password")).toBeInTheDocument();
+    expect(screen.getByText("Send reset link")).toBeInTheDocument();
   });
 
   it("renders link back to login", () => {
     render(() => <ForgotPasswordPage />);
-    expect(screen.getByText("返回登录")).toBeInTheDocument();
+    expect(screen.getByText("Back to login")).toBeInTheDocument();
   });
 });

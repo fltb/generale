@@ -1,7 +1,10 @@
+import { useT } from "../i18n/useT";
+
 export default function Test() {
+  const { t } = useT();
   return (
     <main>
-      <p>Test page placeholder</p>
+      <p>{t("Test page placeholder")}</p>
     </main>
   );
 }

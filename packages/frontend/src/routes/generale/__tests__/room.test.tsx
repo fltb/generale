@@ -3,7 +3,7 @@ import { render } from "@solidjs/testing-library";
 
 vi.mock("@solidjs/meta", () => ({ Title: () => null, Meta: () => null }));
 
-vi.mock("~/hooks/useAuth", () => ({ useAuth: () => ({ user: null }) }));
+vi.mock("~/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "1" }, isLoading: false }) }));
 
 vi.mock("@solidjs/router", () => ({
   A: (props: any) => <a href={props.href}>{props.children}</a>,

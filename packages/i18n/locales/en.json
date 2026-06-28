@@ -50,6 +50,8 @@
   "{name} was kicked": "{name} was kicked",
   "(Team)": "(Team)",
   "Player {name} captured tile ({x}, {y})": "Player {name} captured tile ({x}, {y})",
+  "{name} joined the game": "{name} joined the game",
+  "{name} left the game": "{name} left the game",
   "3, 2, 1... 开战!": "3, 2, 1... Go!",
   "Capture enemy tiles by clicking on them": "Capture enemy tiles by clicking on them",
   "Terms of Service": "Terms of Service",

@@ -2,19 +2,22 @@ import type { MapSumaryRespBody } from "@generale/types";
 import { Title, Meta } from "@solidjs/meta";
 import { A, useSearchParams } from "@solidjs/router";
 import { createResource, createSignal, For, Show } from "solid-js";
+import { useT } from "~/i18n/useT";
 import { deleteMapApi, forkMapApi, listMapsApi, mapThumbnailUrl, myMapsApi } from "~/api/mapApi";
 import CreateRoomModal from "~/components/roomlist/CreateRoomModal";
 import GeneraleLayout from "~/components/game/GeneraleLayout";
+import { ProtectedRoute } from "~/components/ProtectedRoute";
 import { Badge, Button, Card, Input, Select, Spinner, Tabs } from "~/ui";
 
 const SORT_OPTIONS = [
-  { value: "updated", label: "最新" },
-  { value: "usage", label: "最热" },
-  { value: "largest", label: "最大" },
-  { value: "smallest", label: "最小" },
+  { value: "updated", label: "Newest" },
+  { value: "usage", label: "Most popular" },
+  { value: "largest", label: "Largest" },
+  { value: "smallest", label: "Smallest" },
 ];
 
 export default function MapsPage() {
+  const { t } = useT();
   const [searchParams, setSearchParams] = useSearchParams<{ tab?: string; search?: string; sort?: string }>();
   const [openRoomMapId, setOpenRoomMapId] = createSignal<string | undefined>();
   const [createOpen, setCreateOpen] = createSignal(false);
@@ -48,7 +51,7 @@ export default function MapsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("确定删除此地图？")) return;
+    if (!confirm(t("Delete this map?"))) return;
     await deleteMapApi(id);
     refetch();
   }
@@ -58,37 +61,38 @@ export default function MapsPage() {
       await forkMapApi(id);
       refetch();
     } catch (e: unknown) {
-      alert(`Fork 失败: ${(e as { message?: string })?.message ?? String(e)}`);
+      alert(`${t("Fork failed")}: ${(e as { message?: string })?.message ?? String(e)}`);
     }
   }
 
   return (
+    <ProtectedRoute>
     <GeneraleLayout>
-      <Title>Map Workshop — General E</Title>
-      <Meta name="description" content="Browse, create, and share custom maps for General E." />
-      <Meta property="og:title" content="Map Workshop — General E" />
-      <Meta property="og:description" content="Browse, create, and share custom maps for General E." />
+      <Title>{t("Map Workshop")} — {t("General E")}</Title>
+      <Meta name="description" content={t("Browse, create, and share custom maps for General E.")} />
+      <Meta property="og:title" content={`${t("Map Workshop")} — ${t("General E")}`} />
+      <Meta property="og:description" content={t("Browse, create, and share custom maps for General E.")} />
       <Meta property="og:image" content="/og-image.svg" />
       <Meta property="og:type" content="website" />
     <main class="container mx-auto p-6 max-w-6xl">
       <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold">地图工坊</h1>
+        <h1 class="text-2xl font-bold">{t("Map Workshop")}</h1>
         <A href="/maps/editor">
           <Button variant="primary" size="sm">
-            创建地图
+            {t("Create map")}
           </Button>
         </A>
       </div>
 
       <Tabs bordered class="mb-4">
         <A href="/maps" class={`tab ${tab() === "public" ? "tab-active" : ""}`}>
-          公开地图
+          {t("Public maps")}
         </A>
         <A
           href={`/maps?tab=my${searchText() ? `&search=${encodeURIComponent(searchText())}` : ""}${sortBy() !== "updated" ? `&sort=${sortBy()}` : ""}`}
           class={`tab ${tab() === "my" ? "tab-active" : ""}`}
         >
-          我的地图
+          {t("My maps")}
         </A>
       </Tabs>
 
@@ -99,12 +103,12 @@ export default function MapsPage() {
           onKeyDown={(e) => {
             if (e.key === "Enter") doSearch();
           }}
-          placeholder="搜索名称或标签..."
+          placeholder={t("Search by name or tag...")}
           size="sm"
           class="flex-1 max-w-xs"
         />
         <Button variant="ghost" size="sm" onClick={doSearch}>
-          搜索
+          {t("Search")}
         </Button>
         <Show when={searchText()}>
           <Button
@@ -115,7 +119,7 @@ export default function MapsPage() {
               setSearchParams({ search: undefined, sort: sortBy() !== "updated" ? sortBy() : undefined });
             }}
           >
-            清空
+            {t("Clear")}
           </Button>
         </Show>
         <Select
@@ -147,10 +151,10 @@ export default function MapsPage() {
           when={maps() && maps()?.length > 0}
           fallback={
             <div class="text-center py-12 text-base-content/50">
-              {searchText() ? "未找到匹配的地图。" : "暂无地图。"}
+              {searchText() ? t("No matching maps found.") : t("No maps yet.")}
               <br />
               <A href="/maps/editor" class="link link-primary">
-                创建第一张地图
+                {t("Create the first map")}
               </A>
             </div>
           }
@@ -183,6 +187,7 @@ export default function MapsPage() {
         initialMapId={openRoomMapId()}
       />
     </GeneraleLayout>
+    </ProtectedRoute>
   );
 }
 
@@ -193,6 +198,7 @@ function MapCard(props: {
   isOwner: boolean;
   onOpenRoom: () => void;
 }) {
+  const { t } = useT();
   const m = props.map;
 
   const editorLink = () => (props.isOwner ? `/maps/editor/${m.id}` : `/maps/preview/${m.id}`);
@@ -224,12 +230,12 @@ function MapCard(props: {
           <div class="flex gap-1 shrink-0">
             <Show when={m.isDraft}>
               <Badge variant="warning" class="badge-xs">
-                草稿
+                {t("Draft")}
               </Badge>
             </Show>
             <Show when={m.isPublic && !m.isDraft}>
               <Badge variant="success" class="badge-xs">
-                公开
+                {t("Public")}
               </Badge>
             </Show>
           </div>
@@ -240,22 +246,22 @@ function MapCard(props: {
         <div class="flex gap-1 mt-2">
           <A href={editorLink()}>
             <Button size="xs" variant="ghost">
-              {props.isOwner ? "编辑" : "预览"}
+              {props.isOwner ? t("Edit") : t("Preview")}
             </Button>
           </A>
           <Show when={!m.isDraft}>
             <Button size="xs" variant="primary" onClick={() => props.onOpenRoom()}>
-              用此地图开房
+              {t("Create room with this map")}
             </Button>
           </Show>
           <Show when={!props.isOwner}>
             <Button size="xs" variant="ghost" onClick={() => props.onFork(m.id)}>
-              Fork
+              {t("Fork")}
             </Button>
           </Show>
           <Show when={props.isOwner}>
             <Button size="xs" variant="ghost" onClick={() => props.onDelete(m.id)}>
-              删除
+              {t("Delete")}
             </Button>
           </Show>
         </div>

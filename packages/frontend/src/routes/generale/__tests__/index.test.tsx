@@ -3,6 +3,12 @@ import { render, screen } from "@solidjs/testing-library";
 
 vi.mock("@solidjs/meta", () => ({ Title: () => null, Meta: () => null }));
 
+vi.mock("@solidjs/router", () => ({
+  useNavigate: () => vi.fn(),
+}));
+
+vi.mock("~/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "1" }, isLoading: false }) }));
+
 vi.mock("~/components/roomlist", () => ({
   default: () => <div data-testid="roomlist">Active Rooms</div>,
 }));

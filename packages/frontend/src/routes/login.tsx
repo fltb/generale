@@ -1,28 +1,23 @@
 import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
+import { useT } from "../i18n/useT";
 import { useAuth } from "~/hooks/useAuth";
 
 type Tab = "login" | "register";
 
-/**
- * 单页认证：包含登录与注册（含验证码验证）两块，使用 Tab 切换
- * 修改点：在验证码验证成功后尝试自动登录并跳转到 /profile
- */
 export default function LoginPage() {
   const auth = useAuth();
   const nav = useNavigate();
+  const { t } = useT();
 
-  // Tab 控制
   const [tab, setTab] = createSignal<Tab>("login");
 
-  // -------- 登录状态 ----------
   const [loginUsername, setLoginUsername] = createSignal("");
   const [loginPassword, setLoginPassword] = createSignal("");
   const [loginError, setLoginError] = createSignal("");
   const [loginLoading, setLoginLoading] = createSignal(false);
 
-  // -------- 注册状态 ----------
   const [regUsername, setRegUsername] = createSignal("");
   const [regPassword, setRegPassword] = createSignal("");
   const [regEmail, setRegEmail] = createSignal("");
@@ -31,9 +26,6 @@ const [regSent, setRegSent] = createSignal(false);
 const [regLoading, setRegLoading] = createSignal(false);
 const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
 
-  /**
-   * 处理登录提交
-   */
   const handleLogin = async (e: Event) => {
     e.preventDefault();
     setLoginError("");
@@ -43,31 +35,16 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
         username: loginUsername(),
         password: loginPassword(),
       });
-      // try {
-      //   if (!wsManager.isConnected) {
-      //     // true 表示尝试使用已有 connectionId 进行 reattach
-      //     wsManager.connect(true);
-      //   }
-      //   // 可选：立即请求打开你常用的 domain（会被入队并在连接后发送）
-      //   // wsManager.openDomain("room"); // 举例：打开 room domain
-      // } catch (wsErr) {
-      //   console.warn("WebSocket connect/open failed:", wsErr);
-      //   // 不要阻塞用户登录流程：仅记录或展示非致命提示
-      // }
       console.log("try nav");
       nav("/");
       console.log("nav called");
     } catch (err: unknown) {
-      setLoginError((err as Error)?.message || "登录失败");
+      setLoginError((err as Error)?.message || t("Login failed"));
     } finally {
       setLoginLoading(false);
     }
   };
 
-  /**
-   * 注册：服务端落库 unverified 用户并发可点击链接到邮箱。
-   * 不再有验证码回填步骤——用户去邮箱点链接完成。
-   */
   const handleRegister = async (e: Event) => {
     e.preventDefault();
     setRegMessage("");
@@ -78,16 +55,15 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
         password: regPassword(),
         email: regEmail(),
       });
-      setRegMessage(res?.message || "验证链接已发送，请查收邮箱后点击链接完成验证");
+      setRegMessage(res?.message || t("Verification link sent, please check your email"));
       setRegSent(true);
     } catch (err: unknown) {
-      setRegMessage((err as Error)?.message || "注册失败");
+      setRegMessage((err as Error)?.message || t("Registration failed"));
     } finally {
       setRegLoading(false);
     }
   };
 
-  // 切换 tab 时清理相关提示（可按需调整）
   const switchTo = (t: Tab) => {
     setTab(t);
     setLoginError("");
@@ -97,15 +73,14 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
 
   return (
     <div class="p-4 max-w-md mx-auto">
-      <Title>Login — General E</Title>
-      <Meta name="description" content="Sign in to your account." />
-      <Meta property="og:title" content="Login — General E" />
-      <Meta property="og:description" content="Sign in to your account." />
+      <Title>{t("Login")} — {t("General E")}</Title>
+      <Meta name="description" content={t("Sign in to your account.")} />
+      <Meta property="og:title" content={`${t("Login")} — ${t("General E")}`} />
+      <Meta property="og:description" content={t("Sign in to your account.")} />
       <Meta property="og:image" content="/og-image.svg" />
       <Meta property="og:type" content="website" />
-      <h1 class="text-2xl mb-4">账户</h1>
+      <h1 class="text-2xl mb-4">{t("Account")}</h1>
 
-      {/* Tab 控制 */}
       <div class="tabs mb-4">
         <button
           type="button"
@@ -113,7 +88,7 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
           onClick={() => switchTo("login")}
           aria-pressed={tab() === "login"}
         >
-          登录
+          {t("Login")}
         </button>
         <button
           type="button"
@@ -121,16 +96,15 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
           onClick={() => switchTo("register")}
           aria-pressed={tab() === "register"}
         >
-          注册
+          {t("Register")}
         </button>
       </div>
 
-      {/* 登录表单 */}
       <Show when={tab() === "login"}>
         <form onSubmit={handleLogin} class="flex flex-col gap-2">
           <input
             data-testid="login-username"
-            placeholder="用户名或邮箱"
+            placeholder={t("Username or email")}
             value={loginUsername()}
             onInput={(e) => setLoginUsername(e.currentTarget.value)}
             class="input input-bordered"
@@ -140,7 +114,7 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
           <input
             data-testid="login-password"
             type="password"
-            placeholder="密码"
+            placeholder={t("Password")}
             value={loginPassword()}
             onInput={(e) => setLoginPassword(e.currentTarget.value)}
             class="input input-bordered"
@@ -148,37 +122,36 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
             required
           />
           <button data-testid="login-submit" type="submit" class="btn btn-primary" disabled={loginLoading()}>
-            {loginLoading() ? "登录中..." : "登录"}
+            {loginLoading() ? t("Logging in...") : t("Login")}
           </button>
         </form>
         <p class="mt-2 text-red-500">{loginError()}</p>
         <p class="mt-2 text-sm">
           <A href="/forgot-password" class="link">
-            忘记密码？
+            {t("Forgot password?")}
           </A>
         </p>
         <p class="mt-2">
-          还没有账号？{" "}
+          {t("No account yet?")}{" "}
           <button type="button" class="link" onClick={() => switchTo("register")}>
-            去注册
+            {t("Register here")}
           </button>
         </p>
       </Show>
 
-      {/* 注册表单：提交后服务端发可点击链接到邮箱，用户去邮箱点链接完成验证 */}
       <Show when={tab() === "register"}>
         <div class="flex flex-col gap-2">
           <Show
             when={!regSent()}
             fallback={
               <div class="space-y-3">
-                <div class="alert alert-success">{regMessage() || "验证链接已发送，请查收邮箱后点击链接完成验证"}</div>
+                <div class="alert alert-success">{regMessage() || t("Verification link sent, please check your email")}</div>
                 <p class="text-sm opacity-70">
-                  查看邮箱（包括垃圾邮件），点击邮件里的链接即可激活账号。链接 10 分钟内有效。
+                  {t("Check your email (including spam) and click the link to activate your account. The link expires in 10 minutes.")}
                 </p>
                 <div class="flex gap-2">
                   <button type="button" class="btn btn-ghost btn-sm" onClick={() => switchTo("login")}>
-                    返回登录
+                    {t("Back to login")}
                   </button>
                   <button
                     type="button"
@@ -188,7 +161,7 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
                       setRegMessage("");
                     }}
                   >
-                    重新填写注册信息
+                    {t("Re-enter registration info")}
                   </button>
                 </div>
               </div>
@@ -196,7 +169,7 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
           >
             <form onSubmit={handleRegister} class="flex flex-col gap-2">
               <input
-                placeholder="用户名"
+                placeholder={t("Username")}
                 value={regUsername()}
                 onInput={(e) => setRegUsername(e.currentTarget.value)}
                 class="input input-bordered"
@@ -204,7 +177,7 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
                 required
               />
               <input
-                placeholder="邮箱"
+                placeholder={t("Email")}
                 value={regEmail()}
                 onInput={(e) => setRegEmail(e.currentTarget.value)}
                 class="input input-bordered"
@@ -214,7 +187,7 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
               />
               <input
                 type="password"
-                placeholder="密码"
+                placeholder={t("Password")}
                 value={regPassword()}
                 onInput={(e) => setRegPassword(e.currentTarget.value)}
                 class="input input-bordered"
@@ -228,10 +201,10 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
                   onChange={(e) => setRegAcceptedTerms(e.currentTarget.checked)}
                   class="checkbox checkbox-xs mt-0.5"
                 />
-                <span>I agree to the <A href="/terms" class="link">Terms of Service</A></span>
+                <span>{t("I agree to the")} <A href="/terms" class="link">{t("Terms of Service")}</A></span>
               </label>
               <button type="submit" class="btn btn-primary" disabled={regLoading() || !regAcceptedTerms()}>
-                {regLoading() ? "提交中..." : "注册"}
+                {regLoading() ? t("Submitting...") : t("Register")}
               </button>
               <Show when={regMessage()}>
                 <p class="mt-2 text-sm text-error">{regMessage()}</p>
@@ -240,9 +213,9 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
           </Show>
 
           <p class="mt-2">
-            已有账号？{" "}
+            {t("Already have an account?")}{" "}
             <button type="button" class="link" onClick={() => switchTo("login")}>
-              去登录
+              {t("Login here")}
             </button>
           </p>
         </div>

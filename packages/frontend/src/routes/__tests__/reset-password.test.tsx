@@ -30,7 +30,7 @@ import ResetPasswordPage from "../reset-password";
 describe("ResetPassword route", () => {
   it("renders heading", () => {
     render(() => <ResetPasswordPage />);
-    expect(screen.getByText("设置新密码")).toBeInTheDocument();
+    expect(screen.getByText("Set New Password")).toBeInTheDocument();
   });
 
   it("renders password fields", () => {
@@ -41,6 +41,6 @@ describe("ResetPassword route", () => {
 
   it("renders submit button", () => {
     render(() => <ResetPasswordPage />);
-    expect(screen.getByText("重置密码")).toBeInTheDocument();
+    expect(screen.getByText("Reset Password")).toBeInTheDocument();
   });
 });

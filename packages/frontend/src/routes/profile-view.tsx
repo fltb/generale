@@ -3,6 +3,7 @@ import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate, useParams } from "@solidjs/router";
 import { useQuery } from "@tanstack/solid-query";
 import { createMemo, Show } from "solid-js";
+import { useT } from "../i18n/useT";
 import { ApiError } from "~/api/base";
 import { getProfileApi } from "~/api/profileApi";
 import Avatar from "~/components/Avatar";
@@ -20,6 +21,7 @@ export default function PublicProfilePage() {
   const params = useParams<{ userId: string }>();
   const auth = useAuth();
   const nav = useNavigate();
+  const { t } = useT();
 
   const query = useQuery<ProfileRespBody>(() => ({
     queryKey: ["profile", params.userId],
@@ -40,34 +42,34 @@ export default function PublicProfilePage() {
 
   return (
     <div class="container mx-auto p-6 max-w-2xl space-y-4">
-      <Title>Player Profile — General E</Title>
-      <Meta name="description" content="View player profile." />
-      <Meta property="og:title" content="Player Profile — General E" />
-      <Meta property="og:description" content="View player profile." />
+      <Title>{t("Player Profile")} — {t("General E")}</Title>
+      <Meta name="description" content={t("View player profile.")} />
+      <Meta property="og:title" content={`${t("Player Profile")} — ${t("General E")}`} />
+      <Meta property="og:description" content={t("View player profile.")} />
       <Meta property="og:image" content="/og-image.svg" />
       <Meta property="og:type" content="website" />
       <button type="button" class="btn btn-sm btn-ghost" onClick={() => nav(-1)}>
-        ← 返回
+        {t("← Back")}
       </button>
 
-      <Show when={!query.isLoading} fallback={<div class="p-4 opacity-70">加载中...</div>}>
+      <Show when={!query.isLoading} fallback={<div class="p-4 opacity-70">{t("Loading...")}</div>}>
         <Show
           when={!query.isError}
           fallback={
             <Show
               when={notFound()}
-              fallback={<div class="alert alert-error">{query.error?.message ?? "无法加载该用户资料"}</div>}
+              fallback={<div class="alert alert-error">{query.error?.message ?? t("Failed to load profile")}</div>}
             >
               {/* 404 专用 UI：明确说找不到，并显示用户输入的标识符方便检查拼写 */}
               <div class="card bg-base-200 p-8 flex flex-col items-center text-center space-y-3">
                 <div class="text-5xl">🤷</div>
-                <h1 class="text-2xl font-bold">用户不存在</h1>
+                <h1 class="text-2xl font-bold">{t("User not found")}</h1>
                 <p class="opacity-70">
-                  找不到 <span class="font-mono bg-base-300 px-2 py-0.5 rounded">{params.userId}</span> 对应的账号
+                  {t("No account found for")} <span class="font-mono bg-base-300 px-2 py-0.5 rounded">{params.userId}</span>
                 </p>
-                <p class="text-sm opacity-60">检查一下用户名或 ID 是否拼对了。</p>
+                <p class="text-sm opacity-60">{t("Check the username or ID for typos.")}</p>
                 <A href="/" class="btn btn-primary btn-sm">
-                  回首页
+                  {t("Back to Home")}
                 </A>
               </div>
             </Show>
@@ -83,9 +85,9 @@ export default function PublicProfilePage() {
 
           <Show when={isSelf()}>
             <div class="alert alert-info">
-              <span>这是你自己的公开资料 —— 想改昵称 / 头像 / 简介？</span>
+              <span>{t("This is your public profile — want to edit your display name / avatar / bio?")}</span>
               <A href="/profile" class="btn btn-sm btn-primary">
-                前往编辑
+                {t("Go to edit")}
               </A>
             </div>
           </Show>

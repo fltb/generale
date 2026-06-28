@@ -3,6 +3,7 @@ import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { useT } from "../i18n/useT";
 import { confirmEmailChangeApi } from "~/api/accountApi";
 import type { ApiError } from "~/api/base";
 import { useAuth } from "~/hooks/useAuth";
@@ -14,6 +15,7 @@ import { useAuth } from "~/hooks/useAuth";
 export default function ConfirmEmailChangePage() {
   const nav = useNavigate();
   const auth = useAuth();
+  const { t } = useT();
   const [searchParams] = useSearchParams<{ token?: string }>();
   const token = createMemo(() => (searchParams.token ?? "").trim());
 
@@ -43,32 +45,32 @@ export default function ConfirmEmailChangePage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
-      <Title>Confirm Email Change — General E</Title>
-      <Meta name="description" content="Confirm your email change." />
-      <Meta property="og:title" content="Confirm Email Change — General E" />
-      <Meta property="og:description" content="Confirm your email change." />
+      <Title>{t("Confirm Email Change")} — {t("General E")}</Title>
+      <Meta name="description" content={t("Confirm your email change.")} />
+      <Meta property="og:title" content={`${t("Confirm Email Change")} — ${t("General E")}`} />
+      <Meta property="og:description" content={t("Confirm your email change.")} />
       <Meta property="og:image" content="/og-image.svg" />
       <Meta property="og:type" content="website" />
-      <h1 class="text-2xl mb-4">确认邮箱变更</h1>
+      <h1 class="text-2xl mb-4">{t("Confirm Email Change")}</h1>
 
-      <Show when={token()} fallback={<div class="alert alert-error">链接缺少 token。</div>}>
+      <Show when={token()} fallback={<div class="alert alert-error">{t("Missing token in link.")}</div>}>
         <Show when={mutation.isPending}>
-          <div>正在确认...</div>
+          <div>{t("Confirming...")}</div>
         </Show>
         <Show when={mutation.isSuccess}>
           <div class="space-y-3">
-            <div class="alert alert-success">{mutation.data?.message ?? "邮箱已更新"}</div>
-            <p class="text-sm opacity-70">即将跳转到个人资料页...</p>
+            <div class="alert alert-success">{mutation.data?.message ?? t("Email updated")}</div>
+            <p class="text-sm opacity-70">{t("Redirecting to profile page...")}</p>
             <A href="/profile" class="link">
-              立即前往
+              {t("Go to profile")}
             </A>
           </div>
         </Show>
         <Show when={mutation.isError}>
           <div class="space-y-3">
-            <div class="alert alert-error">{mutation.error?.message ?? "确认失败"}</div>
+            <div class="alert alert-error">{mutation.error?.message ?? t("Confirmation failed")}</div>
             <A href="/profile" class="link">
-              返回个人资料
+              {t("Back to profile")}
             </A>
           </div>
         </Show>

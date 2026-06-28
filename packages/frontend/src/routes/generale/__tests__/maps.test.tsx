@@ -3,7 +3,7 @@ import { render, screen } from "@solidjs/testing-library";
 
 vi.mock("@solidjs/meta", () => ({ Title: () => null, Meta: () => null }));
 
-vi.mock("~/hooks/useAuth", () => ({ useAuth: () => ({ user: null }) }));
+vi.mock("~/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "1" }, isLoading: false }) }));
 
 vi.mock("@solidjs/router", () => ({
   A: (props: any) => <a href={props.href}>{props.children}</a>,
@@ -56,18 +56,18 @@ import MapsPage from "../maps";
 describe("Maps route", () => {
   it("renders heading and create button", () => {
     render(() => <MapsPage />);
-    expect(screen.getByText("地图工坊")).toBeInTheDocument();
-    expect(screen.getByText("创建地图")).toBeInTheDocument();
+    expect(screen.getByText("Map Workshop")).toBeInTheDocument();
+    expect(screen.getByText("Create map")).toBeInTheDocument();
   });
 
   it("renders tabs", () => {
     render(() => <MapsPage />);
-    expect(screen.getByText("公开地图")).toBeInTheDocument();
-    expect(screen.getByText("我的地图")).toBeInTheDocument();
+    expect(screen.getByText("Public maps")).toBeInTheDocument();
+    expect(screen.getByText("My maps")).toBeInTheDocument();
   });
 
   it("renders search input", () => {
     render(() => <MapsPage />);
-    expect(screen.getByPlaceholderText("搜索名称或标签...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search by name or tag...")).toBeInTheDocument();
   });
 });
