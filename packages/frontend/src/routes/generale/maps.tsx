@@ -2,6 +2,7 @@ import type { MapSumaryRespBody } from "@generale/types";
 import { A, useSearchParams } from "@solidjs/router";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { deleteMapApi, forkMapApi, listMapsApi, mapThumbnailUrl, myMapsApi } from "~/api/mapApi";
+import CreateRoomModal from "~/components/roomlist/CreateRoomModal";
 import { Badge, Button, Card, Input, Select, Spinner, Tabs } from "~/ui";
 
 const SORT_OPTIONS = [
@@ -13,6 +14,8 @@ const SORT_OPTIONS = [
 
 export default function MapsPage() {
   const [searchParams, setSearchParams] = useSearchParams<{ tab?: string; search?: string; sort?: string }>();
+  const [openRoomMapId, setOpenRoomMapId] = createSignal<string | undefined>();
+  const [createOpen, setCreateOpen] = createSignal(false);
   const tab = () => (searchParams.tab === "my" ? "my" : "public");
   const searchText = () => searchParams.search || "";
   const sortBy = () => searchParams.sort || "updated";
@@ -58,6 +61,7 @@ export default function MapsPage() {
   }
 
   return (
+    <>
     <main class="container mx-auto p-6 max-w-6xl">
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold">地图工坊</h1>
@@ -145,12 +149,32 @@ export default function MapsPage() {
         >
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <For each={maps()}>
-              {(m) => <MapCard map={m} onDelete={handleDelete} onFork={handleFork} isOwner={tab() === "my"} />}
+              {(m) => (
+                <MapCard
+                  map={m}
+                  onDelete={handleDelete}
+                  onFork={handleFork}
+                  isOwner={tab() === "my"}
+                  onOpenRoom={() => {
+                    setOpenRoomMapId(m.id);
+                    setCreateOpen(true);
+                  }}
+                />
+              )}
             </For>
           </div>
         </Show>
       </Show>
     </main>
+      <CreateRoomModal
+        open={createOpen}
+        onClose={() => {
+          setCreateOpen(false);
+          setOpenRoomMapId(undefined);
+        }}
+        initialMapId={openRoomMapId()}
+      />
+    </>
   );
 }
 
@@ -159,6 +183,7 @@ function MapCard(props: {
   onDelete: (id: string) => void;
   onFork: (id: string) => void;
   isOwner: boolean;
+  onOpenRoom: () => void;
 }) {
   const m = props.map;
 
@@ -210,6 +235,11 @@ function MapCard(props: {
               {props.isOwner ? "编辑" : "预览"}
             </Button>
           </A>
+          <Show when={!m.isDraft}>
+            <Button size="xs" variant="primary" onClick={() => props.onOpenRoom()}>
+              用此地图开房
+            </Button>
+          </Show>
           <Show when={!props.isOwner}>
             <Button size="xs" variant="ghost" onClick={() => props.onFork(m.id)}>
               Fork

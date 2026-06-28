@@ -16,6 +16,7 @@ export default function CreateRoomModal(props: {
   open: () => boolean;
   onClose: () => void;
   onCreated?: (id: string) => void;
+  initialMapId?: string;
 }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -126,7 +127,15 @@ export default function CreateRoomModal(props: {
   }
 
   createEffect(() => {
-    if (!props.open()) resetForm();
+    if (!props.open()) {
+      resetForm();
+      return;
+    }
+    if (props.initialMapId) {
+      setType("custom");
+      setCustomMapId(props.initialMapId);
+      setShowAdvanced(true);
+    }
     if (type() === "custom") setShowAdvanced(true);
   });
 
