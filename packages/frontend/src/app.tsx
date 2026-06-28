@@ -19,6 +19,7 @@ import ResetPasswordPage from "./routes/reset-password";
 import VerifyEmailPage from "./routes/verify-email";
 import ConfirmEmailChangePage from "./routes/confirm-email-change";
 import TermsPage from "./routes/terms";
+import AboutPage from "./routes/about";
 import NotfoundPage from "./routes/[...404]";
 import GeneraleHub from "./routes/generale/index";
 import MapEditorPage from "./routes/map-editor";
@@ -153,6 +154,7 @@ export default function App() {
                 <Route path="/verify-email" component={VerifyEmailPage} />
                 <Route path="/confirm-email-change" component={ConfirmEmailChangePage} />
                 <Route path="/terms" component={TermsPage} />
+                <Route path="/about" component={AboutPage} />
               </Route>
 
               {/* Generale Hub — wrapped in GeneraleLayout */}
