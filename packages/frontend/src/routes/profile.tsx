@@ -11,19 +11,38 @@ import type {
 import { Title, Meta } from "@solidjs/meta";
 import { useNavigate } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
-import { createMemo, createSignal, Show } from "solid-js";
+import { createMemo, createSignal, onMount, Show } from "solid-js";
+import { useT } from "../i18n/useT";
 import { changeEmailApi, changePasswordApi, changeUsernameApi } from "~/api/accountApi";
 import type { ApiError } from "~/api/base";
 import { patchMyProfileApi, uploadMyAvatarApi } from "~/api/profileApi";
 import Avatar from "~/components/Avatar";
 import { ProtectedRoute } from "~/components/ProtectedRoute";
 import { useAuth } from "~/hooks/useAuth";
+import { getSettingsApi, updateSettingsApi } from "~/api/settingsApi";
 
 const ACCEPTED_MIME = "image/png,image/jpeg,image/webp";
 
 export default function ProfilePage() {
   const auth = useAuth();
   const nav = useNavigate();
+  const { t, setLocale } = useT();
+  const [settingsLanguage, setSettingsLanguage] = createSignal("en");
+
+  onMount(async () => {
+    try {
+      const s = await getSettingsApi();
+      if (s.language) setSettingsLanguage(s.language);
+    } catch {}
+  });
+
+  async function handleLanguageChange(value: string) {
+    setSettingsLanguage(value);
+    setLocale(value);
+    try {
+      await updateSettingsApi("language", value);
+    } catch {}
+  }
 
   // 表单 state；初始值用 createMemo 从 auth.user 派生，user 拉到后第一次渲染会用真实值。
   // 后续用户在输入框里改的内容由 controlled signal 维护，不被 auth.user 拽回。
@@ -71,7 +90,7 @@ export default function ProfilePage() {
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      alert(`头像太大：${(file.size / 1024).toFixed(0)} KB（上限 2048 KB）`);
+      alert(t("Avatar too large: {size} KB (max 2048 KB)", { size: (file.size / 1024).toFixed(0) }));
       target.value = "";
       return;
     }
@@ -83,7 +102,7 @@ export default function ProfilePage() {
     const body: ProfileUpdateReqBody = {};
     const trimmed = effectiveDisplayName().trim();
     if (trimmed.length > 50) {
-      alert("昵称最多 50 字符");
+      alert(t("Display name max 50 characters"));
       return;
     }
     body.displayName = trimmed;
@@ -118,11 +137,11 @@ export default function ProfilePage() {
   function submitPassword() {
     setPwLocalErr(null);
     if (pwNew().length < 8) {
-      setPwLocalErr("新密码至少 8 位");
+      setPwLocalErr(t("New password must be at least 8 characters"));
       return;
     }
     if (pwNew() !== pwConfirm()) {
-      setPwLocalErr("两次新密码不一致");
+      setPwLocalErr(t("New passwords do not match"));
       return;
     }
     pwMutation.mutate({ currentPassword: pwCurrent(), newPassword: pwNew() });
@@ -172,19 +191,19 @@ export default function ProfilePage() {
     setUnLocalErr(null);
     const val = unInput().trim();
     if (val.length < 3) {
-      setUnLocalErr("用户名至少 3 个字符");
+      setUnLocalErr(t("Username must be at least 3 characters"));
       return;
     }
     if (val.length > 50) {
-      setUnLocalErr("用户名最多 50 个字符");
+      setUnLocalErr(t("Username max 50 characters"));
       return;
     }
     if (!/^[a-zA-Z0-9._-]+$/.test(val)) {
-      setUnLocalErr("只允许字母、数字和 . _ -");
+      setUnLocalErr(t("Only letters, numbers, and . _ - allowed"));
       return;
     }
     if (val === auth.user?.username) {
-      setUnLocalErr("新用户名与当前相同");
+      setUnLocalErr(t("New username is the same as current"));
       return;
     }
     unMutation.mutate({ username: val });
@@ -192,13 +211,13 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <Title>Profile — General E</Title>
-      <Meta name="description" content="Manage your profile and settings." />
-      <Meta property="og:title" content="Profile — General E" />
-      <Meta property="og:description" content="Manage your profile and settings." />
+      <Title>{t("Profile")} — {t("General E")}</Title>
+      <Meta name="description" content={t("Manage your profile and settings.")} />
+      <Meta property="og:title" content={`${t("Profile")} — ${t("General E")}`} />
+      <Meta property="og:description" content={t("Manage your profile and settings.")} />
       <Meta property="og:image" content="/og-image.svg" />
       <Meta property="og:type" content="website" />
-      <Show when={!auth.isLoading} fallback={<p class="p-4">加载中...</p>}>
+      <Show when={!auth.isLoading} fallback={<p class="p-4">{t("Loading...")}</p>}>
         <Show
           when={auth.user}
           fallback={
@@ -209,11 +228,11 @@ export default function ProfilePage() {
           }
         >
           <div class="container mx-auto p-6 max-w-2xl space-y-6">
-            <h1 class="text-2xl font-bold">个人资料</h1>
+            <h1 class="text-2xl font-bold">{t("Profile")}</h1>
 
-            {/* ---------- 头像 ---------- */}
+            {/* ---------- Avatar ---------- */}
             <section class="card bg-base-200 p-4 space-y-3">
-              <h2 class="text-lg font-semibold">头像</h2>
+              <h2 class="text-lg font-semibold">{t("Avatar")}</h2>
               <div class="flex items-center gap-4">
                 <Avatar src={currentAvatarSrc() ?? ""} alt={auth.user?.displayName || auth.user?.username} size={96} />
                 <div class="flex flex-col gap-2">
@@ -223,7 +242,7 @@ export default function ProfilePage() {
                     accept={ACCEPTED_MIME}
                     onChange={onPickFile}
                   />
-                  <div class="text-xs opacity-60">支持 PNG / JPG / WebP，上限 2 MB</div>
+                  <div class="text-xs opacity-60">{t("Supports PNG/JPG/WebP, max 2 MB")}</div>
                   <div class="flex gap-2">
                     <button
                       type="button"
@@ -231,7 +250,7 @@ export default function ProfilePage() {
                       disabled={!pendingFile() || uploadMutation.isPending}
                       onClick={submitAvatar}
                     >
-                      {uploadMutation.isPending ? "上传中..." : "上传新头像"}
+                      {uploadMutation.isPending ? t("Uploading...") : t("Upload new avatar")}
                     </button>
                     <Show when={pendingFile()}>
                       <button
@@ -244,30 +263,44 @@ export default function ProfilePage() {
                           setPendingPreviewUrl(null);
                         }}
                       >
-                        取消
+                        {t("Cancel")}
                       </button>
                     </Show>
                   </div>
                   <Show when={uploadMutation.isError}>
-                    <div class="text-error text-xs">{uploadMutation.error?.message ?? "上传失败"}</div>
+                    <div class="text-error text-xs">{uploadMutation.error?.message ?? t("Upload failed")}</div>
                   </Show>
                 </div>
               </div>
             </section>
 
-            {/* ---------- 账号信息 + 改用户名 ---------- */}
+            {/* ---------- Settings ---------- */}
             <section class="card bg-base-200 p-4 space-y-3">
-              <h2 class="text-lg font-semibold">账号</h2>
+              <h2 class="text-lg font-semibold">{t("Settings")}</h2>
+              <label class="flex items-center gap-3">
+                <span class="label-text w-20">{t("Language")}</span>
+                <select
+                  class="select select-bordered select-sm flex-1"
+                  value={settingsLanguage()}
+                  onChange={(e) => handleLanguageChange(e.currentTarget.value)}
+                >
+                  <option value="en">English</option>
+                  <option value="zh-CN">简体中文</option>
+                </select>
+              </label>
+            </section>
+
+            {/* ---------- Account Info + Change Username ---------- */}
+            <section class="card bg-base-200 p-4 space-y-3">
+              <h2 class="text-lg font-semibold">{t("Account")}</h2>
 
               <div class="flex items-end gap-3 flex-wrap">
                 <label class="flex-1 min-w-0">
                   <span class="label-text">
-                    用户名
+                    {t("Username")}
                     <Show when={auth.user?.usernameChangedAt}>
                       <span class="text-xs opacity-60 ml-1">
-                        （上次修改：
-                        {auth.user?.usernameChangedAt ? new Date(auth.user.usernameChangedAt).toLocaleDateString() : ""}
-                        ）
+                        {t("(last changed: {date})", { date: auth.user?.usernameChangedAt ? new Date(auth.user.usernameChangedAt).toLocaleDateString() : "" })}
                       </span>
                     </Show>
                   </span>
@@ -280,7 +313,7 @@ export default function ProfilePage() {
                     disabled={!usernameCanChange().can}
                   />
                   <Show when={!usernameCanChange().can}>
-                    <span class="label-text-alt text-warning">{usernameCanChange().daysLeft} 天后可再次修改</span>
+                    <span class="label-text-alt text-warning">{t("{days} days until next change", { days: usernameCanChange().daysLeft })}</span>
                   </Show>
                 </label>
                 <button
@@ -289,42 +322,42 @@ export default function ProfilePage() {
                   disabled={!usernameCanChange().can || unMutation.isPending || !unInput().trim()}
                   onClick={submitUsername}
                 >
-                  {unMutation.isPending ? "提交中..." : "修改"}
+                  {unMutation.isPending ? t("Submitting...") : t("Change")}
                 </button>
               </div>
               <Show when={unMutation.isSuccess}>
-                <span class="text-success text-sm">用户名已修改</span>
+                <span class="text-success text-sm">{t("Username changed")}</span>
               </Show>
               <Show when={unLocalErr()}>
                 <span class="text-error text-sm">{unLocalErr()}</span>
               </Show>
               <Show when={unMutation.isError}>
-                <span class="text-error text-sm">{unMutation.error?.message ?? "修改失败"}</span>
+                <span class="text-error text-sm">{unMutation.error?.message ?? t("Change failed")}</span>
               </Show>
 
               <p class="text-sm">
-                <span class="opacity-60 mr-2">邮箱</span>
+                <span class="opacity-60 mr-2">{t("Email")}</span>
                 <span>{auth.user?.email}</span>
               </p>
             </section>
 
-            {/* ---------- 可编辑信息 ---------- */}
+            {/* ---------- Editable Info ---------- */}
             <section class="card bg-base-200 p-4 space-y-3">
-              <h2 class="text-lg font-semibold">资料</h2>
+              <h2 class="text-lg font-semibold">{t("Profile")}</h2>
 
               <label class="block">
-                <span class="label-text">昵称 (displayName)</span>
+                <span class="label-text">{t("Display Name")}</span>
                 <input
                   class="input input-bordered w-full"
                   maxLength={50}
-                  placeholder="不填则显示用户名"
+                  placeholder={t("Leave empty to show username")}
                   value={effectiveDisplayName()}
                   onInput={(e) => setDisplayName((e.target as HTMLInputElement).value)}
                 />
               </label>
 
               <label class="block">
-                <span class="label-text">个性签名 (bio)</span>
+                <span class="label-text">{t("Bio")}</span>
                 <textarea
                   class="textarea textarea-bordered w-full"
                   maxLength={500}
@@ -342,22 +375,21 @@ export default function ProfilePage() {
                   disabled={patchMutation.isPending}
                   onClick={submitProfile}
                 >
-                  {patchMutation.isPending ? "保存中..." : "保存修改"}
+                  {patchMutation.isPending ? t("Saving...") : t("Save Changes")}
                 </button>
                 <Show when={patchMutation.isSuccess}>
-                  <span class="text-success text-sm">已保存</span>
+                  <span class="text-success text-sm">{t("Saved")}</span>
                 </Show>
                 <Show when={patchMutation.isError}>
-                  <span class="text-error text-sm">{patchMutation.error?.message ?? "保存失败"}</span>
+                  <span class="text-error text-sm">{patchMutation.error?.message ?? t("Save failed")}</span>
                 </Show>
               </div>
             </section>
 
-            {/* ---------- 改密码 ---------- */}
+            {/* ---------- Change Password ---------- */}
             <section class="card bg-base-200 p-4 space-y-3">
-              <h2 class="text-lg font-semibold">修改密码</h2>
-              {/* 隐藏的 username 输入：让浏览器密码管理器把新密码关联到 username（兜底 email），
-                  而不是 displayName 这种可变字段。display:none 不影响 autofill 抓取。 */}
+              <h2 class="text-lg font-semibold">{t("Change Password")}</h2>
+              {/* Hidden username input: helps password managers associate the new password */}
               <input
                 type="text"
                 class="hidden"
@@ -369,7 +401,7 @@ export default function ProfilePage() {
               <input
                 type="password"
                 class="input input-bordered w-full"
-                placeholder="当前密码"
+                placeholder={t("Current password")}
                 value={pwCurrent()}
                 onInput={(e) => setPwCurrent((e.target as HTMLInputElement).value)}
                 autocomplete="current-password"
@@ -377,7 +409,7 @@ export default function ProfilePage() {
               <input
                 type="password"
                 class="input input-bordered w-full"
-                placeholder="新密码（至少 8 位）"
+                placeholder={t("New password (min 8 characters)")}
                 value={pwNew()}
                 onInput={(e) => setPwNew((e.target as HTMLInputElement).value)}
                 autocomplete="new-password"
@@ -385,65 +417,65 @@ export default function ProfilePage() {
               <input
                 type="password"
                 class="input input-bordered w-full"
-                placeholder="再次输入新密码"
+                placeholder={t("Confirm new password")}
                 value={pwConfirm()}
                 onInput={(e) => setPwConfirm((e.target as HTMLInputElement).value)}
                 autocomplete="new-password"
               />
               <div class="flex gap-2 items-center">
                 <button type="button" class="btn btn-primary" disabled={pwMutation.isPending} onClick={submitPassword}>
-                  {pwMutation.isPending ? "提交中..." : "更新密码"}
+                  {pwMutation.isPending ? t("Submitting...") : t("Update Password")}
                 </button>
                 <Show when={pwMutation.isSuccess}>
-                  <span class="text-success text-sm">{pwMutation.data?.message ?? "密码已更新"}</span>
+                  <span class="text-success text-sm">{pwMutation.data?.message ?? t("Password updated")}</span>
                 </Show>
                 <Show when={pwLocalErr()}>
                   <span class="text-error text-sm">{pwLocalErr()}</span>
                 </Show>
                 <Show when={pwMutation.isError}>
-                  <span class="text-error text-sm">{pwMutation.error?.message ?? "更新失败"}</span>
+                  <span class="text-error text-sm">{pwMutation.error?.message ?? t("Update failed")}</span>
                 </Show>
               </div>
             </section>
 
-            {/* ---------- 改邮箱 ---------- */}
+            {/* ---------- Change Email ---------- */}
             <section class="card bg-base-200 p-4 space-y-3">
-              <h2 class="text-lg font-semibold">修改邮箱</h2>
+              <h2 class="text-lg font-semibold">{t("Change Email")}</h2>
               <p class="text-sm opacity-70">
-                提交后会发一封确认链接到<strong>新邮箱</strong>，点击链接才生效。旧邮箱也会收到通知。
+                {t("A confirmation link will be sent to your new email. The old email will also be notified.")}
               </p>
               <input
                 type="email"
                 class="input input-bordered w-full"
-                placeholder="新邮箱"
+                placeholder={t("New email")}
                 value={emNew()}
                 onInput={(e) => setEmNew((e.target as HTMLInputElement).value)}
               />
               <input
                 type="password"
                 class="input input-bordered w-full"
-                placeholder="当前密码（验证身份）"
+                placeholder={t("Current password (verify identity)")}
                 value={emCurrent()}
                 onInput={(e) => setEmCurrent((e.target as HTMLInputElement).value)}
                 autocomplete="current-password"
               />
               <div class="flex gap-2 items-center">
                 <button type="button" class="btn btn-primary" disabled={emMutation.isPending} onClick={submitEmail}>
-                  {emMutation.isPending ? "发送中..." : "发送确认邮件"}
+                  {emMutation.isPending ? t("Sending...") : t("Send confirmation email")}
                 </button>
                 <Show when={emMutation.isSuccess}>
-                  <span class="text-success text-sm">{emMutation.data?.message ?? "已发送确认邮件"}</span>
+                  <span class="text-success text-sm">{emMutation.data?.message ?? t("Confirmation email sent")}</span>
                 </Show>
                 <Show when={emMutation.isError}>
-                  <span class="text-error text-sm">{emMutation.error?.message ?? "发送失败"}</span>
+                  <span class="text-error text-sm">{emMutation.error?.message ?? t("Sending failed")}</span>
                 </Show>
               </div>
             </section>
 
-            {/* ---------- 登出 ---------- */}
+            {/* ---------- Logout ---------- */}
             <div class="flex justify-end">
               <button type="button" class="btn btn-outline" onClick={auth.logout}>
-                退出登录
+                {t("Logout")}
               </button>
             </div>
           </div>
