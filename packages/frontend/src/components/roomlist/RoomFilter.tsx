@@ -8,6 +8,7 @@
 import type { ListGamesQuery } from "@generale/types/dist/api";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { Button, Card, Input, Select } from "~/ui";
+import { useT } from "~/i18n/useT";
 
 type Props = {
   value: Partial<ListGamesQuery>;
@@ -24,6 +25,7 @@ function debounce<A extends unknown[]>(fn: (...args: A) => void, wait = 250) {
 }
 
 export const RoomFilter: Component<Props> = (props) => {
+  const { t } = useT();
   const [local, setLocal] = createSignal<Partial<ListGamesQuery>>({
     ...props.value,
   });
@@ -82,7 +84,7 @@ export const RoomFilter: Component<Props> = (props) => {
         <Input
           size="sm"
           class="w-full"
-          placeholder="Room name"
+          placeholder={t("Room name")}
           value={local().roomName ?? ""}
           onInput={(e) => setField("roomName", e.currentTarget.value)}
         />
@@ -91,7 +93,7 @@ export const RoomFilter: Component<Props> = (props) => {
         <Input
           size="sm"
           class="w-full"
-          placeholder="Host name"
+          placeholder={t("Host name")}
           value={local().hostName ?? ""}
           onInput={(e) => setField("hostName", e.currentTarget.value)}
         />
@@ -99,16 +101,16 @@ export const RoomFilter: Component<Props> = (props) => {
         {/* mode / status / password */}
         <div class="flex gap-2">
           <Select size="sm" value={local().type ?? ""} onChange={(e) => setField("type", e.currentTarget.value)}>
-            <option value="">All modes</option>
-            <option value="standard">standard</option>
-            <option value="custom">custom</option>
+            <option value="">{t("All modes")}</option>
+            <option value="standard">{t("standard")}</option>
+            <option value="custom">{t("custom")}</option>
           </Select>
 
           <Select size="sm" value={local().status ?? ""} onChange={(e) => setField("status", e.currentTarget.value)}>
-            <option value="">Any status</option>
-            <option value="lobby">lobby</option>
-            <option value="in-progress">in-progress</option>
-            <option value="finished">finished</option>
+            <option value="">{t("Any status")}</option>
+            <option value="lobby">{t("lobby")}</option>
+            <option value="in-progress">{t("in-progress")}</option>
+            <option value="finished">{t("finished")}</option>
           </Select>
 
           <Select
@@ -116,9 +118,9 @@ export const RoomFilter: Component<Props> = (props) => {
             value={local().hasPassword ?? ""}
             onChange={(e) => setField("hasPassword", e.currentTarget.value)}
           >
-            <option value="">Any lock</option>
-            <option value="true">Locked</option>
-            <option value="false">Unlocked</option>
+            <option value="">{t("Any lock")}</option>
+            <option value="true">{t("Locked")}</option>
+            <option value="false">{t("Unlocked")}</option>
           </Select>
         </div>
 
@@ -127,7 +129,7 @@ export const RoomFilter: Component<Props> = (props) => {
           <Input
             type="number"
             size="sm"
-            placeholder="min players"
+            placeholder={t("min players")}
             value={local().minPlayers ?? ""}
             onInput={(e) => setField("minPlayers", e.currentTarget.value)}
           />
@@ -135,7 +137,7 @@ export const RoomFilter: Component<Props> = (props) => {
           <Input
             type="number"
             size="sm"
-            placeholder="max players"
+            placeholder={t("max players")}
             value={local().maxPlayers ?? ""}
             onInput={(e) => setField("maxPlayers", e.currentTarget.value)}
           />
@@ -143,10 +145,10 @@ export const RoomFilter: Component<Props> = (props) => {
           {/* map filter */}
           <Show when={local().type === "standard"}>
             <Select size="sm" value={local().map ?? ""} onChange={(e) => setField("map", e.currentTarget.value)}>
-              <option value="">Any map</option>
-              <option value="small">small</option>
-              <option value="medium">medium</option>
-              <option value="large">large</option>
+              <option value="">{t("Any map")}</option>
+              <option value="small">{t("small")}</option>
+              <option value="medium">{t("medium")}</option>
+              <option value="large">{t("large")}</option>
             </Select>
           </Show>
 
@@ -158,7 +160,7 @@ export const RoomFilter: Component<Props> = (props) => {
                 max={500}
                 size="sm"
                 class="w-20"
-                placeholder="W"
+                placeholder={t("W")}
                 value={customWidth()}
                 onInput={(e) => {
                   const v = e.currentTarget.value;
@@ -173,7 +175,7 @@ export const RoomFilter: Component<Props> = (props) => {
                 max={500}
                 size="sm"
                 class="w-20"
-                placeholder="H"
+                placeholder={t("H")}
                 value={customHeight()}
                 onInput={(e) => {
                   const v = e.currentTarget.value;
@@ -188,11 +190,11 @@ export const RoomFilter: Component<Props> = (props) => {
         {/* sort */}
         <div class="flex gap-2 items-center">
           <Select size="sm" value={local().sortBy ?? ""} onChange={(e) => setField("sortBy", e.currentTarget.value)}>
-            <option value="">Sort by</option>
-            <option value="playerCount">playerCount</option>
-            <option value="roomName">roomName</option>
-            <option value="maxPlayers">maxPlayers</option>
-            <option value="status">status</option>
+            <option value="">{t("Sort by")}</option>
+            <option value="playerCount">{t("playerCount")}</option>
+            <option value="roomName">{t("roomName")}</option>
+            <option value="maxPlayers">{t("maxPlayers")}</option>
+            <option value="status">{t("status")}</option>
           </Select>
 
           <Select
@@ -200,12 +202,12 @@ export const RoomFilter: Component<Props> = (props) => {
             value={local().sortOrder ?? "desc"}
             onChange={(e) => setField("sortOrder", e.currentTarget.value)}
           >
-            <option value="desc">desc</option>
-            <option value="asc">asc</option>
+            <option value="desc">{t("desc")}</option>
+            <option value="asc">{t("asc")}</option>
           </Select>
 
           <Button size="sm" onClick={clearAll}>
-            Clear
+            {t("Clear")}
           </Button>
         </div>
       </div>

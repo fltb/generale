@@ -12,6 +12,7 @@ import {
 import { type Component, createSignal, For, Show } from "solid-js";
 import { MapSelector } from "~/components/map-editor/MapSelector";
 import { Button, Input, Textarea } from "~/ui";
+import { useT } from "~/i18n/useT";
 
 export interface PreGameMapSettingFormProps {
   setting: PreGameMapSetting;
@@ -20,6 +21,7 @@ export interface PreGameMapSettingFormProps {
 }
 
 export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (props) => {
+  const { t } = useT();
   const tileTypes = Object.values(TileType) as TileType[];
   const isImported = () => props.setting.type === PreGameMapType.Imported;
   const currentMapId = () =>
@@ -115,7 +117,7 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
         <div class="p-4 bg-base-100 rounded-lg shadow-sm space-y-3">
           <div>
             <div class="label">
-              <span class="label-text">预置尺寸</span>
+              <span class="label-text">{t("预置尺寸")}</span>
             </div>
             <div class="btn-group">
               <Button size="sm" active={currentLabel() === "small"} onClick={() => applyStandardPreset("small")}>
@@ -137,14 +139,14 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
         {/* --- Imported: locked --- */}
         <Show when={isImported()}>
           <div class="alert alert-info text-sm py-2">
-            <span>已选择自定义地图，随机生成参数已禁用。</span>
+            <span>{t("已选择自定义地图，随机生成参数已禁用。")}</span>
           </div>
           <div class="flex items-end gap-2">
             <div class="flex-1">
-              <MapSelector value={currentMapId() ?? ""} onChange={selectCustomMap} placeholder="从地图工坊选择..." />
+              <MapSelector value={currentMapId() ?? ""} onChange={selectCustomMap} placeholder={t("从地图工坊选择...")} />
             </div>
             <Button size="sm" variant="ghost" onClick={clearCustomMap}>
-              清除
+              {t("清除")}
             </Button>
           </div>
         </Show>

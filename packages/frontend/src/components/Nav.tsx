@@ -6,8 +6,10 @@ import Avatar from "~/components/Avatar";
 import LogoIcon from "~/components/LogoIcon";
 import { useAuth } from "~/hooks/useAuth";
 import { MuteToggle } from "~/ui";
+import { useT } from "~/i18n/useT";
 
 export default function Nav(): JSX.Element {
+  const { t } = useT();
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,26 +45,26 @@ export default function Nav(): JSX.Element {
         <div class="flex items-center gap-4">
           <A href="/" class="flex items-center gap-2 text-primary">
             <LogoIcon size={32} />
-            <span class="font-semibold text-base-content">General E</span>
+            <span class="font-semibold text-base-content">{t("General E")}</span>
           </A>
 
           <Show when={!isGamePage()}>
             <A href="/generale" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
-              Play
+              {t("Play")}
             </A>
           </Show>
 
           <Show when={isGamePage()}>
             <A href="/" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
-              Platform
+              {t("Platform")}
             </A>
             <A href="/generale" class={`border-b-2 px-2 py-1 ${location.pathname === "/generale" ? "border-primary text-base-content" : "border-transparent text-base-content/70 hover:text-base-content"}`}>
-              General E
+              {t("General E")}
             </A>
           </Show>
 
           <A href="/about" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
-            About
+            {t("About")}
           </A>
         </div>
 
@@ -70,7 +72,7 @@ export default function Nav(): JSX.Element {
           <MuteToggle />
 
           <A href="/maps" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
-            地图工坊
+            {t("地图工坊")}
           </A>
 
           <div class="relative">
@@ -79,7 +81,7 @@ export default function Nav(): JSX.Element {
               fallback={
                 <div class="flex items-center gap-3">
                   <A href="/login" class="px-3 py-1 rounded-md bg-base-300 hover:bg-base-200">
-                    Login
+                    {t("Login")}
                   </A>
                 </div>
               }
@@ -96,7 +98,7 @@ export default function Nav(): JSX.Element {
                     alt={auth.user?.displayName || auth.user?.username || auth.user?.email}
                     size={32}
                   />
-                  <span>{auth.user?.displayName || auth.user?.username || auth.user?.email || "User"}</span>
+                  <span>{auth.user?.displayName || auth.user?.username || auth.user?.email || t("User")}</span>
                 </button>
 
                 <div
@@ -106,14 +108,14 @@ export default function Nav(): JSX.Element {
                   }`}
                 >
                   <A href="/profile" class="block px-4 py-2 text-sm hover:bg-base-200" onClick={() => setOpen(false)}>
-                    Profile
+                    {t("Profile")}
                   </A>
                   <button
                     type="button"
                     onClick={handleLogout}
                     class="w-full text-left px-4 py-2 text-sm hover:bg-base-200"
                   >
-                    Logout
+                    {t("Logout")}
                   </button>
                 </div>
               </div>
