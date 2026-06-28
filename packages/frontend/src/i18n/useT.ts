@@ -1,9 +1,8 @@
-import { useI18n } from "@solid-primitives/i18n";
+import type { BaseTemplateArgs } from "@solid-primitives/i18n";
 import type { TranslationKey } from "@generale/i18n";
+import { useT as useTContext } from "./I18nProvider";
 
 export function useT() {
-  const [tRaw, { locale, add, remove }] = useI18n();
-  const t = (key: TranslationKey, params?: Record<string, string | number>): string =>
-    tRaw(key, params);
-  return { t, setLocale: locale, addLocale: add };
+  const ctx = useTContext();
+  return { t: (key: TranslationKey, params?: BaseTemplateArgs) => ctx.t(key, params) as string, setLocale: ctx.setLocale };
 }

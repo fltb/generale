@@ -140,7 +140,7 @@ export default function App() {
   });
 
   return (
-    <I18nProvider locale={locale()}>
+    <I18nProvider locale={locale()} setLocale={setLocale}>
     <QueryClientProvider client={queryClient}>
       {/* MetaProvider must wrap anything that uses Title/useHead */}
       <MetaProvider>
