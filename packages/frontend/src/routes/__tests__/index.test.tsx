@@ -17,11 +17,6 @@ vi.mock("@solidjs/router", () => ({
   useParams: () => ({}),
 }));
 
-vi.mock("~/components/roomlist", () => ({
-  default: () => <div data-testid="roomlist">RoomList</div>,
-  RoomList: () => <div data-testid="roomlist">RoomList</div>,
-}));
-
 vi.mock("~/hooks/useWebsocket", () => ({
   WebSocketProvider: (p: any) => p.children,
   useWS: () => ({}),
@@ -31,14 +26,28 @@ vi.mock("~/hooks/useWebsocket", () => ({
 import Home from "../index";
 
 describe("Home route", () => {
-  it("renders room list when authenticated", () => {
+  it("renders Hero section with PLAY ONLINE heading", () => {
     render(() => <Home />);
-    expect(screen.getByTestId("roomlist")).toBeInTheDocument();
+    expect(screen.getByText("PLAY ONLINE")).toBeInTheDocument();
   });
 
-  it("renders sidebar menu", () => {
+  it("renders GAMES section heading", () => {
     render(() => <Home />);
-    expect(screen.getByText("ROOM")).toBeInTheDocument();
-    expect(screen.getByText("MAP")).toBeInTheDocument();
+    expect(screen.getByText("GAMES")).toBeInTheDocument();
+  });
+
+  it("renders General E GameCard", () => {
+    render(() => <Home />);
+    expect(screen.getByText("General E")).toBeInTheDocument();
+  });
+
+  it("renders More Coming Soon GameCard", () => {
+    render(() => <Home />);
+    expect(screen.getByText("More Coming Soon")).toBeInTheDocument();
+  });
+
+  it("renders footer text", () => {
+    render(() => <Home />);
+    expect(screen.getByText("General E — Online Multiplayer Game Platform")).toBeInTheDocument();
   });
 });

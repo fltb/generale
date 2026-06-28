@@ -6,6 +6,10 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+@utility font-press-start {
+  font-family: "Press Start 2P", monospace;
+}
+
 /* ── 16-bit 奇幻战旗 主题（暗底 + 饱和点缀，比浅色更像游戏） ───── */
 @plugin "daisyui/theme" {
   name: "fantasy16";
