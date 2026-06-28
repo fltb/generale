@@ -1,11 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
-import { TileType } from "@generale/types";
 
 const mockState = vi.hoisted(() => ({
   status: 0 as any,
   tick: 1,
-  map: { width: 3, height: 3, tiles: [[{ type: TileType.Plain, ownerId: null, army: 0 }]] },
+  map: { width: 3, height: 3, tiles: [[{ type: "PLAIN", ownerId: null, army: 0 }]] },
   players: {},
   teams: {},
   settings: {} as any,
