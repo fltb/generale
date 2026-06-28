@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 
+vi.mock("@solidjs/meta", () => ({ Title: () => null, Meta: () => null }));
+
 const mockRefresh = vi.fn();
 
 vi.mock("~/hooks/useAuth", () => ({

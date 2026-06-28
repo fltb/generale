@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 
+vi.mock("@solidjs/meta", () => ({ Title: () => null, Meta: () => null }));
+
 const mockMutate = vi.fn();
 
 vi.mock("@solidjs/router", () => ({

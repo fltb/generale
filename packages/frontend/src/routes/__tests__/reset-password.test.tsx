@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 
+vi.mock("@solidjs/meta", () => ({ Title: () => null, Meta: () => null }));
+
 const mockParams = { token: "reset-token-123" };
 vi.mock("@solidjs/router", () => ({
   useNavigate: () => vi.fn(),
