@@ -38,7 +38,7 @@ export const DEFAULT_TILE_THEME: TileTheme = {
     unowned: 0xffffff,
     gridStroke: 0x000000,
     gridStrokeAlpha: 0.15,
-    tileIcon: 0xff0000,
+    tileIcon: 0x222222,
     cursor: 0xffd34d,
     arrow: 0x222222,
     appBackground: "#1099bb",

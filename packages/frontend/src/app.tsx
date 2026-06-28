@@ -1,6 +1,6 @@
 // src/app.tsx
 
-import { MetaProvider } from "@solidjs/meta";
+import { Link, MetaProvider } from "@solidjs/meta";
 import { Route, Router } from "@solidjs/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
@@ -130,6 +130,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       {/* MetaProvider must wrap anything that uses Title/useHead */}
       <MetaProvider>
+        <Link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <AuthProvider>
           <WebSocketProvider url={defaultWsUrl} autoConnect={false}>
             <Router
