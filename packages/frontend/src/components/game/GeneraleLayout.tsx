@@ -62,13 +62,24 @@ export default function GeneraleLayout(props: Props) {
         </div>
         <div class="flex items-center gap-3">
           <MuteToggle />
-          <button
-            type="button"
-            onClick={() => setLocale(locale() === "zh-CN" ? "en" : "zh-CN")}
-            class="px-2 py-1 text-xs rounded border border-base-300 hover:bg-base-300 text-base-content/60 hover:text-base-content"
-          >
-            {locale() === "zh-CN" ? "EN" : "中文"}
-          </button>
+          <div class="flex items-center gap-1">
+            {[
+              { code: "en", label: "EN" },
+              { code: "zh-CN", label: "中文" },
+            ].map((lang) => (
+              <button
+                type="button"
+                onClick={() => setLocale(lang.code)}
+                class={`px-2 py-1 text-xs rounded border ${
+                  locale() === lang.code
+                    ? "border-base-content/30 bg-base-300 text-base-content"
+                    : "border-base-300 hover:bg-base-300 text-base-content/40 hover:text-base-content"
+                }`}
+              >
+                {lang.label}
+              </button>
+            ))}
+          </div>
           <Show
             when={auth.user}
             fallback={
