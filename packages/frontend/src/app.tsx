@@ -13,6 +13,7 @@ import Home from "./routes";
 import ConfirmEmailChangePage from "./routes/confirm-email-change";
 import ForgotPasswordPage from "./routes/forgot-password";
 import LoginPage from "./routes/login";
+import GeneraleHub from "./routes/generale/index";
 import MapEditorPage from "./routes/map-editor";
 import MapPreviewPage from "./routes/map-preview";
 import MapsPage from "./routes/maps";
@@ -153,6 +154,7 @@ export default function App() {
               <Route path="/maps/editor" component={MapEditorPage} />
               <Route path="/maps/editor/:id" component={MapEditorPage} />
               <Route path="/maps/preview/:id" component={MapPreviewPage} />
+              <Route path="/generale" component={GeneraleHub} />
             </Router>
           </WebSocketProvider>
         </AuthProvider>
