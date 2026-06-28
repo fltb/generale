@@ -50,6 +50,6 @@ describe("Home route", () => {
 
   it("renders footer text", () => {
     render(() => <Home />);
-    expect(screen.getByText("Float's Games — Online Multiplayer Games")).toBeInTheDocument();
+    expect(screen.getByText(/Float's Games.*Online Multiplayer Games/)).toBeInTheDocument();
   });
 });

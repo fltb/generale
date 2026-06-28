@@ -31,7 +31,7 @@ export default function Home() {
         </div>
       </section>
       <footer class="border-t-2 border-base-300 py-6 text-center text-xs text-base-content/40">
-        {PLATFORM_NAME} — {PLATFORM_TAGLINE}
+        {PLATFORM_NAME} — {PLATFORM_TAGLINE} · © {new Date().getFullYear()} <a href="/terms" class="hover:text-base-content/60">Terms</a>
       </footer>
       <script type="application/ld+json">
         {JSON.stringify({
