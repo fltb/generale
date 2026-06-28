@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS custom_maps (id TEXT PRIMARY KEY NOT NULL, name TEXT 
 
 export async function createTestApp() {
   process.env["DB_FILE_NAME"] = ":memory:";
-  const { db } = await import("../../db/client");
+  const { db, resetDb } = await import("../../db/client");
+  resetDb(); // Force fresh connection for test isolation
   const rawDb = (db as any).session?.client as Database;
   if (!rawDb) throw new Error("Cannot access underlying SQLite database");
   for (const sql of TABLE_DDL.split(";").filter(Boolean)) {
