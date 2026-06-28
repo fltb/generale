@@ -19,7 +19,14 @@ export function I18nProvider(props: {
   setLocale: (l: string) => void;
   children: JSX.Element;
 }) {
-  const dict = createMemo((): Dict => (props.locale === "zh-CN" ? zhCN : en));
+  const dict = createMemo((): Dict => {
+    if (props.locale !== "zh-CN") return en;
+    const merged: Dict = { ...en };
+    for (const [k, v] of Object.entries(zhCN)) {
+      if (v) (merged as Record<string, string>)[k] = v as string;
+    }
+    return merged;
+  });
   const tRaw = translator(dict, resolve);
   const t: TT = (key, params) => tRaw(key as keyof Dict, params) as string;
   return (
