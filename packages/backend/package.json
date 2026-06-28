@@ -3,10 +3,11 @@
   "version": "1.0.50",
   "private": true,
   "scripts": {
-    "test": "vitest",
+    "test": "vitest && bun test src/__tests__/helpers/ src/__tests__/routes/",
+    "test:unit": "vitest",
+    "test:integration": "bun test src/__tests__/helpers/ src/__tests__/routes/",
     "test:game": "vitest src/plugins/__tests__/websocket.game-scenario.test.ts",
     "test:all-websocket": "vitest src/plugins/__tests__/websocket.*.test.ts",
-    "test:integration": "bun test src/__tests__/helpers/",
     "test:watch": "vitest --watch",
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts"

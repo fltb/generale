@@ -1,5 +1,5 @@
 // src/ws/__test__/manager.test.ts
-import { beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "vitest";
 import { ClientConnectionManager } from "../manager"; // 调整为你的路径，如果不在同目录请改
 
 // --- Fake WebSocket ---

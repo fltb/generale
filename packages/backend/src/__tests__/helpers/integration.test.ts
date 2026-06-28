@@ -8,6 +8,5 @@ describe("helpers smoke", () => {
     const { sid, status } = await loginAs(app, user.username, "testpass123");
     expect(status).toBe(200);
     expect(sid).toBeTruthy();
-    rawDb.close();
   });
 });

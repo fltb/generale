@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect } from "vitest";
 import { applyGameEventLocal } from "../gameReducer";
 import { applyPregameEventLocal } from "../pregameReducer";
 import {

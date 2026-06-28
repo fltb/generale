@@ -12,8 +12,8 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     setupFiles: ["./src/__tests__/setup.ts"],
-    exclude: ["**/node_modules/**", "**/dist/**", "src/game/__tests__/**", "src/ws/__test__/**"],
-    include: ["src/**/__tests__/**/*.test.{ts,tsx}"],
+    exclude: ["**/node_modules/**", "**/dist/**"],
+    include: ["src/**/__tests__/**/*.test.{ts,tsx}", "src/ws/__test__/**/*.test.ts"],
     globals: false,
     server: {
       deps: {

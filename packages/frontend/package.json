@@ -7,9 +7,7 @@
     "build": "rsbuild build",
     "dev": "rsbuild dev --open",
     "preview": "rsbuild preview",
-    "test": "bun test src/game/__tests__/ src/ws/__test__/",
-    "test:all": "bun test",
-    "test:vitest": "vitest run --reporter verbose"
+    "test": "vitest run --reporter verbose"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.0.1",
