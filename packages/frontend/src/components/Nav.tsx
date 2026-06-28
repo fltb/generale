@@ -1,28 +1,23 @@
 // src/components/Nav.tsx
 
-import { A, useNavigate } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import { createEffect, createSignal, type JSX, onCleanup, Show } from "solid-js";
 import Avatar from "~/components/Avatar";
+import LogoIcon from "~/components/LogoIcon";
 import { useAuth } from "~/hooks/useAuth";
 import { MuteToggle } from "~/ui";
 
-/**
- * Navigation bar component
- *
- * 左: site logo -> "/"
- * 中: about -> "/about"
- * 右: user 区（折叠菜单）
- */
 export default function Nav(): JSX.Element {
   const auth = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [open, setOpen] = createSignal(false);
 
-  // 点击页面其它地方时自动关闭菜单
+  const isGamePage = () => location.pathname.startsWith("/generale") || location.pathname.startsWith("/game/");
+
   createEffect(() => {
     const handler = (e: MouseEvent) => {
-      // 如果菜单是打开的，且点击目标不在菜单或触发按钮内，则关闭
       if (!open()) return;
       const target = e.target as HTMLElement | null;
       if (!target) return;
@@ -43,37 +38,47 @@ export default function Nav(): JSX.Element {
   }
 
   return (
-    <nav class="bg-sky-800 text-gray-100">
-      <div class="container mx-auto flex items-center justify-between p-3">
-        {/* 左：Logo */}
-        <div class="flex items-center space-x-3">
-          <A href="/" class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-md bg-white/20 flex items-center justify-center text-xl font-bold">G</div>
-            <span class="font-semibold">General E</span>
+    <nav class="bg-base-100 text-base-content">
+      <div class="flex items-center justify-between p-3">
+        <div class="flex items-center gap-4">
+          <A href="/" class="flex items-center gap-2 text-primary">
+            <LogoIcon size={32} />
+            <span class="font-semibold text-base-content">General E</span>
+          </A>
+
+          <Show when={!isGamePage()}>
+            <A href="/generale" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
+              Play
+            </A>
+          </Show>
+
+          <Show when={isGamePage()}>
+            <A href="/" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
+              Platform
+            </A>
+            <A href="/generale" class={`border-b-2 px-2 py-1 ${location.pathname === "/generale" ? "border-primary text-base-content" : "border-transparent text-base-content/70 hover:text-base-content"}`}>
+              General E
+            </A>
+          </Show>
+
+          <A href="/about" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
+            About
           </A>
         </div>
 
-        {/* ❗右侧整体：包含 About + 用户区 */}
         <div class="flex items-center gap-6">
-          {/* 音效开关 */}
           <MuteToggle />
 
-          {/* 右侧导航 */}
-          <A href="/about" class="border-b-2 border-transparent hover:border-sky-400 px-2 py-1">
-            About
-          </A>
-
-          <A href="/maps" class="border-b-2 border-transparent hover:border-sky-400 px-2 py-1">
+          <A href="/maps" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
             地图工坊
           </A>
 
-          {/* 右：用户区 —— 原 user dropdown 直接保持不动 */}
           <div class="relative">
             <Show
               when={auth.user}
               fallback={
                 <div class="flex items-center gap-3">
-                  <A href="/login" class="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20">
+                  <A href="/login" class="px-3 py-1 rounded-md bg-base-300 hover:bg-base-200">
                     Login
                   </A>
                 </div>
@@ -84,7 +89,7 @@ export default function Nav(): JSX.Element {
                   type="button"
                   id="nav-user-button"
                   onClick={() => setOpen(!open())}
-                  class="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-white/10"
+                  class="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-base-300"
                 >
                   <Avatar
                     src={auth.user?.avatarThumbUrl ?? auth.user?.avatarUrl ?? ""}
@@ -94,20 +99,19 @@ export default function Nav(): JSX.Element {
                   <span>{auth.user?.displayName || auth.user?.username || auth.user?.email || "User"}</span>
                 </button>
 
-                {/* 下拉菜单保留 */}
                 <div
                   id="nav-user-menu"
-                  class={`absolute right-0 mt-2 w-44 bg-white text-gray-800 rounded-md shadow-lg ${
+                  class={`absolute right-0 mt-2 w-44 bg-base-100 text-base-content rounded-md shadow-lg ${
                     open() ? "block" : "hidden"
                   }`}
                 >
-                  <A href="/profile" class="block px-4 py-2 text-sm hover:bg-sky-100" onClick={() => setOpen(false)}>
+                  <A href="/profile" class="block px-4 py-2 text-sm hover:bg-base-200" onClick={() => setOpen(false)}>
                     Profile
                   </A>
                   <button
                     type="button"
                     onClick={handleLogout}
-                    class="w-full text-left px-4 py-2 text-sm hover:bg-sky-100"
+                    class="w-full text-left px-4 py-2 text-sm hover:bg-base-200"
                   >
                     Logout
                   </button>
