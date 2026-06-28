@@ -202,7 +202,7 @@ const PlayerCard: Component<{
           <div class="flex flex-col gap-1 ml-2 items-end">
             <div class="flex gap-1">
               <Show when={props.onTransferHost}>
-                <Button size="xs" variant="warning" onClick={() => props.onTransferHost?.(p().id)}>
+                <Button size="xs" variant="warning" data-testid="transfer-host" onClick={() => props.onTransferHost?.(p().id)}>
                   设为房主
                 </Button>
               </Show>
@@ -211,6 +211,7 @@ const PlayerCard: Component<{
                 <Button
                   size="xs"
                   variant="error"
+                  data-testid="kick-player"
                   disabled={p().status !== PreGamePlayerStatus.Lobby}
                   title={p().status !== PreGamePlayerStatus.Lobby ? "游戏中无法踢出该玩家" : "踢出该玩家"}
                   onClick={() => props.onKick?.(p().id)}

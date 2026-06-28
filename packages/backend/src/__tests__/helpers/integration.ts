@@ -5,6 +5,7 @@ import { authPlugin } from "../../middleware/authPlugin";
 import { userRoutes } from "../../routes/user";
 import { profileRoutes } from "../../routes/profile";
 import { gameRoutes } from "../../routes/game";
+import { mapRoutes } from "../../routes/map";
 import { pbkdf2Sync, randomBytes } from "node:crypto";
 
 export function hashPassword(password: string): string {
@@ -41,7 +42,7 @@ export async function createTestApp() {
     .use(cors())
     .use(authPlugin)
     .group("/api", (api) =>
-      api.use(userRoutes).use(profileRoutes).use(gameRoutes).get("/health", () => ({ status: "ok" })),
+      api.use(userRoutes).use(profileRoutes).use(gameRoutes).use(mapRoutes).get("/health", () => ({ status: "ok" })),
     );
   return { app, rawDb };
 }

@@ -14,7 +14,7 @@ async function ensureDir() {
   }
 }
 
-function parseTags(tagsRaw: string | undefined): string[] {
+export function parseTags(tagsRaw: string | undefined): string[] {
   if (!tagsRaw) return [];
   try {
     return JSON.parse(tagsRaw);
