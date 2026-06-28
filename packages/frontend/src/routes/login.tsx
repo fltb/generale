@@ -1,3 +1,4 @@
+import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
 import { useAuth } from "~/hooks/useAuth";
@@ -95,6 +96,12 @@ export default function LoginPage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
+      <Title>Login — General E</Title>
+      <Meta name="description" content="Sign in to your account." />
+      <Meta property="og:title" content="Login — General E" />
+      <Meta property="og:description" content="Sign in to your account." />
+      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:type" content="website" />
       <h1 class="text-2xl mb-4">账户</h1>
 
       {/* Tab 控制 */}

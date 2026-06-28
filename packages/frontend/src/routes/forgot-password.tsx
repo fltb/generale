@@ -1,4 +1,5 @@
 import type { ErrorResp, MessageResp, RequestPasswordResetReqBody } from "@generale/types/dist/api";
+import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
 import { createSignal, Show } from "solid-js";
@@ -21,6 +22,12 @@ export default function ForgotPasswordPage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
+      <Title>Forgot Password — General E</Title>
+      <Meta name="description" content="Reset your password." />
+      <Meta property="og:title" content="Forgot Password — General E" />
+      <Meta property="og:description" content="Reset your password." />
+      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:type" content="website" />
       <h1 class="text-2xl mb-4">找回密码</h1>
 
       <Show

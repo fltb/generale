@@ -1,4 +1,5 @@
 import type { ErrorResp, PasswordResetTokenRespBody, ResetPasswordReqBody } from "@generale/types/dist/api";
+import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
 import { createMemo, createSignal, Show } from "solid-js";
@@ -38,6 +39,12 @@ export default function ResetPasswordPage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
+      <Title>Reset Password — General E</Title>
+      <Meta name="description" content="Set a new password." />
+      <Meta property="og:title" content="Reset Password — General E" />
+      <Meta property="og:description" content="Set a new password." />
+      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:type" content="website" />
       <h1 class="text-2xl mb-4">设置新密码</h1>
 
       <Show when={token()} fallback={<div class="alert alert-error">链接缺少 token，请重新发起找回密码。</div>}>

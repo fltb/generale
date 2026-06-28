@@ -1,4 +1,5 @@
 import { GamePhase, PreGamePlayerStatus } from "@generale/types";
+import { Title, Meta } from "@solidjs/meta";
 import { useNavigate, useParams } from "@solidjs/router";
 import { createEffect, type Component, createSignal, Match, Show, Switch } from "solid-js";
 import ChatPanel from "~/components/ChatPanel";
@@ -28,6 +29,12 @@ const RoomRoute: Component = () => {
 
   return (
     <main class="container mx-auto p-6">
+      <Title>Game Room — General E</Title>
+      <Meta name="description" content="Join or spectate a General E game room." />
+      <Meta property="og:title" content="Game Room — General E" />
+      <Meta property="og:description" content="Join or spectate a General E game room." />
+      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:type" content="website" />
       <Switch>
         <Match when={!!session.error()}>
           <Alert variant="error" class="mb-4">

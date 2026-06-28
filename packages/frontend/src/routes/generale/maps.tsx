@@ -1,4 +1,5 @@
 import type { MapSumaryRespBody } from "@generale/types";
+import { Title, Meta } from "@solidjs/meta";
 import { A, useSearchParams } from "@solidjs/router";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { deleteMapApi, forkMapApi, listMapsApi, mapThumbnailUrl, myMapsApi } from "~/api/mapApi";
@@ -62,6 +63,12 @@ export default function MapsPage() {
 
   return (
     <>
+      <Title>Map Workshop — General E</Title>
+      <Meta name="description" content="Browse, create, and share custom maps for General E." />
+      <Meta property="og:title" content="Map Workshop — General E" />
+      <Meta property="og:description" content="Browse, create, and share custom maps for General E." />
+      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:type" content="website" />
     <main class="container mx-auto p-6 max-w-6xl">
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold">地图工坊</h1>

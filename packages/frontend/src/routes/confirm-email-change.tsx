@@ -1,4 +1,5 @@
 import type { ConfirmEmailChangeReqBody, ErrorResp, MessageResp } from "@generale/types/dist/api";
+import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
@@ -42,6 +43,12 @@ export default function ConfirmEmailChangePage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
+      <Title>Confirm Email Change — General E</Title>
+      <Meta name="description" content="Confirm your email change." />
+      <Meta property="og:title" content="Confirm Email Change — General E" />
+      <Meta property="og:description" content="Confirm your email change." />
+      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:type" content="website" />
       <h1 class="text-2xl mb-4">确认邮箱变更</h1>
 
       <Show when={token()} fallback={<div class="alert alert-error">链接缺少 token。</div>}>

@@ -1,0 +1,11 @@
+# General E
+> Online multiplayer game platform. Play real-time strategy games in your browser. No download required.
+
+## Games
+- General E: Real-time multiplayer territory conquest strategy game. 2-8 players. Play at /generale
+
+## Features
+- Real-time multiplayer battles
+- Custom map editor
+- Pixel art visual style
+- Cross-platform (browser-based)

@@ -1,4 +1,5 @@
 import type { ErrorResp, MessageResp, VerifyReqBody } from "@generale/types/dist/api";
+import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
@@ -34,6 +35,12 @@ export default function VerifyEmailPage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
+      <Title>Verify Email — General E</Title>
+      <Meta name="description" content="Confirm your email address." />
+      <Meta property="og:title" content="Verify Email — General E" />
+      <Meta property="og:description" content="Confirm your email address." />
+      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:type" content="website" />
       <h1 class="text-2xl mb-4">邮箱验证</h1>
 
       <Show when={token()} fallback={<div class="alert alert-error">链接缺少 token。</div>}>

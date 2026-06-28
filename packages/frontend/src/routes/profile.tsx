@@ -8,6 +8,7 @@ import type {
   MessageResp,
   ProfileUpdateReqBody,
 } from "@generale/types/dist/api";
+import { Title, Meta } from "@solidjs/meta";
 import { useNavigate } from "@solidjs/router";
 import { useMutation } from "@tanstack/solid-query";
 import { createMemo, createSignal, Show } from "solid-js";
@@ -191,6 +192,12 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
+      <Title>Profile — General E</Title>
+      <Meta name="description" content="Manage your profile and settings." />
+      <Meta property="og:title" content="Profile — General E" />
+      <Meta property="og:description" content="Manage your profile and settings." />
+      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:type" content="website" />
       <Show when={!auth.isLoading} fallback={<p class="p-4">加载中...</p>}>
         <Show
           when={auth.user}

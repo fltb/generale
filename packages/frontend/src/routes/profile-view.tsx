@@ -1,4 +1,5 @@
 import type { ErrorResp, ProfileRespBody } from "@generale/types/dist/api";
+import { Title, Meta } from "@solidjs/meta";
 import { A, useNavigate, useParams } from "@solidjs/router";
 import { useQuery } from "@tanstack/solid-query";
 import { createMemo, Show } from "solid-js";
@@ -39,6 +40,12 @@ export default function PublicProfilePage() {
 
   return (
     <div class="container mx-auto p-6 max-w-2xl space-y-4">
+      <Title>Player Profile — General E</Title>
+      <Meta name="description" content="View player profile." />
+      <Meta property="og:title" content="Player Profile — General E" />
+      <Meta property="og:description" content="View player profile." />
+      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:type" content="website" />
       <button type="button" class="btn btn-sm btn-ghost" onClick={() => nav(-1)}>
         ← 返回
       </button>
