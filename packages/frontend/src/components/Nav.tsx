@@ -14,7 +14,7 @@ export default function Nav(): JSX.Element {
 
   const [open, setOpen] = createSignal(false);
 
-  const isGamePage = () => location.pathname.startsWith("/generale") || location.pathname.startsWith("/game/");
+  const isGamePage = () => location.pathname.startsWith("/generale") || location.pathname.startsWith("/game/") || location.pathname.startsWith("/maps");
 
   createEffect(() => {
     const handler = (e: MouseEvent) => {
