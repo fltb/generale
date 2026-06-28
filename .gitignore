@@ -39,3 +39,13 @@ AGENTS.md
 
 # Playwright test artifacts
 e2e/test-results/
+
+# git worktrees
+.worktrees
+
+# AI-generated test coverage reports
+测试覆盖率报告*
+
+# Superpowers AI-generated design docs / plans / artifacts
+.superpowers/
+docs/superpowers/

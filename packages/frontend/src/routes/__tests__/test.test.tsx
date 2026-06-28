@@ -1,19 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 
-vi.mock("solid-pixi", () => ({
-  Application: (p: any) => p.children ?? null,
-}));
-
-vi.mock("~/components/__tests__/MapRenderTest", () => ({
-  default: () => <div data-testid="map-render-test">MapRenderTest</div>,
+vi.mock("@solidjs/router", () => ({
+  useNavigate: () => vi.fn(), A: (p: any) => <a href={p.href}>{p.children}</a>,
 }));
 
 import Test from "../test";
 
 describe("Test route", () => {
-  it("renders MapRenderTest component", () => {
+  it("renders placeholder", () => {
     render(() => <Test />);
-    expect(screen.getByTestId("map-render-test")).toBeInTheDocument();
+    expect(screen.getByText("Test page placeholder")).toBeInTheDocument();
   });
 });

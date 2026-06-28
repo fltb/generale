@@ -25,6 +25,8 @@
 - [X] 添加 `bun run lint` / `bun run check` / `bun run check:write` 脚本
 - [X] 启用严格模式（新增 ~25 条规则，开启 auto-fix）
 - [X] 验证：`bun run lint` → 0 errors 0 warnings，全构建通过，162 tests passed
+- [X] **前端全覆盖测试已完成** — 513 tests, 82 files, 0 fail。覆盖 ui/ (23/23), components/ (20/21), hooks/ (7/7), routes/ (14/15), game/ (10/10)。统一到 vitest，`bun run test` 单命令
+- [X] **测试框架统一** — bun:test + vitest 双 runner 已统一到 vitest，后端集成测试保持 bun:test（需 bun:sqlite）。`test`/`test:unit`/`test:integration` 三级脚本
 - [ ] 前后端日志系统：替代直接 `console.log`，支持 production/debug 等级（当前 `noConsole` rule 已关闭等待此项目）
 
 ### 自动化的功能验证
