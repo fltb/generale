@@ -408,19 +408,19 @@ await test.stop();
 
 #### 待办清单
 
-- [ ] 后端：拆分 `index.ts` → `app.ts` + `index.ts`，导出 `createApp()`
-- [ ] 后端：`createApp()` 支持通过 env 控制 DB 路径、port
-- [ ] 后端：编写 seed 脚本（创建测试用户）
-- [ ] 前端：关键 DOM 元素添加 `data-testid` 属性
-- [ ] 前端：`useGameSession` 暴露 `window.__test__`（clickTile, getGameState, waitFor*）
-- [ ] 前端：`useWebsocket` 暴露连接状态
-- [ ] TestHarness：实现 BackendRunner（启动/停止后端）
-- [ ] TestHarness：实现 FrontendRunner（启动/停止 rsbuild dev + 动态 proxy）
-- [ ] Playwright：实现 ScenarioRunner（browser + context 管理）
-- [ ] Playwright：封装 PlayerSession（DOM-first，仅必要时用 `window.__test__`）
-- [ ] Playwright：实现 `waitFor*` 工具函数（基于 `page.waitForFunction`）
-- [ ] 脚本示例：编写 2-3 个完整场景验证整个链路可工作
-- [ ] CI：GitHub Actions 中集成 Playwright
+- [X] 后端：拆分 `index.ts` → `app.ts` + `index.ts`，导出 `createApp()`
+- [X] 后端：`createApp()` 支持通过 env 控制 DB 路径、port
+- [X] 后端：编写 seed 脚本（创建测试用户）
+- [X] 前端：关键 DOM 元素添加 `data-testid` 属性
+- [X] 前端：`useGameSession` 暴露 `window.__test__`（clickTile, getGameState, waitFor*）
+- [X] 前端：`useWebsocket` 暴露连接状态
+- [X] TestHarness：实现 BackendRunner（启动/停止后端）
+- [X] TestHarness：实现 FrontendRunner（启动/停止 rsbuild dev + 动态 proxy）
+- [X] Playwright：实现 ScenarioRunner（browser + context 管理）
+- [X] Playwright：封装 PlayerSession（DOM-first，仅必要时用 `window.__test__`）
+- [X] Playwright：实现 `waitFor*` 工具函数（基于 `page.waitForFunction`）
+- [X] **7 个 E2E 场景已完成：** 注册登录 → 房间管理 → 游戏流程 → 聊天 → 踢人/房主转移 → 游戏内交互 → 断线重连
+- [ ] CI：GitHub Actions 中集成 Playwright（目前缺）
 
 ## 游戏的外观与功能优化
 
