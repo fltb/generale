@@ -19,38 +19,38 @@ export default function GeneraleLayout(props: Props) {
         <div class="flex items-center gap-6 text-sm">
           <A href="/" class="flex items-center gap-2 text-primary">
             <LogoIcon size={28} />
-            <span class="font-semibold text-base-content">General E</span>
+            <span class="font-semibold text-primary text-sm tracking-wide">GENERAL E</span>
           </A>
-          <div class="flex items-center gap-4">
-            <A
-              href="/"
-              class="border-b-2 border-transparent hover:border-primary text-base-content/50 hover:text-base-content"
-            >
-              ← Platform
-            </A>
+          <div class="flex items-center gap-1">
             <A
               href="/generale"
-              class={`border-b-2 ${
+              class={`px-3 py-1.5 text-sm ${
                 currentPath() === "/generale"
-                  ? "border-primary text-base-content"
-                  : "border-transparent text-base-content/50 hover:text-base-content"
+                  ? "text-base-content bg-base-300"
+                  : "text-base-content/50 hover:text-base-content hover:bg-base-300/50"
               }`}
             >
-              General E
+              Rooms
             </A>
             <A
               href="/maps"
-              class={`border-b-2 ${
+              class={`px-3 py-1.5 text-sm ${
                 currentPath().startsWith("/maps")
-                  ? "border-primary text-base-content"
-                  : "border-transparent text-base-content/50 hover:text-base-content"
+                  ? "text-base-content bg-base-300"
+                  : "text-base-content/50 hover:text-base-content hover:bg-base-300/50"
               }`}
             >
               Maps
             </A>
           </div>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-4">
+          <A
+            href="/"
+            class="text-xs text-base-content/30 hover:text-base-content/70"
+          >
+            ← Platform
+          </A>
           <MuteToggle />
           <Show when={auth.user}>
             <Avatar
