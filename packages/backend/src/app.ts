@@ -122,14 +122,14 @@ export async function createApp(opts: CreateAppOptions = {}) {
         .get("/", () => ({ message: "Generale Game Server", version: "1.0.0" }))
         .get("/health", () => ({ status: "ok", timestamp: new Date().toISOString() })),
     )
-    // 前端静态文件 serve + SPA fallback（仅 FRONTEND_DIST 存在时启用，如 dev 模式）
+    // 前端静态文件 serve + SPA fallback（仅 production 模式或 FRONTEND_DIST 显式指定时启用）
     // 开发模式下 rsbuild dev server 自己处理
 
-  const frontendDist = process.env["FRONTEND_DIST"] || "./frontend";
-  if (existsSync(frontendDist)) {
-    app.use(staticPlugin({ assets: frontendDist, prefix: "/", alwaysStatic: true }));
+  if (process.env["NODE_ENV"] === "production" || process.env["FRONTEND_DIST"]) {
+    const dist = process.env["FRONTEND_DIST"] || "./frontend";
+    app.use(staticPlugin({ assets: dist, prefix: "/", alwaysStatic: true }));
     app.get("/*", ({ set }) => {
-      const indexHtml = join(frontendDist, "index.html");
+      const indexHtml = join(dist, "index.html");
       if (existsSync(indexHtml)) {
         set.headers["Content-Type"] = "text/html";
         return Bun.file(indexHtml);
