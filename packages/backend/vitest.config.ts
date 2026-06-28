@@ -8,7 +8,7 @@ export default defineConfig({
     hookTimeout: 10000,
     teardownTimeout: 5000,
     include: ["src/**/*.test.ts"],
-    exclude: ["node_modules", "dist"],
+    exclude: ["node_modules", "dist", "src/__tests__"],
     reporters: ["verbose"],
     env: {
       DB_FILE_NAME: ":memory:",
