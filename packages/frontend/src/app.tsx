@@ -6,9 +6,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import "./index.css";
-import { createEffect, createSignal, onMount, Suspense } from "solid-js";
+import { createEffect, createSignal, Suspense } from "solid-js";
 import { WebSocketProvider } from "./hooks/useWebsocket";
-import { I18nProvider, useT } from "./i18n/I18nProvider";
+import { I18nProvider } from "./i18n/I18nProvider";
 import { getSettingsApi } from "./api/settingsApi";
 import CookieConsent from "./components/CookieConsent";
 import PlatformShell from "./components/platform/PlatformShell";
@@ -132,16 +132,18 @@ if (IS_TEST_MODE) {
   exposeTestBridge();
 }
 
-function LocaleSync() {
+function LocaleSync(props: { setLocale: (l: string) => void }) {
   const auth = useAuth();
-  const { setLocale } = useT();
 
   createEffect(() => {
     const user = auth.user;
     if (user) {
       getSettingsApi().then((settings) => {
-        if (settings.locale) setLocale(settings.locale);
+        if (settings.locale) props.setLocale(settings.locale);
       });
+    } else {
+      const navLang = navigator.language?.startsWith("zh") ? "zh-CN" : "en";
+      props.setLocale(navLang);
     }
   });
 
@@ -151,11 +153,6 @@ function LocaleSync() {
 export default function App() {
   const [locale, setLocale] = createSignal("en");
 
-  onMount(() => {
-    const navLang = navigator.language?.startsWith("zh") ? "zh-CN" : "en";
-    setLocale(navLang);
-  });
-
   return (
     <I18nProvider locale={locale()} setLocale={setLocale}>
     <QueryClientProvider client={queryClient}>
@@ -163,7 +160,7 @@ export default function App() {
       <MetaProvider>
         <Link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <AuthProvider>
-          <LocaleSync />
+          <LocaleSync setLocale={setLocale} />
           <WebSocketProvider url={defaultWsUrl} autoConnect={false}>
             <Router
               root={(props) => (

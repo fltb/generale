@@ -7,7 +7,9 @@ import type { TranslationKey } from "@generale/i18n";
 type TT = (key: TranslationKey, params?: BaseTemplateArgs) => string;
 type Dict = typeof en;
 
-const I18nCtx = createContext<{ t: TT; setLocale: (l: string) => void }>();
+type TContext = { t: TT; setLocale: (l: string) => void; locale: () => string };
+
+const I18nCtx = createContext<TContext>();
 
 function resolve(str: string, params?: BaseTemplateArgs): string {
   if (!params) return str;
@@ -30,7 +32,7 @@ export function I18nProvider(props: {
   const tRaw = translator(dict, resolve);
   const t: TT = (key, params) => tRaw(key as keyof Dict, params) as string;
   return (
-    <I18nCtx.Provider value={{ t, setLocale: props.setLocale }}>
+    <I18nCtx.Provider value={{ t, setLocale: props.setLocale, locale: () => props.locale }}>
       {props.children}
     </I18nCtx.Provider>
   );
@@ -43,7 +45,7 @@ export function useT() {
       if (!params) return key;
       return key.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? `{${k}}`));
     };
-    return { t: fallbackT, setLocale: () => {} };
+    return { t: fallbackT, setLocale: () => {}, locale: () => "en" };
   }
   return ctx;
 }

@@ -5,6 +5,7 @@ import LogoIcon from "~/components/LogoIcon";
 import { useAuth } from "~/hooks/useAuth";
 import { MuteToggle } from "~/ui";
 import { GAME_NAME } from "~/config";
+import { useT } from "~/i18n/useT";
 
 interface Props {
   children?: JSX.Element;
@@ -14,6 +15,7 @@ export default function GeneraleLayout(props: Props) {
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { locale, setLocale } = useT();
   const [open, setOpen] = createSignal(false);
 
   const isRoomsActive = createMemo(() => location.pathname === "/generale" || location.pathname.startsWith("/game/"));
@@ -60,6 +62,13 @@ export default function GeneraleLayout(props: Props) {
         </div>
         <div class="flex items-center gap-3">
           <MuteToggle />
+          <button
+            type="button"
+            onClick={() => setLocale(locale() === "zh-CN" ? "en" : "zh-CN")}
+            class="px-2 py-1 text-xs rounded border border-base-300 hover:bg-base-300 text-base-content/60 hover:text-base-content"
+          >
+            {locale() === "zh-CN" ? "EN" : "中文"}
+          </button>
           <Show
             when={auth.user}
             fallback={
