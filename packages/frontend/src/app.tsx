@@ -19,6 +19,7 @@ import ResetPasswordPage from "./routes/reset-password";
 import VerifyEmailPage from "./routes/verify-email";
 import ConfirmEmailChangePage from "./routes/confirm-email-change";
 import TermsPage from "./routes/terms";
+import NotfoundPage from "./routes/[...404]";
 import GeneraleHub from "./routes/generale/index";
 import MapEditorPage from "./routes/map-editor";
 import MapPreviewPage from "./routes/map-preview";
@@ -165,6 +166,9 @@ export default function App() {
               <Route path="/maps/editor" component={MapEditorPage} />
               <Route path="/maps/editor/:id" component={MapEditorPage} />
               <Route path="/maps/preview/:id" component={MapPreviewPage} />
+
+              {/* Catch-all 404 */}
+              <Route path="*" component={NotfoundPage} />
             </Router>
           </WebSocketProvider>
         </AuthProvider>
