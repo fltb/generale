@@ -19,7 +19,7 @@ export default function GeneraleLayout(props: Props) {
   const isRoomsActive = createMemo(() => location.pathname === "/generale" || location.pathname.startsWith("/game/"));
   const isMapsActive = createMemo(() => location.pathname.startsWith("/maps") && !location.pathname.startsWith("/maps/editor"));
   const isEditorActive = createMemo(() => location.pathname.startsWith("/maps/editor"));
-  const showSidebar = createMemo(() => !location.pathname.startsWith("/game/"));
+  const showSidebar = createMemo(() => !location.pathname.startsWith("/game/") && !location.pathname.startsWith("/maps/editor"));
 
   createEffect(() => {
     const handler = (e: MouseEvent) => {
