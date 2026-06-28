@@ -26,9 +26,10 @@ export default function LoginPage() {
   const [regUsername, setRegUsername] = createSignal("");
   const [regPassword, setRegPassword] = createSignal("");
   const [regEmail, setRegEmail] = createSignal("");
-  const [regMessage, setRegMessage] = createSignal("");
-  const [regSent, setRegSent] = createSignal(false);
-  const [regLoading, setRegLoading] = createSignal(false);
+const [regMessage, setRegMessage] = createSignal("");
+const [regSent, setRegSent] = createSignal(false);
+const [regLoading, setRegLoading] = createSignal(false);
+const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
 
   /**
    * 处理登录提交
@@ -220,7 +221,16 @@ export default function LoginPage() {
                 autocomplete="new-password"
                 required
               />
-              <button type="submit" class="btn btn-primary" disabled={regLoading()}>
+              <label class="flex items-start gap-2 text-xs text-base-content/60">
+                <input
+                  type="checkbox"
+                  checked={regAcceptedTerms()}
+                  onChange={(e) => setRegAcceptedTerms(e.currentTarget.checked)}
+                  class="checkbox checkbox-xs mt-0.5"
+                />
+                <span>I agree to the <A href="/terms" class="link">Terms of Service</A></span>
+              </label>
+              <button type="submit" class="btn btn-primary" disabled={regLoading() || !regAcceptedTerms()}>
                 {regLoading() ? "提交中..." : "注册"}
               </button>
               <Show when={regMessage()}>

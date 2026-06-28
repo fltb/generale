@@ -8,6 +8,7 @@ import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
 import { Suspense } from "solid-js";
 import { WebSocketProvider } from "./hooks/useWebsocket";
+import CookieConsent from "./components/CookieConsent";
 import PlatformShell from "./components/platform/PlatformShell";
 import GeneraleLayout from "./components/game/GeneraleLayout";
 import Home from "./routes";
@@ -139,7 +140,10 @@ export default function App() {
           <WebSocketProvider url={defaultWsUrl} autoConnect={false}>
             <Router
               root={(props) => (
+                <>
                 <Suspense>{props.children}</Suspense>
+                <CookieConsent />
+                </>
               )}
             >
               {/* Platform routes — wrapped in PlatformShell */}
