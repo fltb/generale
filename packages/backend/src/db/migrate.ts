@@ -71,6 +71,7 @@ function sealExistingMigrations(dbPath: string) {
   const migrationTables: Record<string, string[]> = {
     "0000_clammy_korath": ["users", "profiles", "sessions", "verification_tokens"],
     "0002_sparkling_stranger": ["custom_maps"],
+    "0004_certain_joseph": ["user_settings"],
   };
 
   let sealed = 0;

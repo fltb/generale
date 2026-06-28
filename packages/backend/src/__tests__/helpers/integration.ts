@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY NOT NULL, user_id TEXT 
 CREATE TABLE IF NOT EXISTS verification_tokens (token TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES users(id), purpose TEXT NOT NULL DEFAULT 'register', new_email TEXT, expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS profiles (user_id TEXT PRIMARY KEY NOT NULL REFERENCES users(id), display_name TEXT, avatar_url TEXT, avatar_thumb_url TEXT, bio TEXT, updated_at INTEGER DEFAULT (strftime('%s','now')));
 CREATE TABLE IF NOT EXISTS custom_maps (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, description TEXT DEFAULT '', author_id TEXT NOT NULL REFERENCES users(id), author_name TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, tile_count INTEGER NOT NULL, min_players INTEGER DEFAULT 2 NOT NULL, max_players INTEGER DEFAULT 8 NOT NULL, is_public INTEGER DEFAULT 0 NOT NULL, is_draft INTEGER DEFAULT 1 NOT NULL, usage_count INTEGER DEFAULT 0 NOT NULL, tags TEXT, has_custom_thumbnail INTEGER DEFAULT 0 NOT NULL, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')), updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')));
+CREATE TABLE IF NOT EXISTS user_settings (user_id TEXT NOT NULL REFERENCES users(id), key TEXT NOT NULL, value TEXT NOT NULL, updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')), PRIMARY KEY (user_id, key));
 `;
 
 export async function createTestApp() {

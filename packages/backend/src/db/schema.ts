@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   // Store UUIDs as TEXT; generate by default in JS
@@ -100,3 +100,16 @@ export const profiles = sqliteTable("profiles", {
   bio: text("bio"),
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(CURRENT_TIMESTAMP)`),
 });
+
+export const userSettings = sqliteTable("user_settings", {
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  key: text("key").notNull(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(CURRENT_TIMESTAMP)`),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.userId, table.key] }),
+}));
