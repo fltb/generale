@@ -5,32 +5,23 @@ import {
   profileRespSchema,
   profileUpdateReqSchema,
 } from "@generale/types";
-import { Elysia, t } from "elysia";
+import { Elysia, t as tSchema } from "elysia";
 import { AVATAR_MAX_BYTES, ProfileService, profileService } from "../services/profileService";
 import { sessionService } from "../services/sessionService";
 import { userSettingsService } from "../services/userSettingsService";
 import { userService } from "../services/userService";
+import { tForRequest } from "../services/i18n";
 
-const cookieScheme = t.Cookie({
-  sid: t.Optional(t.String()),
+const cookieScheme = tSchema.Cookie({
+  sid: tSchema.Optional(tSchema.String()),
 });
 
 const ALLOWED_AVATAR_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 
-/**
- * 用户 profile 相关路由。
- *
- * 设计：
- * - `GET /profile/:userId` —— 公开拉取，任何人都能看；不返回 email/password 等敏感字段
- * - `PATCH /profile/me` —— 当前登录用户改 displayName / bio（文本类）
- * - `POST /profile/avatar` —— 当前登录用户上传新头像（multipart/form-data, 字段名 `file`）
- */
 export const profileRoutes = new Elysia({ prefix: "/profile" })
   .get(
     "/:userId",
     async ({ params: { userId }, set }) => {
-      // URL 里的 :userId 同时接受真实 UUID 或 username。
-      // 先按 id 查；找不到再按 username 查；都没就 404，不再返回"空架子"假装存在。
       let user = await userService.findById(userId);
       if (!user) user = await userService.findByUsername(userId);
       if (!user) {
@@ -43,7 +34,6 @@ export const profileRoutes = new Elysia({ prefix: "/profile" })
       return {
         userId: user.id,
         username: user.username,
-        // displayName 默认 fallback 到 username，前端永远有东西可展示
         displayName: profile?.displayName || user.username,
         avatarUrl: profile?.avatarUrl || defaults.avatarUrl,
         avatarThumbUrl: profile?.avatarThumbUrl || defaults.avatarThumbUrl,
@@ -60,23 +50,23 @@ export const profileRoutes = new Elysia({ prefix: "/profile" })
   )
   .patch(
     "/me",
-    async ({ body, cookie: { sid }, set }) => {
+    async ({ body, cookie: { sid }, set, request }) => {
+      const t = tForRequest({ cookie: { sid }, request });
       const sessionId = sid?.value;
       const userId = sessionId ? sessionService.get(sessionId)?.userId : undefined;
       if (!userId) {
         set.status = 401;
-        return { error: "Unauthorized" };
+        return { error: t("Unauthorized") };
       }
-      // 只取允许通过 PATCH 改的几个字段，避免恶意客户端塞 avatarUrl 等
       const patch: Partial<{ displayName: string; bio: string }> = {};
       if (typeof body.displayName === "string") patch.displayName = body.displayName.trim();
       if (typeof body.bio === "string") patch.bio = body.bio;
 
       if (Object.keys(patch).length === 0) {
-        return { success: true, message: "No changes" };
+        return { success: true, message: t("No changes") };
       }
       await profileService.updateProfile(userId, patch);
-      return { success: true, message: "Profile updated successfully" };
+      return { success: true, message: t("Profile updated successfully") };
     },
     {
       body: profileUpdateReqSchema,
@@ -89,26 +79,27 @@ export const profileRoutes = new Elysia({ prefix: "/profile" })
   )
   .post(
     "/avatar",
-    async ({ body, cookie: { sid }, set }) => {
+    async ({ body, cookie: { sid }, set, request }) => {
+      const t = tForRequest({ cookie: { sid }, request });
       const sessionId = sid?.value;
       const userId = sessionId ? sessionService.get(sessionId)?.userId : undefined;
       if (!userId) {
         set.status = 401;
-        return { error: "Unauthorized" };
+        return { error: t("Unauthorized") };
       }
 
       const file = body.file;
       if (!file) {
         set.status = 400;
-        return { error: "No file provided" };
+        return { error: t("No file provided") };
       }
       if (!ALLOWED_AVATAR_MIME.has(file.type)) {
         set.status = 400;
-        return { error: `Unsupported mime type: ${file.type}. Allowed: png/jpeg/webp` };
+        return { error: t("Unsupported file type") };
       }
       if (file.size > AVATAR_MAX_BYTES) {
         set.status = 400;
-        return { error: `File too large: ${file.size} bytes (max ${AVATAR_MAX_BYTES})` };
+        return { error: t("File too large") };
       }
 
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -116,23 +107,20 @@ export const profileRoutes = new Elysia({ prefix: "/profile" })
       try {
         result = await profileService.saveAvatarBytes(userId, bytes, file.type);
       } catch (e: unknown) {
-        // sharp 解码失败 / 维度超限 / mime 不匹配等都走这里
         set.status = 400;
-        return { error: e instanceof Error ? e.message : "Invalid image" };
+        return { error: e instanceof Error ? e.message : t("Invalid image") };
       }
 
       return {
         success: true,
         avatarUrl: result.avatarUrl,
         avatarThumbUrl: result.avatarThumbUrl,
-        message: "Avatar uploaded successfully",
+        message: t("Avatar uploaded successfully"),
       };
     },
     {
-      // 用 inline t.Object 让 elysia 自动解析 multipart
-      body: t.Object({
-        file: t.File({
-          // 这里的 maxSize 是 elysia 解析层的硬上限；具体校验在 handler 里再做一次更友好的错误
+      body: tSchema.Object({
+        file: tSchema.File({
           maxSize: AVATAR_MAX_BYTES,
           type: ["image/png", "image/jpeg", "image/webp"],
         }),
@@ -156,7 +144,7 @@ export const profileRoutes = new Elysia({ prefix: "/profile" })
       }
       return userSettingsService.getAll(userId);
     },
-    { cookie: cookieScheme, response: t.Record(t.String(), t.String()) },
+    { cookie: cookieScheme, response: tSchema.Record(tSchema.String(), tSchema.String()) },
   )
   .patch(
     "/settings",
@@ -171,7 +159,7 @@ export const profileRoutes = new Elysia({ prefix: "/profile" })
       return { success: true };
     },
     {
-      body: t.Object({ key: t.String(), value: t.String() }),
+      body: tSchema.Object({ key: tSchema.String(), value: tSchema.String() }),
       cookie: cookieScheme,
     },
   );

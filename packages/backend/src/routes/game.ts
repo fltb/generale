@@ -17,17 +17,19 @@ import { gameServiceManager } from "../game/service/GameServiceManager";
 import { sessionService } from "../services/sessionService";
 import { cookieScheme } from "./user";
 import { applyGameFilters, applyGameSort, paginateGames } from "./utils/gameListFilter";
+import { tForRequest } from "../services/i18n";
 
 export const gameRoutes = new Elysia({ prefix: "/game" })
   // Decorate with the actual singleton manager instance
   .decorate("gameServiceManager", gameServiceManager)
   .post(
     "/create",
-    ({ body, gameServiceManager, set, cookie: { sid } }) => {
+    ({ body, gameServiceManager, set, cookie: { sid }, request }) => {
+      const t = tForRequest({ cookie: { sid }, request });
       const session = sid?.value ? sessionService.get(sid.value) : undefined;
       if (!session) {
         set.status = 401;
-        return { success: false, error: "请先登录" };
+        return { success: false, error: t("Please log in first") };
       }
       const gameId = `game_${Date.now()}` as GameId;
 
@@ -46,7 +48,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
             finalMapSize = { width: 20, height: 20 }; // placeholder, GameService will override from map data
           } else {
             set.status = 400;
-            return { success: false, error: "custom mode requires numeric mapSize or customMapId" };
+            return { success: false, error: t("custom mode requires numeric mapSize or customMapId") };
           }
         } else {
           finalMapSize = (settings.mapSize ?? "medium") as "small" | "medium" | "large";
@@ -72,7 +74,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
 
       return {
         success: true,
-        data: { gameId, playerId: "", message: "Game created successfully. Player can now join." },
+        data: { gameId, playerId: "", message: t("Game created successfully") },
       };
     },
     {
@@ -84,12 +86,13 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
   )
   .get(
     "/info/:gameId",
-    ({ params, gameServiceManager, set }) => {
+    ({ params, gameServiceManager, set, request }) => {
+      const t = tForRequest({ request });
       const gameService = gameServiceManager.getGame(params.gameId as GameId);
 
       if (!gameService) {
         set.status = 404;
-        return { error: "Game not found" };
+        return { error: t("Game not found") };
       }
 
       // Call the instance method
@@ -136,13 +139,13 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
   )
   .get(
     "/connect/:gameId",
-    ({ params, gameServiceManager, set, cookie: { sid } }) => {
+    ({ params, gameServiceManager, set, cookie: { sid }, request }) => {
+      const t = tForRequest({ cookie: { sid }, request });
       const { gameId } = params as { gameId: string };
-      // require session
       const session = sid?.value ? sessionService.get(sid.value) : undefined;
       if (!session) {
         set.status = 401;
-        return { success: false, error: "Not authenticated (missing/expired session)" };
+        return { success: false, error: t("Not authenticated") };
       }
 
       const playerId = session.userId as PlayerId;
@@ -150,10 +153,9 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
       const gameService = gameServiceManager.getGame(gameId as GameId);
       if (!gameService) {
         set.status = 404;
-        return { success: false, error: "Game not found" };
+        return { success: false, error: t("Game not found") };
       }
 
-      // service handles authorization/availability
       const result = gameService.prepareConnectionForPlayer(playerId);
 
       if (!result.success) {
@@ -173,16 +175,15 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
         return { success: false, error: result.message };
       }
 
-      // success: return domains/phase/message, but do NOT expose internal session details
       return {
         success: true,
         data: {
           gameId,
-          playerId, // ok to return if you want but front-end should not rely on it
+          playerId,
           phase: result.data.phase,
           domains: result.data.domains,
           hasPassword: result.data.hasPassword,
-          message: "Ready to connect. Please open the provided domains.",
+          message: t("Ready to connect"),
         },
       };
     },

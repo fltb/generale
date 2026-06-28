@@ -72,7 +72,7 @@ describe("EmailService", () => {
     expect(mockSendMail).toHaveBeenCalledWith({
       from: "sender@app.com", // from .env
       to,
-      subject: "请验证您的邮箱",
+      subject: "Please verify your email",
       html: expect.stringContaining(verificationUrl),
     });
   });
