@@ -6,10 +6,11 @@ export interface LabelProps extends JSX.HTMLAttributes<HTMLDivElement> {
 }
 
 export const Label: Component<LabelProps> = (props) => {
-  const [local, rest] = splitProps(props, ["text", "alt", "class"]);
+  const [local, rest] = splitProps(props, ["text", "alt", "class", "children"]);
   const cls = () => ["label", local.class ?? ""].filter(Boolean).join(" ");
   return (
     <div {...rest} class={cls()}>
+      {local.children}
       <Show when={local.text}>
         <span class="label-text">{local.text}</span>
       </Show>
