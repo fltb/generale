@@ -17,6 +17,10 @@ function initDb() {
   return _db;
 }
 
+export function resetDb() {
+  _db = undefined;
+}
+
 export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(_target, prop) {
     return (initDb() as unknown as Record<string, unknown>)[prop as string];
