@@ -1,12 +1,11 @@
 import { Title, Meta } from "@solidjs/meta";
 import Hero from "~/components/Hero";
 import GameCard from "~/components/GameCard";
-import { ProtectedRoute } from "~/components/ProtectedRoute";
 import { PLATFORM_NAME, PLATFORM_TAGLINE, BASE_URL } from "~/config";
 
 export default function Home() {
   return (
-    <ProtectedRoute>
+    <>
       <Title>{PLATFORM_NAME} — {PLATFORM_TAGLINE}</Title>
       <Meta name="description" content={`${PLATFORM_NAME} — Play real-time multiplayer strategy games online. Free, no download.`} />
       <Meta property="og:title" content={`${PLATFORM_NAME} — ${PLATFORM_TAGLINE}`} />
@@ -45,6 +44,6 @@ export default function Home() {
           "browserRequirements": "Requires JavaScript"
         })}
       </script>
-    </ProtectedRoute>
+    </>
   );
 }
