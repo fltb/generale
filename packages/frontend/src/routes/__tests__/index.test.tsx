@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 
+vi.mock("@solidjs/meta", () => ({ Title: () => null, Meta: () => null }));
+
 vi.mock("~/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "1", username: "test", displayName: "Test" },
@@ -48,6 +50,6 @@ describe("Home route", () => {
 
   it("renders footer text", () => {
     render(() => <Home />);
-    expect(screen.getByText("General E — Online Multiplayer Game Platform")).toBeInTheDocument();
+    expect(screen.getByText("Float's Games — Online Multiplayer Games")).toBeInTheDocument();
   });
 });

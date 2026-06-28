@@ -4,6 +4,7 @@ import Avatar from "~/components/Avatar";
 import LogoIcon from "~/components/LogoIcon";
 import { useAuth } from "~/hooks/useAuth";
 import { MuteToggle } from "~/ui";
+import { GAME_NAME } from "~/config";
 
 interface Props {
   children?: JSX.Element;
@@ -21,7 +22,7 @@ export default function GeneraleLayout(props: Props) {
         <div class="flex items-center gap-6 text-sm">
           <A href="/" class="flex items-center gap-2 text-primary">
             <LogoIcon size={28} />
-            <span class="font-semibold text-primary text-sm tracking-wide">GENERAL E</span>
+            <span class="font-semibold text-primary text-sm tracking-wide">{GAME_NAME}</span>
           </A>
           <div class="flex items-center gap-1">
             <A

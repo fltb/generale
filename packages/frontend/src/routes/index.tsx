@@ -2,15 +2,16 @@ import { Title, Meta } from "@solidjs/meta";
 import Hero from "~/components/Hero";
 import GameCard from "~/components/GameCard";
 import { ProtectedRoute } from "~/components/ProtectedRoute";
+import { PLATFORM_NAME, PLATFORM_TAGLINE, BASE_URL } from "~/config";
 
 export default function Home() {
   return (
     <ProtectedRoute>
-      <Title>General E — Online Multiplayer Games</Title>
-      <Meta name="description" content="Play real-time multiplayer strategy games online. Free, no download." />
-      <Meta property="og:title" content="General E — Online Multiplayer Games" />
+      <Title>{PLATFORM_NAME} — {PLATFORM_TAGLINE}</Title>
+      <Meta name="description" content={`${PLATFORM_NAME} — Play real-time multiplayer strategy games online. Free, no download.`} />
+      <Meta property="og:title" content={`${PLATFORM_NAME} — ${PLATFORM_TAGLINE}`} />
       <Meta property="og:description" content="Play real-time multiplayer strategy games online. Free, no download." />
-      <Meta property="og:image" content="/og-image.svg" />
+      <Meta property="og:image" content={`${BASE_URL}/og-image.svg`} />
       <Meta property="og:type" content="website" />
       <Hero />
       <section class="max-w-4xl mx-auto px-6 py-8">
@@ -31,14 +32,14 @@ export default function Home() {
         </div>
       </section>
       <footer class="border-t-2 border-base-300 py-6 text-center text-xs text-base-content/40">
-        General E — Online Multiplayer Game Platform
+        {PLATFORM_NAME} — {PLATFORM_TAGLINE}
       </footer>
       <script type="application/ld+json">
         {JSON.stringify({
           "@context": "https://schema.org",
           "@type": "WebApplication",
-          "name": "General E",
-          "description": "Online multiplayer game platform",
+          "name": PLATFORM_NAME,
+          "description": `${PLATFORM_NAME} — ${PLATFORM_TAGLINE}`,
           "applicationCategory": "Game",
           "operatingSystem": "Web",
           "browserRequirements": "Requires JavaScript"

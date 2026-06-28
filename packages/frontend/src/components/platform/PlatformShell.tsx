@@ -5,6 +5,7 @@ import Avatar from "~/components/Avatar";
 import LogoIcon from "~/components/LogoIcon";
 import { useAuth } from "~/hooks/useAuth";
 import { MuteToggle } from "~/ui";
+import { PLATFORM_NAME } from "~/config";
 
 export default function PlatformShell(props: { children?: JSX.Element }) {
   const auth = useAuth();
@@ -39,7 +40,7 @@ export default function PlatformShell(props: { children?: JSX.Element }) {
           <div class="flex items-center gap-6">
             <A href="/" class="flex items-center gap-2 text-primary">
               <LogoIcon size={28} />
-              <span class="font-semibold text-base-content">General E</span>
+              <span class="font-semibold text-base-content">{PLATFORM_NAME}</span>
             </A>
             <div class="flex items-center gap-4 text-sm">
               <A href="/generale" class="border-b-2 border-transparent hover:border-primary text-base-content/70 hover:text-base-content">
