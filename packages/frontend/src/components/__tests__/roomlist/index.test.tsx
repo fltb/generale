@@ -80,7 +80,7 @@ describe("RoomList", () => {
 
   it("renders create room button", () => {
     render(() => <RoomList />);
-    expect(screen.getByText("新建房间")).toBeInTheDocument();
+    expect(screen.getByText("New Room")).toBeInTheDocument();
   });
 
   it("renders refresh button", () => {
@@ -106,7 +106,7 @@ describe("RoomList", () => {
     mockGameListQuery.isSuccess = false;
     mockGameListQuery.error = { message: "Network error" };
     render(() => <RoomList />);
-    expect(screen.getByText(/载入房间列表失败/)).toBeInTheDocument();
+    expect(screen.getByText(/Failed to load room list/)).toBeInTheDocument();
   });
 
   it("renders game cards on success with data", () => {
@@ -143,7 +143,7 @@ describe("RoomList", () => {
 
   it("opens create modal when new room button clicked", () => {
     render(() => <RoomList />);
-    fireEvent.click(screen.getByText("新建房间"));
+    fireEvent.click(screen.getByText("New Room"));
     expect(screen.getByTestId("create-room-modal")).toBeInTheDocument();
   });
 

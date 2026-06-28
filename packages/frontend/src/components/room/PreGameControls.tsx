@@ -28,25 +28,25 @@ export const PreGameControls: Component<PreGameControlsProps> = (props) => {
               props.onReadyToggle(!props.ready);
             }}
             disabled={props.started}
-            title={props.started ? t("游戏已开始，无法改变准备") : props.ready ? t("取消准备") : t("准备")}
+            title={props.started ? t("Game already started, cannot change ready status") : props.ready ? t("Cancel Ready") : t("Ready")}
           >
-            {props.ready ? t("取消准备") : t("准备")}
+            {props.ready ? t("Cancel Ready") : t("Ready")}
           </Button>
         </Show>
 
         <Show when={props.isHost}>
           <Button data-testid="start-game" variant="accent" onClick={() => props.onStartGame?.()} disabled={props.started}>
-            {t("开始游戏")}
+            {t("Start Game")}
           </Button>
         </Show>
 
         <Button variant="ghost" data-testid="leave-room" onClick={() => props.onLeave?.()}>
-          {t("离开房间")}
+          {t("Leave Room")}
         </Button>
 
         <Show when={props.isHost}>
           <Button variant="error" data-testid="disband-room" onClick={() => props.onDisband?.()}>
-            {t("解散房间")}
+            {t("Disband Room")}
           </Button>
         </Show>
       </div>

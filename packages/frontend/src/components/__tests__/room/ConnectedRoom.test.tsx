@@ -85,7 +85,7 @@ describe("ConnectedRoom", () => {
     render(() => (
       <ConnectedRoom domain="test" playerId="p1" gameId="test-game" />
     ));
-    expect(screen.getByText("房间信息")).toBeInTheDocument();
+    expect(screen.getByText("Room Info")).toBeInTheDocument();
   });
 
   it("renders game id", () => {

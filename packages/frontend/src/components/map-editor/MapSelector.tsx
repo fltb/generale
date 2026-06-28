@@ -34,7 +34,7 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
     <Collapse arrow class="border border-base-300 bg-base-100">
       <Checkbox />
       <CollapseTitle class="text-sm font-medium">
-        <Show when={selectedMap()} fallback={<span class="opacity-50 ml-6">{props.placeholder || t("选择地图...")}</span>}>
+        <Show when={selectedMap()} fallback={<span class="opacity-50 ml-6">{props.placeholder || t("Select a map…")}</span>}>
           <span class="text ml-5">{selectedMap()?.name}</span>
           <span class="text-xs opacity-50 ml-2">
             {selectedMap()?.width}×{selectedMap()?.height}
@@ -46,12 +46,12 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
           <Input
             value={search()}
             onInput={(e) => setSearch(e.currentTarget.value)}
-            placeholder={t("搜索...")}
+            placeholder={t("Search…")}
             size="sm"
             class="flex-1"
           />
           <Button size="xs" variant="ghost" onClick={() => props.onChange("")}>
-            {t("清除")}
+            {t("Clear")}
           </Button>
         </div>
 
@@ -65,7 +65,7 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
         >
           <Show
             when={maps() && maps()?.length > 0}
-            fallback={<div class="text-center py-4 opacity-50 text-sm">{t("暂无已发布的地图")}</div>}
+            fallback={<div class="text-center py-4 opacity-50 text-sm">{t("No published maps yet")}</div>}
           >
             <div class="space-y-1 max-h-[180px] overflow-y-auto">
               <For each={maps()}>

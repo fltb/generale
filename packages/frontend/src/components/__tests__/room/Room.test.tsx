@@ -85,7 +85,7 @@ function makeCtrl(overrides?: Partial<PregameController>): PregameController {
 describe("RoomWithSync", () => {
   it("renders room info card", () => {
     render(() => <RoomWithSync ctrl={makeCtrl()} playerId="p1" gameId="g1" />);
-    expect(screen.getByText("房间信息")).toBeInTheDocument();
+    expect(screen.getByText("Room Info")).toBeInTheDocument();
   });
 
   it("renders game id", () => {
@@ -95,12 +95,12 @@ describe("RoomWithSync", () => {
 
   it("renders copy invite link button for host", () => {
     render(() => <RoomWithSync ctrl={makeCtrl()} playerId="p1" gameId="g1" />);
-    expect(screen.getByText("复制邀请链接")).toBeInTheDocument();
+    expect(screen.getByText("Copy Invite Link")).toBeInTheDocument();
   });
 
-  it("renders玩家上限 info", () => {
+  it("renders Player Limit info", () => {
     render(() => <RoomWithSync ctrl={makeCtrl()} playerId="p1" gameId="g1" />);
-    expect(screen.getByText(/玩家上限/)).toBeInTheDocument();
+    expect(screen.getByText(/Player Limit/)).toBeInTheDocument();
   });
 
   it("hides when visible is false", () => {

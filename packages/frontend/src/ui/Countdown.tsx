@@ -26,7 +26,7 @@ export const Countdown: Component<CountdownProps> = (props) => {
         setLabel(String(from - step));
         sfx.countdownBeep();
       } else if (step === from) {
-        setLabel(t("开战!"));
+        setLabel(t("Go!"));
         sfx.go();
       }
       step++;
@@ -46,7 +46,7 @@ export const Countdown: Component<CountdownProps> = (props) => {
     <Show when={label()}>
       <div class="pointer-events-none fixed inset-0 z-[55] flex items-center justify-center">
         <div
-          class={`font-display text-7xl ${label() === t("开战!") ? "text-primary" : "text-base-content"} animate-countdown`}
+          class={`font-display text-7xl ${label() === t("Go!") ? "text-primary" : "text-base-content"} animate-countdown`}
           style={{ "text-shadow": "4px 4px 0 var(--pixel-ink)" }}
         >
           {label()}

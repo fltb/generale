@@ -33,7 +33,7 @@ describe("Overlay", () => {
 describe("TakeoverOverlay", () => {
   it("renders takeover message with default scope", () => {
     render(() => <TakeoverOverlay />);
-    expect(screen.getByText(/已被/)).toBeInTheDocument();
+    expect(screen.getByText(/This page has been taken over/)).toBeInTheDocument();
   });
   it("renders with custom scope", () => {
     render(() => <TakeoverOverlay scope="游戏" />);

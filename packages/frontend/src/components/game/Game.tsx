@@ -87,8 +87,8 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
         when={mapReady()}
         fallback={
           <div class="flex h-full w-full flex-col items-center justify-center gap-3 bg-base-300 text-base-content">
-            <div class="font-display text-2xl text-primary animate-pulse">{t("召集军队中…")}</div>
-            <div class="text-sm opacity-60">{t("正在与战场同步")}</div>
+            <div class="font-display text-2xl text-primary animate-pulse">{t("Assembling the army…")}</div>
+            <div class="text-sm opacity-60">{t("Syncing with the battlefield")}</div>
           </div>
         }
       >
@@ -124,22 +124,22 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
             fallback={
               <>
                 <Badge variant="info" class="badge-xs" data-testid="spectator-badge">
-                  {t("观战中")}
+                  {t("Spectating")}
                 </Badge>
                 <Button size="xs" variant="ghost" onClick={() => props.onLeaveSpectate?.()}>
-                  {t("退出观战")}
+                  {t("Leave Spectate")}
                 </Button>
               </>
             }
           >
             <Button size="xs" variant="ghost" onClick={ctrl.handleClearQueue}>
-              {t("清空队列")}
+              {t("Clear Queue")}
             </Button>
             <Button data-testid="surrender" size="xs" variant="warning" onClick={ctrl.handleSurrender}>
-              {t("投降")}
+              {t("Surrender")}
             </Button>
             <Button size="xs" variant="ghost" onClick={ctrl.handleLeave}>
-              {t("离开")}
+              {t("Leave")}
             </Button>
           </Show>
         </div>
@@ -152,7 +152,7 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
           class="self-end mr-2 bg-base-200/70 backdrop-blur-sm px-2 py-0.5 text-xs pixel-border"
           onClick={() => setPlayerPanelOpen((v) => !v)}
         >
-          {playerPanelOpen() ? t("▶ 收起") : t("◀ 玩家")}
+          {playerPanelOpen() ? t("▶ Collapse") : t("◀ Players")}
         </button>
         <Show when={playerPanelOpen()}>
           <div class="w-44 max-h-full bg-base-200/70 backdrop-blur-sm overflow-auto mr-2">
@@ -163,13 +163,13 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
 
       {/* ---- HUD: 底部缩放控制 ---- */}
       <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-base-200/80 backdrop-blur-sm pixel-border rounded px-3 py-1.5">
-        <Button size="xs" variant="ghost" onClick={() => viewportApi()?.zoomOut()} title={t("缩小 (−)")}>
+        <Button size="xs" variant="ghost" onClick={() => viewportApi()?.zoomOut()} title={t("Zoom Out (−)")}>
           −
         </Button>
-        <Button size="xs" variant="ghost" onClick={() => viewportApi()?.zoomReset()} title={t("重置缩放 (0)")}>
+        <Button size="xs" variant="ghost" onClick={() => viewportApi()?.zoomReset()} title={t("Reset Zoom (0)")}>
           ⊙
         </Button>
-        <Button size="xs" variant="ghost" onClick={() => viewportApi()?.zoomIn()} title={t("放大 (=)")}>
+        <Button size="xs" variant="ghost" onClick={() => viewportApi()?.zoomIn()} title={t("Zoom In (=)")}>
           +
         </Button>
       </div>
@@ -181,7 +181,7 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
 
       {/* ---- Displaced overlay ---- */}
       <Show when={ctrl.displaced()}>
-        <TakeoverOverlay scope={t("游戏")} dim={70} />
+        <TakeoverOverlay scope={t("Game")} dim={70} />
       </Show>
 
       {/* ---- 胜利纸屑 ---- */}
@@ -197,34 +197,34 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
             fallback={
               <Show
                 when={endgameResult()?.selfOutcome === "lost"}
-                fallback={<h1 class="font-display text-4xl mb-4 animate-slam">{t("游戏结束")}</h1>}
+                fallback={<h1 class="font-display text-4xl mb-4 animate-slam">{t("Game Over")}</h1>}
               >
-                <h1 class={`font-display text-5xl mb-4 animate-slam ${uiTheme.outcome.lost}`}>{t("你输了")}</h1>
+                <h1 class={`font-display text-5xl mb-4 animate-slam ${uiTheme.outcome.lost}`}>{t("You Lost")}</h1>
               </Show>
             }
           >
-            <h1 class={`font-display text-5xl mb-4 animate-slam ${uiTheme.outcome.won}`}>{t("你赢了")}</h1>
+            <h1 class={`font-display text-5xl mb-4 animate-slam ${uiTheme.outcome.won}`}>{t("You Won")}</h1>
           </Show>
 
           <Show when={endgameResult()?.winnerLabel}>
             <p class="mb-2 text-lg">
-              {t("获胜：")}<span class="font-semibold">{endgameResult()?.winnerLabel}</span>
+              {t("Winner: ")}<span class="font-semibold">{endgameResult()?.winnerLabel}</span>
             </p>
           </Show>
 
           <Show when={(endgameResult()?.loserLabels ?? []).length > 0}>
-            <p class="mb-4 text-sm opacity-80">{t("失败：")}{endgameResult()?.loserLabels.join(" / ")}</p>
+            <p class="mb-4 text-sm opacity-80">{t("Losers: ")}{endgameResult()?.loserLabels.join(" / ")}</p>
           </Show>
 
-          <p class="mb-4 opacity-70">{t("5 秒后返回房间")}</p>
+          <p class="mb-4 opacity-70">{t("Returning to room in 5 seconds…")}</p>
 
           <div class="flex gap-4">
             <Button variant="primary" onClick={ctrl.handleBackToRoom}>
-              {t("回到房间")}
+              {t("Back to Room")}
             </Button>
 
             <Button variant="secondary" onClick={handleReturnToLobby}>
-              {t("返回大厅")}
+              {t("Back to Lobby")}
             </Button>
           </div>
         </Overlay>

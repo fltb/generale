@@ -28,23 +28,23 @@ import { ChatPanel } from "~/components/ChatPanel";
 describe("ChatPanel", () => {
   it("renders title", () => {
     render(() => <ChatPanel domain="test" userId="u1" />);
-    expect(screen.getByText("战局聊天")).toBeInTheDocument();
+    expect(screen.getByText("Game Chat")).toBeInTheDocument();
   });
 
   it("shows empty state when no messages", () => {
     render(() => <ChatPanel domain="test" userId="u1" />);
-    expect(screen.getByText("暂无消息")).toBeInTheDocument();
+    expect(screen.getByText("No messages yet")).toBeInTheDocument();
   });
 
   it("shows connection badge 在线", () => {
     render(() => <ChatPanel domain="test" userId="u1" />);
-    expect(screen.getByText("在线")).toBeInTheDocument();
+    expect(screen.getByText("Online")).toBeInTheDocument();
   });
 
   it("shows connection badge 离线 when disconnected", () => {
     mockChat.connected.mockReturnValue(false);
     render(() => <ChatPanel domain="test" userId="u1" />);
-    expect(screen.getByText("离线")).toBeInTheDocument();
+    expect(screen.getByText("Offline")).toBeInTheDocument();
   });
 
   it("renders messages", () => {
@@ -61,7 +61,7 @@ describe("ChatPanel", () => {
   it("connect button disabled when connected", () => {
     mockChat.connected.mockReturnValue(true);
     render(() => <ChatPanel domain="test" userId="u1" />);
-    const btns = screen.getAllByText("连接");
+    const btns = screen.getAllByText("Connect");
     for (const btn of btns) {
       expect(btn.closest("button")).toBeDisabled();
     }
@@ -70,7 +70,7 @@ describe("ChatPanel", () => {
   it("disconnect button enabled when connected", () => {
     mockChat.connected.mockReturnValue(true);
     render(() => <ChatPanel domain="test" userId="u1" />);
-    const btns = screen.getAllByText("断开");
+    const btns = screen.getAllByText("Disconnect");
     for (const btn of btns) {
       expect(btn.closest("button")).not.toBeDisabled();
     }
@@ -79,7 +79,7 @@ describe("ChatPanel", () => {
   it("disconnect button disabled when not connected", () => {
     mockChat.connected.mockReturnValue(false);
     render(() => <ChatPanel domain="test" userId="u1" />);
-    const btns = screen.getAllByText("断开");
+    const btns = screen.getAllByText("Disconnect");
     for (const btn of btns) {
       expect(btn.closest("button")).toBeDisabled();
     }
@@ -88,29 +88,29 @@ describe("ChatPanel", () => {
   it("send button disabled when input empty", () => {
     mockChat.connected.mockReturnValue(true);
     render(() => <ChatPanel domain="test" userId="u1" />);
-    const sendBtn = screen.getByText("发送").closest("button")!;
+    const sendBtn = screen.getByText("Send").closest("button")!;
     expect(sendBtn).toBeDisabled();
   });
 
   it("renders role badge 房间玩家 when no phase and no status", () => {
     mockChat.connected.mockReturnValue(true);
     render(() => <ChatPanel domain="test" userId="u1" />);
-    expect(screen.getByText("房间玩家")).toBeInTheDocument();
+    expect(screen.getByText("Room Player")).toBeInTheDocument();
   });
 
   it("renders role badge 游戏玩家 when playing", () => {
     render(() => <ChatPanel domain="test" userId="u1" selfStatus={PreGamePlayerStatus.Playing} />);
-    expect(screen.getByText("游戏玩家")).toBeInTheDocument();
+    expect(screen.getByText("In-Game Player")).toBeInTheDocument();
   });
 
   it("renders role badge 旁观者 when spectating", () => {
     render(() => <ChatPanel domain="test" userId="u1" selfStatus={PreGamePlayerStatus.Spectating} />);
-    expect(screen.getByText("旁观者")).toBeInTheDocument();
+    expect(screen.getByText("Spectator")).toBeInTheDocument();
   });
 
   it("renders role badge 大厅等待 when phase is INGAME", () => {
     render(() => <ChatPanel domain="test" userId="u1" phase={GamePhase.INGAME} />);
-    expect(screen.getByText("大厅等待")).toBeInTheDocument();
+    expect(screen.getByText("Lobby")).toBeInTheDocument();
   });
 
   it("calls send on button click with non-empty input", () => {
@@ -119,7 +119,7 @@ describe("ChatPanel", () => {
     render(() => <ChatPanel domain="test" userId="u1" />);
     const textarea = screen.getByRole("textbox");
     fireEvent.input(textarea, { target: { value: "test message" } });
-    const sendBtn = screen.getByText("发送").closest("button")!;
+    const sendBtn = screen.getByText("Send").closest("button")!;
     expect(sendBtn).not.toBeDisabled();
     fireEvent.click(sendBtn);
     expect(mockChat.send).toHaveBeenCalledWith("test message");
@@ -128,7 +128,7 @@ describe("ChatPanel", () => {
   it("renders history button as 已到顶 when no more history", () => {
     mockChat.hasMoreHistory.mockReturnValue(false);
     render(() => <ChatPanel domain="test" userId="u1" />);
-    expect(screen.getByText("已到顶")).toBeInTheDocument();
+    expect(screen.getByText("No more")).toBeInTheDocument();
   });
 
   it("renders history button as 历史 when has more history", () => {
@@ -137,6 +137,6 @@ describe("ChatPanel", () => {
     ]);
     mockChat.hasMoreHistory.mockReturnValue(true);
     render(() => <ChatPanel domain="test" userId="u1" />);
-    expect(screen.getByText("历史")).toBeInTheDocument();
+    expect(screen.getByText("History")).toBeInTheDocument();
   });
 });

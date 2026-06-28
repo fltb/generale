@@ -37,7 +37,7 @@ function importedSetting(mapId?: string): PreGameMapSetting {
 describe("PreGameMapSettingForm", () => {
   it("shows preset buttons for standard roomType", () => {
     render(() => <PreGameMapSettingForm setting={randomSetting()} roomType="standard" onChange={vi.fn()} />);
-    expect(screen.getByText("预置尺寸")).toBeInTheDocument();
+    expect(screen.getByText("Preset Size")).toBeInTheDocument();
     expect(screen.getByText("Small (10×10)")).toBeInTheDocument();
     expect(screen.getByText("Medium (20×20)")).toBeInTheDocument();
     expect(screen.getByText("Large (40×40)")).toBeInTheDocument();
@@ -45,13 +45,13 @@ describe("PreGameMapSettingForm", () => {
 
   it("does not show preset buttons for non-standard roomType", () => {
     render(() => <PreGameMapSettingForm setting={randomSetting()} onChange={vi.fn()} />);
-    expect(screen.queryByText("预置尺寸")).not.toBeInTheDocument();
+    expect(screen.queryByText("Preset Size")).not.toBeInTheDocument();
   });
 
   it("shows random/custom toggle buttons", () => {
     render(() => <PreGameMapSettingForm setting={randomSetting()} onChange={vi.fn()} />);
-    expect(screen.getByText("随机")).toBeInTheDocument();
-    expect(screen.getByText("自定义")).toBeInTheDocument();
+    expect(screen.getByText("Random")).toBeInTheDocument();
+    expect(screen.getByText("Custom")).toBeInTheDocument();
   });
 
   it("shows width and height inputs", () => {
@@ -81,7 +81,7 @@ describe("PreGameMapSettingForm", () => {
   it("switches to custom mode when custom button clicked", () => {
     const onChange = vi.fn();
     render(() => <PreGameMapSettingForm setting={randomSetting()} onChange={onChange} />);
-    fireEvent.click(screen.getByText("自定义"));
+    fireEvent.click(screen.getByText("Custom"));
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ type: PreGameMapType.Custom }),
     );
@@ -90,7 +90,7 @@ describe("PreGameMapSettingForm", () => {
   it("switches to random mode when random button clicked", () => {
     const onChange = vi.fn();
     render(() => <PreGameMapSettingForm setting={customSetting()} onChange={onChange} />);
-    fireEvent.click(screen.getByText("随机"));
+    fireEvent.click(screen.getByText("Random"));
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ type: PreGameMapType.Random }),
     );
@@ -98,30 +98,30 @@ describe("PreGameMapSettingForm", () => {
 
   it("shows advanced settings toggle", () => {
     render(() => <PreGameMapSettingForm setting={randomSetting()} onChange={vi.fn()} />);
-    expect(screen.getByText("高级生成设置")).toBeInTheDocument();
+    expect(screen.getByText("Advanced Generation Settings")).toBeInTheDocument();
   });
 
   it("shows tile frequency inputs when advanced opened", () => {
     render(() => <PreGameMapSettingForm setting={randomSetting()} onChange={vi.fn()} />);
-    fireEvent.click(screen.getByText("高级生成设置"));
-    expect(screen.getByText("地形频率")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Advanced Generation Settings"));
+    expect(screen.getByText("Tile Frequency")).toBeInTheDocument();
   });
 
   it("shows custom data textarea in custom mode when advanced opened", () => {
     render(() => <PreGameMapSettingForm setting={customSetting()} onChange={vi.fn()} />);
-    fireEvent.click(screen.getByText("高级生成设置"));
-    expect(screen.getByText("自定义数据")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Advanced Generation Settings"));
+    expect(screen.getByText("Custom Data")).toBeInTheDocument();
   });
 
   it("does not show custom data textarea in random mode even when advanced opened", () => {
     render(() => <PreGameMapSettingForm setting={randomSetting()} onChange={vi.fn()} />);
-    fireEvent.click(screen.getByText("高级生成设置"));
-    expect(screen.queryByText("自定义数据")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Advanced Generation Settings"));
+    expect(screen.queryByText("Custom Data")).not.toBeInTheDocument();
   });
 
   it("shows imported mode alert when setting is imported", () => {
     render(() => <PreGameMapSettingForm setting={importedSetting("map1")} onChange={vi.fn()} />);
-    expect(screen.getByText("已选择自定义地图，随机生成参数已禁用。")).toBeInTheDocument();
+    expect(screen.getByText("Custom map selected. Random generation parameters disabled.")).toBeInTheDocument();
   });
 
   it("shows MapSelector in imported mode", () => {
@@ -139,8 +139,8 @@ describe("PreGameMapSettingForm", () => {
 
   it("does not show random/custom toggle when imported", () => {
     render(() => <PreGameMapSettingForm setting={importedSetting("map1")} onChange={vi.fn()} />);
-    expect(screen.queryByText("随机")).not.toBeInTheDocument();
-    expect(screen.queryByText("自定义")).not.toBeInTheDocument();
+    expect(screen.queryByText("Random")).not.toBeInTheDocument();
+    expect(screen.queryByText("Custom")).not.toBeInTheDocument();
   });
 
   it("calls onChange with width clamped between 10 and 500", () => {

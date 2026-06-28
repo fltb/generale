@@ -31,7 +31,7 @@ export const PlayerList: Component<Props> = (props) => {
   return (
     <div class={props.compact ? "p-1.5" : "p-2 w-full max-w-sm"}>
       <Show when={!props.compact}>
-        <div class="font-semibold mb-2">{t("玩家信息")}</div>
+        <div class="font-semibold mb-2">{t("Players")}</div>
       </Show>
       <div class="flex flex-col gap-1.5">
         <For each={summaries()}>

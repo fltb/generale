@@ -117,7 +117,7 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
         <div class="p-4 bg-base-100 rounded-lg shadow-sm space-y-3">
           <div>
             <div class="label">
-              <span class="label-text">{t("预置尺寸")}</span>
+              <span class="label-text">{t("Preset Size")}</span>
             </div>
             <div class="btn-group">
               <Button size="sm" active={currentLabel() === "small"} onClick={() => applyStandardPreset("small")}>
@@ -139,14 +139,14 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
         {/* --- Imported: locked --- */}
         <Show when={isImported()}>
           <div class="alert alert-info text-sm py-2">
-            <span>{t("已选择自定义地图，随机生成参数已禁用。")}</span>
+            <span>{t("Custom map selected. Random generation parameters disabled.")}</span>
           </div>
           <div class="flex items-end gap-2">
             <div class="flex-1">
-              <MapSelector value={currentMapId() ?? ""} onChange={selectCustomMap} placeholder={t("从地图工坊选择...")} />
+              <MapSelector value={currentMapId() ?? ""} onChange={selectCustomMap} placeholder={t("Select from map workshop...")} />
             </div>
             <Button size="sm" variant="ghost" onClick={clearCustomMap}>
-              {t("清除")}
+              {t("Clear")}
             </Button>
           </div>
         </Show>
@@ -160,14 +160,14 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
                 active={props.setting.type === PreGameMapType.Random}
                 onClick={() => switchGenType(PreGameMapType.Random)}
               >
-                随机
+                {t("Random")}
               </Button>
               <Button
                 size="sm"
                 active={props.setting.type === PreGameMapType.Custom}
                 onClick={() => switchGenType(PreGameMapType.Custom)}
               >
-                自定义
+                {t("Custom")}
               </Button>
             </div>
             <Input
@@ -210,8 +210,8 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
         <Show when={!isImported()}>
           <div>
             <div class="label py-1">
-              <span class="label-text text-xs">自定义地图</span>
-              <span class="label-text-alt">选择预设地图替代随机生成</span>
+              <span class="label-text text-xs">{t("Custom Map")}</span>
+              <span class="label-text-alt">{t("Choose a preset map instead of random generation")}</span>
             </div>
             <MapSelector value={currentMapId() ?? ""} onChange={selectCustomMap} placeholder="留空使用随机生成" />
           </div>
@@ -227,13 +227,13 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
             <span class={advancedOpen() ? "rotate-90" : ""} style="transition:transform 0.15s;display:inline-block">
               ▸
             </span>
-            高级生成设置
+            {t("Advanced Generation Settings")}
           </button>
           <Show when={advancedOpen()}>
             <div class="space-y-3">
               <div>
                 <div class="label py-1">
-                  <span class="label-text text-xs">地形频率</span>
+                  <span class="label-text text-xs">{t("Tile Frequency")}</span>
                   <span class="label-text-alt">数值越大越常见</span>
                 </div>
                 <div class="grid gap-1">
@@ -263,7 +263,7 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
               <Show when={props.setting.type === PreGameMapType.Custom}>
                 <div>
                   <div class="label py-1">
-                    <span class="label-text text-xs">自定义数据</span>
+                    <span class="label-text text-xs">{t("Custom Data")}</span>
                   </div>
                   <Textarea
                     bordered

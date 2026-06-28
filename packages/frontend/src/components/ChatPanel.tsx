@@ -46,19 +46,19 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
     const phase = props.phase;
 
     if (status === PreGamePlayerStatus.Spectating) {
-      return { label: t("旁观者"), variant: "info" as const };
+      return { label: t("Spectator"), variant: "info" as const };
     }
     if (status === PreGamePlayerStatus.Playing) {
-      return { label: t("游戏玩家"), variant: "success" as const };
+      return { label: t("In-Game Player"), variant: "success" as const };
     }
     if (phase === GamePhase.INGAME) {
-      return { label: t("大厅等待"), variant: "warning" as const };
+      return { label: t("Lobby"), variant: "warning" as const };
     }
-    return { label: t("房间玩家"), variant: "neutral" as const };
+    return { label: t("Room Player"), variant: "neutral" as const };
   });
 
   const connectionBadge = createMemo(() =>
-    connected() ? { label: t("在线"), variant: "success" as const } : { label: t("离线"), variant: "outline" as const },
+    connected() ? { label: t("Online"), variant: "success" as const } : { label: t("Offline"), variant: "outline" as const },
   );
 
   function doSend() {
@@ -113,7 +113,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
       title={
         <div class="flex items-center justify-between gap-3">
           <div>
-            <div class="text-sm font-semibold">{t("战局聊天")}</div>
+            <div class="text-sm font-semibold">{t("Game Chat")}</div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
             <Badge variant={role().variant}>{role().label}</Badge>
@@ -125,10 +125,10 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
     >
       <div class="flex items-center gap-2">
         <Button size="xs" variant="ghost" disabled={connected()} onClick={connect}>
-          {t("连接")}
+          {t("Connect")}
         </Button>
         <Button size="xs" variant="ghost" disabled={!connected()} onClick={disconnect}>
-          {t("断开")}
+          {t("Disconnect")}
         </Button>
         <Button
           size="xs"
@@ -137,7 +137,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
           disabled={loadingHistory() || !hasMoreHistory() || messages().length === 0}
           onClick={loadMore}
         >
-          {loadingHistory() ? t("加载中") : hasMoreHistory() ? t("历史") : t("已到顶")}
+          {loadingHistory() ? t("Loading") : hasMoreHistory() ? t("History") : t("No more")}
         </Button>
       </div>
 
@@ -149,7 +149,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
       >
         <Show
           when={messages().length > 0}
-          fallback={<div class="flex h-full items-center justify-center text-sm opacity-60">{t("暂无消息")}</div>}
+          fallback={<div class="flex h-full items-center justify-center text-sm opacity-60">{t("No messages yet")}</div>}
         >
           <div class="flex flex-col gap-2">
             <For each={messages()}>
@@ -164,7 +164,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
                     </div>
                     <Show when={m.scope === "team"}>
                       <Badge variant="success" class="badge-xs">
-                        {t("小队")}
+                        {t("Team")}
                       </Badge>
                     </Show>
                     <Show when={chat.teamLabel(m)}>
@@ -219,7 +219,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
           class="textarea-sm min-h-16 flex-1 resize-none"
           placeholder={
             props.placeholder ??
-            (chat.canTeamChat() ? t("输入消息，/team 小队聊天") : t("输入消息，Enter 发送，Shift+Enter 换行"))
+            (chat.canTeamChat() ? t("Type a message, /team for team chat") : t("Type a message, Enter to send, Shift+Enter for newline"))
           }
           value={input()}
           maxLength={500}
@@ -228,7 +228,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
           onKeyDown={onKey}
         />
         <Button size="sm" variant="primary" disabled={!connected() || input().trim().length === 0} onClick={doSend}>
-          {t("发送")}
+          {t("Send")}
         </Button>
       </div>
     </Panel>

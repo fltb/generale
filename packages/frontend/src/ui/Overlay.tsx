@@ -43,11 +43,11 @@ export const TakeoverOverlay: Component<TakeoverOverlayProps> = (props) => {
   const { t } = useT();
   return (
     <Overlay dim={props.dim ?? 70}>
-      <h2 class="text-3xl font-bold mb-3">{t("该页面已被接管")}</h2>
+      <h2 class="text-3xl font-bold mb-3">{t("This page has been taken over")}</h2>
       <p class="opacity-80 mb-4 text-center max-w-md">
-        {t("你的账号在另一个标签页或设备上打开了这个{scope}，所有操作都将在那一边进行。", { scope: props.scope ?? t("房间") })}
+        {t("你的账号在另一个标签页或设备上打开了这个{scope}，所有操作都将在那一边进行。", { scope: props.scope ?? t("Room") })}
       </p>
-      <p class="text-sm opacity-60">{t("关掉这个页面或刷新可重新接管")}</p>
+      <p class="text-sm opacity-60">{t("Close this page or refresh to retake control")}</p>
     </Overlay>
   );
 };

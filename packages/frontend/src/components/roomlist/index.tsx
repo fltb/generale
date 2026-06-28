@@ -74,7 +74,7 @@ export function RoomList() {
         <h2 class="text-2xl font-semibold">{t("Active Rooms")}</h2>
         <div class="flex items-center gap-2">
           <Button data-testid="create-room" size="sm" variant="secondary" onClick={() => setCreateOpen(true)}>
-            {t("新建房间")}
+            {t("New Room")}
           </Button>
           <Button size="sm" variant="primary" onClick={() => (gamesQuery.refetch ? gamesQuery.refetch() : null)}>
             {t("Refresh")}
@@ -99,7 +99,7 @@ export function RoomList() {
         <Match when={gamesQuery.isError}>
           <Alert variant="error" class="shadow-lg">
             <div>
-              <span>{t("载入房间列表失败")}: {gamesQuery.error?.message ?? t("Unknown")}</span>
+              <span>{t("Failed to load room list")}: {gamesQuery.error?.message ?? t("Unknown")}</span>
             </div>
           </Alert>
         </Match>

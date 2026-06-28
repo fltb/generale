@@ -29,14 +29,14 @@ describe("PreGameRoomStateFrom", () => {
     render(() => (
       <PreGameRoomStateFrom state={defaultState} map={defaultMap} onChange={vi.fn()} />
     ));
-    expect(screen.getByText(/游戏倍速/)).toBeInTheDocument();
+    expect(screen.getByText(/Game Speed/)).toBeInTheDocument();
   });
 
   it("renders afkThreshold input", () => {
     render(() => (
       <PreGameRoomStateFrom state={defaultState} map={defaultMap} onChange={vi.fn()} />
     ));
-    const input = screen.getByLabelText(/挂机阈值/) as HTMLInputElement;
+    const input = screen.getByLabelText(/AFK Threshold/) as HTMLInputElement;
     expect(input).toBeInTheDocument();
     expect(input.value).toBe("100");
   });
@@ -45,21 +45,21 @@ describe("PreGameRoomStateFrom", () => {
     render(() => (
       <PreGameRoomStateFrom state={defaultState} map={defaultMap} onChange={vi.fn()} />
     ));
-    expect(screen.getByText("应用设置")).toBeInTheDocument();
+    expect(screen.getByText("Apply Settings")).toBeInTheDocument();
   });
 
   it("renders tileGrow section toggle", () => {
     render(() => (
       <PreGameRoomStateFrom state={defaultState} map={defaultMap} onChange={vi.fn()} />
     ));
-    expect(screen.getByText("地块增长规则 (tileGrow)")).toBeInTheDocument();
+    expect(screen.getByText("Tile Growth Rules (tileGrow)")).toBeInTheDocument();
   });
 
   it("renders tile grow entries when expanded", () => {
     render(() => (
       <PreGameRoomStateFrom state={defaultState} map={defaultMap} onChange={vi.fn()} />
     ));
-    fireEvent.click(screen.getByText("地块增长规则 (tileGrow)"));
+    fireEvent.click(screen.getByText("Tile Growth Rules (tileGrow)"));
     expect(screen.getByText(TileType.Plain)).toBeInTheDocument();
     expect(screen.getByText(TileType.Mountain)).toBeInTheDocument();
   });

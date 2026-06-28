@@ -72,7 +72,7 @@ import MapPreview from "~/components/map-editor/MapPreview";
 describe("MapPreview", () => {
   it("shows loading state initially", () => {
     render(() => <MapPreview mapId="map1" />);
-    expect(screen.getByText("加载中...")).toBeInTheDocument();
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
 
   it("renders map name after loading", async () => {
@@ -91,6 +91,6 @@ describe("MapPreview", () => {
 
   it("renders back link", () => {
     render(() => <MapPreview mapId="map1" />);
-    expect(screen.getByText("← 返回")).toBeInTheDocument();
+    expect(screen.getByText("← Back")).toBeInTheDocument();
   });
 });

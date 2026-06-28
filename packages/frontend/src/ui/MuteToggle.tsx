@@ -9,8 +9,8 @@ export const MuteToggle: Component<{ class?: string }> = (props) => {
     <button
       type="button"
       class={`px-2 py-1 ${props.class ?? ""}`}
-      title={isMuted() ? t("开启音效") : t("静音")}
-      aria-label={isMuted() ? t("开启音效") : t("静音")}
+      title={isMuted() ? t("Enable sound") : t("Mute")}
+      aria-label={isMuted() ? t("Enable sound") : t("Mute")}
       onClick={() => toggleMuted()}
     >
       <span class="text-lg">{isMuted() ? "🔇" : "🔊"}</span>

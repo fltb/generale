@@ -84,7 +84,7 @@ export default function MapPreview(props: { mapId: string }) {
         ),
       );
     } catch (e: unknown) {
-      setError((e as Error).message || t("加载失败"));
+      setError((e as Error).message || t("Load failed"));
     } finally {
       setLoading(false);
     }
@@ -102,9 +102,9 @@ export default function MapPreview(props: { mapId: string }) {
     <div class="flex flex-col h-full">
       <div class="p-3 bg-base-200 text-sm flex items-center gap-3 shrink-0">
         <A href="/maps" class="opacity-50 hover:opacity-100">
-          {t("← 返回")}
+          {t("← Back")}
         </A>
-        <span class="font-medium">{loading() ? t("加载中...") : name() || t("地图预览")}</span>
+        <span class="font-medium">{loading() ? t("Loading...") : name() || t("Map Preview")}</span>
         {!loading() && (
           <span class="opacity-50 text-xs">
             {width()}×{height()}

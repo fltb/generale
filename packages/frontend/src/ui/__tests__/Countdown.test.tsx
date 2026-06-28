@@ -23,6 +23,6 @@ describe("Countdown", () => {
   it("shows 开战 after countdown", () => {
     render(() => <Countdown from={1} />);
     vi.advanceTimersByTime(1500);
-    expect(screen.getByText("开战!")).toBeInTheDocument();
+    expect(screen.getByText("Go!")).toBeInTheDocument();
   });
 });

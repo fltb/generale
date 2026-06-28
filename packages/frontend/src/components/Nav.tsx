@@ -72,7 +72,7 @@ export default function Nav(): JSX.Element {
           <MuteToggle />
 
           <A href="/maps" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
-            {t("地图工坊")}
+            {t("Map Workshop")}
           </A>
 
           <div class="relative">

@@ -26,7 +26,7 @@ import { MapSelector } from "~/components/map-editor/MapSelector";
 describe("MapSelector", () => {
   it("renders placeholder when no map selected", () => {
     render(() => <MapSelector value="" onChange={vi.fn()} />);
-    expect(screen.getByText("选择地图...")).toBeInTheDocument();
+    expect(screen.getByText("Select a map…")).toBeInTheDocument();
   });
 
   it("renders placeholder text", () => {
@@ -36,11 +36,11 @@ describe("MapSelector", () => {
 
   it("renders clear button", () => {
     render(() => <MapSelector value="m1" onChange={vi.fn()} />);
-    expect(screen.getByText("清除")).toBeInTheDocument();
+    expect(screen.getByText("Clear")).toBeInTheDocument();
   });
 
   it("renders search input", () => {
     render(() => <MapSelector value="" onChange={vi.fn()} />);
-    expect(screen.getByPlaceholderText("搜索...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search…")).toBeInTheDocument();
   });
 });

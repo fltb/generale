@@ -26,13 +26,15 @@ const TILE_COLORS: Record<string, string> = {
   [TileType.Swamp]: "#06b6d4",
 };
 
-const TILE_LABELS: Record<TileType, string> = {
-  [TileType.Plain]: "平原",
-  [TileType.Throne]: "王座",
-  [TileType.Barracks]: "兵营",
-  [TileType.Mountain]: "山地",
-  [TileType.Swamp]: "沼泽",
-  [TileType.Fog]: "迷雾",
+import type { TranslationKey } from "@generale/i18n";
+
+const TILE_LABELS: Record<TileType, TranslationKey> = {
+  [TileType.Plain]: "Plain",
+  [TileType.Throne]: "Throne",
+  [TileType.Barracks]: "Barracks",
+  [TileType.Mountain]: "Mountain",
+  [TileType.Swamp]: "Swamp",
+  [TileType.Fog]: "Fog",
 };
 
 const TILE_TYPES = Object.values(TileType).filter((v) => typeof v === "string" && v !== TileType.Fog) as TileType[];
@@ -230,11 +232,11 @@ export default function MapEditor(props: MapEditorProps) {
         if (!hasCustomThumbnail) await generatePreview();
         navigate("/maps?tab=my");
       } else {
-        setMessage(t("地图已保存"));
+        setMessage(t("Map saved"));
         setMessageType("success");
       }
     } catch (e: unknown) {
-      setMessage(`${t("保存失败")}: ${(e as Error).message}`);
+      setMessage(`${t("Save failed")}: ${(e as Error).message}`);
       setMessageType("error");
     } finally {
       setSaving(false);
@@ -244,7 +246,7 @@ export default function MapEditor(props: MapEditorProps) {
   async function generatePreview() {
     const id = editingMapId();
     if (!id) {
-      setMessage(t("请先保存地图"));
+      setMessage(t("Please save the map first"));
       setMessageType("error");
       return;
     }
@@ -329,16 +331,16 @@ export default function MapEditor(props: MapEditorProps) {
       app.destroy(true, { children: true });
 
       if (!blob) {
-        setMessage(t("生成预览失败"));
+        setMessage(t("Preview generation failed"));
         setMessageType("error");
         return;
       }
       await uploadMapThumbnailApi(id, new File([blob], "preview.png", { type: "image/png" }));
       setThumbStamp(Date.now());
-      setMessage(t("预览图已生成"));
+      setMessage(t("Preview generated"));
       setMessageType("success");
     } catch (e: unknown) {
-      setMessage(`${t("预览失败")}: ${(e as Error).message}`);
+      setMessage(`${t("Preview failed")}: ${(e as Error).message}`);
       setMessageType("error");
     } finally {
       setThumbnailBusy(false);
@@ -353,12 +355,12 @@ export default function MapEditor(props: MapEditorProps) {
     setThumbnailBusy(true);
     try {
       await uploadMapThumbnailApi(editId, file);
-      setMessage(t("封面上传成功"));
+      setMessage(t("Cover uploaded"));
       setMessageType("success");
       hasCustomThumbnail = true;
       setThumbStamp(Date.now());
     } catch (e: unknown) {
-      setMessage(`${t("上传失败")}: ${(e as Error).message}`);
+      setMessage(`${t("Upload failed")}: ${(e as Error).message}`);
       setMessageType("error");
     } finally {
       setThumbnailBusy(false);
@@ -386,7 +388,7 @@ export default function MapEditor(props: MapEditorProps) {
       setHasDraft(!!d.hasDraft);
       hasCustomThumbnail = !!d.hasCustomThumbnail;
     } catch (e: unknown) {
-      setMessage(`${t("加载失败")}: ${(e as Error).message}`);
+      setMessage(`${t("Load failed")}: ${(e as Error).message}`);
       setMessageType("error");
     }
   }
@@ -398,10 +400,10 @@ export default function MapEditor(props: MapEditorProps) {
       await discardDraftApi(id);
       setHasDraft(false);
       await loadMap(id);
-      setMessage(t("草稿已放弃，已恢复已发布版本"));
+      setMessage(t("Draft discarded, restored to published version"));
       setMessageType("success");
     } catch (e: unknown) {
-      setMessage(`${t("放弃草稿失败")}: ${(e as Error).message}`);
+      setMessage(`${t("Failed to discard draft")}: ${(e as Error).message}`);
       setMessageType("error");
     }
   }
@@ -436,26 +438,26 @@ export default function MapEditor(props: MapEditorProps) {
     <div class="flex h-full">
       <div class="w-56 bg-base-200 p-3 flex flex-col gap-2 shrink-0">
         <A href="/maps" class="text-xs opacity-50 hover:opacity-100 mb-1">
-          {t("← 返回地图工坊")}
+          {t("← Back to Map Workshop")}
         </A>
 
         <div>
-          <div class="text-xs font-medium mb-0.5">{t("地图名称")}</div>
-          <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder={t("输入地图名称")} size="sm" />
+          <div class="text-xs font-medium mb-0.5">{t("Map Name")}</div>
+          <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder={t("Enter map name")} size="sm" />
         </div>
         <div>
-          <div class="text-xs font-medium mb-0.5">{t("描述")}</div>
+          <div class="text-xs font-medium mb-0.5">{t("Description")}</div>
           <Input
             value={description()}
             onInput={(e) => setDescription(e.currentTarget.value)}
-            placeholder={t("可选描述")}
+            placeholder={t("Optional description")}
             size="sm"
           />
         </div>
 
         <div class="flex gap-2">
           <div class="flex-1">
-            <div class="text-xs font-medium mb-0.5">{t("宽")}</div>
+            <div class="text-xs font-medium mb-0.5">{t("Width")}</div>
             <Input
               type="number"
               value={String(width())}
@@ -464,7 +466,7 @@ export default function MapEditor(props: MapEditorProps) {
             />
           </div>
           <div class="flex-1">
-            <div class="text-xs font-medium mb-0.5">{t("高")}</div>
+            <div class="text-xs font-medium mb-0.5">{t("Height")}</div>
             <Input
               type="number"
               value={String(height())}
@@ -475,7 +477,7 @@ export default function MapEditor(props: MapEditorProps) {
         </div>
 
         <div>
-          <div class="text-xs font-medium mb-0.5">{t("地形类型")}</div>
+          <div class="text-xs font-medium mb-0.5">{t("Tile Type")}</div>
           <div class="grid grid-cols-2 gap-1">
             {TILE_TYPES.map((tileType) => (
               <button
@@ -499,10 +501,10 @@ export default function MapEditor(props: MapEditorProps) {
         </div>
 
         <div>
-          <div class="text-xs font-medium mb-0.5">{t("兵力")}</div>
+          <div class="text-xs font-medium mb-0.5">{t("Army")}</div>
           <Show
             when={PASSABLE_TYPES.has(selectedType())}
-            fallback={<div class="text-xs opacity-50">{t("该地形不可驻兵")}</div>}
+            fallback={<div class="text-xs opacity-50">{t("Cannot station troops on this terrain")}</div>}
           >
             <Input
               type="number"
@@ -515,22 +517,22 @@ export default function MapEditor(props: MapEditorProps) {
 
         <Show when={editingMapId()}>
           <div class="border-t border-base-300 pt-2 flex flex-col gap-2">
-            <div class="text-xs font-medium">{t("封面图片")}</div>
+            <div class="text-xs font-medium">{t("Cover Image")}</div>
 
             <Show when={mapThumbnailUrl(editingMapId() as string)}>
               <img
                 src={`${mapThumbnailUrl(editingMapId() as string)}?v=${thumbStamp()}`}
-                alt={t("预览")}
+                alt={t("Preview")}
                 class="w-full rounded border border-base-300"
               />
             </Show>
 
             <p class="text-[10px] leading-relaxed opacity-50">
-              {t("自定义封面：上传一张本地图片作为地图展示封面。上传后会标记为自定义封面，后续发布不再自动覆盖。")}
+              {t("Custom cover: Upload a local image as the map cover. Will be marked as custom and not overwritten on publish.")}
             </p>
             <label class="cursor-pointer">
               <span class={`btn btn-xs btn-ghost ${thumbnailBusy() ? "btn-disabled" : ""}`}>
-                {thumbnailBusy() ? t("处理中...") : t("上传自定义封面")}
+                {thumbnailBusy() ? t("Processing…") : t("Upload custom cover")}
               </span>
               <input
                 type="file"
@@ -542,37 +544,37 @@ export default function MapEditor(props: MapEditorProps) {
             </label>
 
             <p class="text-[10px] leading-relaxed opacity-50">
-              {t("自动生成：根据当前地图格内容自动渲染一张预览图。适合没有自定义封面的地图，发布时会自动调用。")}
+              {t("Auto-generate: Render a preview from the current map content. Suitable for maps without a custom cover; called automatically on publish.")}
             </p>
             <Button variant="ghost" size="xs" onClick={generatePreview} disabled={thumbnailBusy()}>
-              {thumbnailBusy() ? t("生成中...") : t("自动生成预览图")}
+              {thumbnailBusy() ? t("Generating…") : t("Auto-generate preview")}
             </Button>
           </div>
         </Show>
 
         <div class="flex flex-col gap-1 text-xs opacity-50">
           <Show when={hasDraft()}>
-            <div class="text-warning opacity-100">{t("正在编辑草稿 — 名称、描述等修改只保存到发布版")}</div>
+            <div class="text-warning opacity-100">{t("Editing draft — only the published version saves name, description, etc.")}</div>
           </Show>
-          <div>{t("缩放:")} {(viewScale() * 100).toFixed(0)}%</div>
+          <div>{t("Zoom:")} {(viewScale() * 100).toFixed(0)}%</div>
           <div>
-            {t("尺寸:")} {width()} × {height()}
+            {t("Size:")} {width()} × {height()}
           </div>
-          <div>{t("Ctrl+Z 撤销 / Ctrl+Y 重做")}</div>
-          <div>{t("中键拖动 / 滚轮缩放")}</div>
+          <div>{t("Ctrl+Z Undo / Ctrl+Y Redo")}</div>
+          <div>{t("Middle-click drag / Scroll to zoom")}</div>
         </div>
 
         <div class="flex flex-col gap-2 mt-4 pt-2 border-t border-base-300">
           <Button variant="ghost" size="sm" onClick={() => save(false)} disabled={saving() || !name()}>
-            {saving() ? t("保存中...") : t("保存草稿")}
+            {saving() ? t("Saving...") : t("Save Draft")}
           </Button>
           <Show when={hasDraft()}>
             <Button variant="ghost" size="xs" onClick={discardDraft}>
-              {t("放弃草稿")}
+              {t("Discard Draft")}
             </Button>
           </Show>
           <Button variant="primary" size="sm" onClick={() => save(true)} disabled={saving() || !name()}>
-            {saving() ? t("发布中...") : t("发布地图")}
+            {saving() ? t("Publishing…") : t("Publish Map")}
           </Button>
           {message() && (
             <div

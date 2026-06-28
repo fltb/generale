@@ -51,33 +51,33 @@ describe("CreateRoomModal", () => {
 
   it("renders modal when open", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    expect(screen.getByText("新建房间")).toBeInTheDocument();
+    expect(screen.getByText("New Room")).toBeInTheDocument();
   });
 
   it("does not render when closed", () => {
     render(() => <CreateRoomModal open={() => false} onClose={vi.fn()} />);
-    expect(screen.queryByText("新建房间")).not.toBeInTheDocument();
+    expect(screen.queryByText("New Room")).not.toBeInTheDocument();
   });
 
   it("renders room name input", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    expect(screen.getByPlaceholderText("例如：alice 的房间")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("e.g. alice's room")).toBeInTheDocument();
   });
 
   it("renders password input", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    expect(screen.getByPlaceholderText("留空为公开房间")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Leave empty for public room")).toBeInTheDocument();
   });
 
   it("renders mode select", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    expect(screen.getByText("快速")).toBeInTheDocument();
-    expect(screen.getByText("自定义")).toBeInTheDocument();
+    expect(screen.getByText("Quick")).toBeInTheDocument();
+    expect(screen.getByText("Custom")).toBeInTheDocument();
   });
 
   it("renders map size select for standard mode", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    expect(screen.getByText("默认 (medium)")).toBeInTheDocument();
+    expect(screen.getByText("Default (medium)")).toBeInTheDocument();
     expect(screen.getByText("Small (10×10)")).toBeInTheDocument();
     expect(screen.getByText("Medium (20×20)")).toBeInTheDocument();
     expect(screen.getByText("Large (40×40)")).toBeInTheDocument();
@@ -86,36 +86,36 @@ describe("CreateRoomModal", () => {
   it("does not show map size select for custom mode", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
     // Default is standard, switch to custom
-    const modeSelect = screen.getByDisplayValue("快速") as HTMLSelectElement;
+    const modeSelect = screen.getByDisplayValue("Quick") as HTMLSelectElement;
     fireEvent.change(modeSelect, { target: { value: "custom" } });
-    expect(screen.queryByText("默认 (medium)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Default (medium)")).not.toBeInTheDocument();
   });
 
   it("shows advanced settings toggle", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    expect(screen.getByText("高级设置")).toBeInTheDocument();
+    expect(screen.getByText("Advanced Settings")).toBeInTheDocument();
   });
 
   it("shows advanced content when toggled", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    fireEvent.click(screen.getByText("高级设置"));
-    expect(screen.getByText("最大玩家数")).toBeInTheDocument();
-    expect(screen.getByText("队伍模式")).toBeInTheDocument();
-    expect(screen.getByText("游戏玩法（可选）")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Advanced Settings"));
+    expect(screen.getByText("Max Players")).toBeInTheDocument();
+    expect(screen.getByText("Team Mode")).toBeInTheDocument();
+    expect(screen.getByText("Game Mode (optional)")).toBeInTheDocument();
   });
 
   it("shows custom map section when type is custom and advanced open", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
     // Switch to custom
-    const modeSelect = screen.getByDisplayValue("快速") as HTMLSelectElement;
+    const modeSelect = screen.getByDisplayValue("Quick") as HTMLSelectElement;
     fireEvent.change(modeSelect, { target: { value: "custom" } });
     // Custom mode auto-opens advanced
-    expect(screen.getByText("自定义地图")).toBeInTheDocument();
+    expect(screen.getByText("Custom Map")).toBeInTheDocument();
   });
 
   it("shows width/height inputs in custom mode", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    const modeSelect = screen.getByDisplayValue("快速") as HTMLSelectElement;
+    const modeSelect = screen.getByDisplayValue("Quick") as HTMLSelectElement;
     fireEvent.change(modeSelect, { target: { value: "custom" } });
     const inputs = screen.getAllByPlaceholderText("10-500");
     expect(inputs).toHaveLength(2);
@@ -123,15 +123,15 @@ describe("CreateRoomModal", () => {
 
   it("shows alert when submitting empty room name", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    fireEvent.click(screen.getByText("创建房间"));
-    expect(alertSpy).toHaveBeenCalledWith("请输入房间名字");
+    fireEvent.click(screen.getByText("Create Room"));
+    expect(alertSpy).toHaveBeenCalledWith("Please enter a room name");
   });
 
   it("calls mutate when submitting valid form", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    const nameInput = screen.getByPlaceholderText("例如：alice 的房间");
+    const nameInput = screen.getByPlaceholderText("e.g. alice's room");
     fireEvent.input(nameInput, { target: { value: "Test Room" } });
-    fireEvent.click(screen.getByText("创建房间"));
+    fireEvent.click(screen.getByText("Create Room"));
     expect(mockMutate).toHaveBeenCalledWith(
       expect.objectContaining({ roomName: "Test Room" }),
     );
@@ -146,11 +146,11 @@ describe("CreateRoomModal", () => {
 
   it("shows submit button with text 创建房间", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    expect(screen.getByText("创建房间")).toBeInTheDocument();
+    expect(screen.getByText("Create Room")).toBeInTheDocument();
   });
 
   it("shows cancel button", () => {
     render(() => <CreateRoomModal open={() => true} onClose={vi.fn()} />);
-    expect(screen.getByText("取消")).toBeInTheDocument();
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
   });
 });

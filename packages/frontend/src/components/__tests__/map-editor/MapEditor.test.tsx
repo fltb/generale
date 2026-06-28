@@ -83,29 +83,29 @@ import MapEditor from "~/components/map-editor/MapEditor";
 describe("MapEditor", () => {
   it("renders editor with sidebar", () => {
     render(() => <MapEditor />);
-    expect(screen.getByText("← 返回地图工坊")).toBeInTheDocument();
+    expect(screen.getByText("← Back to Map Workshop")).toBeInTheDocument();
   });
 
   it("renders map name input", () => {
     render(() => <MapEditor />);
-    expect(screen.getByPlaceholderText("输入地图名称")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Enter map name")).toBeInTheDocument();
   });
 
   it("renders terrain type buttons", () => {
     render(() => <MapEditor />);
-    expect(screen.getByText("平原")).toBeInTheDocument();
-    expect(screen.getByText("王座")).toBeInTheDocument();
-    expect(screen.getByText("兵营")).toBeInTheDocument();
+    expect(screen.getByText("Plain")).toBeInTheDocument();
+    expect(screen.getByText("Throne")).toBeInTheDocument();
+    expect(screen.getByText("Barracks")).toBeInTheDocument();
   });
 
   it("renders save draft button", () => {
     render(() => <MapEditor />);
-    expect(screen.getByText("保存草稿")).toBeInTheDocument();
+    expect(screen.getByText("Save Draft")).toBeInTheDocument();
   });
 
   it("renders publish button", () => {
     render(() => <MapEditor />);
-    expect(screen.getByText("发布地图")).toBeInTheDocument();
+    expect(screen.getByText("Publish Map")).toBeInTheDocument();
   });
 
   it("renders width and height inputs", () => {

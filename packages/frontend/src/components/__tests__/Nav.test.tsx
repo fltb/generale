@@ -64,7 +64,7 @@ describe("Nav", () => {
 
   it("renders 地图工坊 link", () => {
     render(() => <Nav />);
-    expect(screen.getByText("地图工坊")).toBeInTheDocument();
+    expect(screen.getByText("Map Workshop")).toBeInTheDocument();
   });
 
   it("shows Login when user is not authenticated", () => {
@@ -74,7 +74,7 @@ describe("Nav", () => {
 
   it("renders MuteToggle", () => {
     render(() => <Nav />);
-    const muteBtn = screen.getByTitle("静音");
+    const muteBtn = screen.getByTitle("Mute");
     expect(muteBtn).toBeInTheDocument();
   });
 });
