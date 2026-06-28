@@ -12,6 +12,8 @@ interface Props {
 export default function GeneraleLayout(props: Props) {
   const auth = useAuth();
   const currentPath = createMemo(() => window.location.pathname);
+  const isRoomsActive = createMemo(() => currentPath() === "/generale" || currentPath().startsWith("/game/"));
+  const isMapsActive = createMemo(() => currentPath().startsWith("/maps"));
 
   return (
     <div>
@@ -25,7 +27,7 @@ export default function GeneraleLayout(props: Props) {
             <A
               href="/generale"
               class={`px-3 py-1.5 text-sm ${
-                currentPath() === "/generale"
+                isRoomsActive()
                   ? "text-base-content bg-base-300"
                   : "text-base-content/50 hover:text-base-content hover:bg-base-300/50"
               }`}
@@ -35,7 +37,7 @@ export default function GeneraleLayout(props: Props) {
             <A
               href="/maps"
               class={`px-3 py-1.5 text-sm ${
-                currentPath().startsWith("/maps")
+                isMapsActive()
                   ? "text-base-content bg-base-300"
                   : "text-base-content/50 hover:text-base-content hover:bg-base-300/50"
               }`}
