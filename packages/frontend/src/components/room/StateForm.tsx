@@ -1,5 +1,6 @@
 import { PreGameMapType, type PreGameRoomState, TileType } from "@generale/types";
 import { type Component, createSignal, For, Show } from "solid-js";
+import { useT } from "~/i18n/useT";
 import { Button, Input, Range } from "~/ui";
 
 export interface PreGameRoomStateFromProps {
@@ -13,6 +14,7 @@ export interface PreGameRoomStateFromProps {
  * 基本表单：编辑 speed, afkThreshold, 以及 tileGrow 下每个 tile 的 duration/growth
  */
 export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props) => {
+  const { t } = useT();
   const [tileGrowOpen, setTileGrowOpen] = createSignal(false);
   // 将更新立即回传给父组件（并更新本地）
   const commit = (next: PreGameRoomState["gameSetting"]) => {
@@ -78,10 +80,10 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
       <div>
         <label class="label" for="state-speed">
           <span class="label-text">
-            游戏倍速 {props.state.speed.toFixed(1)}×
-            <span class="opacity-60 ml-2">（每秒 {effectiveTicksPerSec().toFixed(1)} 帧）</span>
+            {t("游戏倍速")} {props.state.speed.toFixed(1)}×
+            <span class="opacity-60 ml-2">{t("({n} ticks/sec)", { n: effectiveTicksPerSec().toFixed(1) })}</span>
           </span>
-          <span class="label-text-alt">范围 0.5 — 4</span>
+          <span class="label-text-alt">{t("Range 0.5 — 4")}</span>
         </label>
 
         {/* range 控件：min/max/step 用"档位索引"，每次拖动都落在 SPEED_PRESETS 的某档 */}
@@ -112,8 +114,8 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
 
       <div>
         <label class="label" for="state-afk">
-          <span class="label-text">挂机阈值 (afkThreshold)</span>
-          <span class="label-text-alt">单位：tick（整数）</span>
+          <span class="label-text">{t("挂机阈值 (afkThreshold)")}</span>
+          <span class="label-text-alt">{t("单位：tick（整数）")}</span>
         </label>
         <Input
           id="state-afk"
@@ -137,8 +139,8 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
             <span class={tileGrowOpen() ? "rotate-90" : ""} style="transition:transform 0.15s;display:inline-block">
               ▸
             </span>
-            地块增长规则 (tileGrow)
-            <span class="text-xs opacity-50 ml-1">对每种地形设置 duration 和 growth</span>
+            {t("地块增长规则 (tileGrow)")}
+            <span class="text-xs opacity-50 ml-1">{t("对每种地形设置 duration 和 growth")}</span>
           </button>
 
           <Show when={tileGrowOpen()}>
@@ -156,7 +158,7 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
                     <div class="border rounded p-3 bg-base-200">
                       <div class="flex justify-between items-center">
                         <div class="font-medium">{tileType}</div>
-                        <div class="text-sm opacity-70">（地形类型）</div>
+                        <div class="text-sm opacity-70">{t("(tile type)")}</div>
                       </div>
 
                       <div class="grid sm:grid-cols-2 gap-3 mt-3">
@@ -204,7 +206,7 @@ export const PreGameRoomStateFrom: Component<PreGameRoomStateFromProps> = (props
       <div class="flex justify-end">
         {/* 这里给个显式的“应用”按钮（可选） */}
         <Button type="button" variant="primary" onClick={() => props.onChange(props.state)}>
-          应用设置
+          {t("应用设置")}
         </Button>
       </div>
     </form>

@@ -8,6 +8,7 @@ import {
 import { A } from "@solidjs/router";
 import { type Component, createMemo, createSignal, For, Show } from "solid-js";
 import Avatar from "~/components/Avatar";
+import { useT } from "~/i18n/useT";
 import { alertDialog, Badge, Button, confirmDialog } from "~/ui";
 import { playerColorCss } from "~/utils/playerColor";
 import { resolveDisplayNames } from "~/utils/playerDisplay";
@@ -63,6 +64,7 @@ const PlayerCard: Component<{
   onChangeTeam?: (playerId: string | undefined, teamId: string) => void;
   onChangeColor?: (tileColor: PlayerColor) => void;
 }> = (props) => {
+  const { t } = useT();
   const p = () => props.player;
   const display = () => props.resolvedDisplayName ?? p().displayName ?? p().name;
 
@@ -78,7 +80,7 @@ const PlayerCard: Component<{
       <div class="flex items-center gap-3 overflow-hidden">
         <A
           href={`/profile/${p().id}`}
-          title={`查看 ${display()} 的资料`}
+          title={t("View {display}'s profile", { display: display() })}
           target="_blank"
           rel="noopener"
           class="shrink-0"
@@ -92,16 +94,16 @@ const PlayerCard: Component<{
               {display()}
             </A>
             <Show when={p().isHost}>
-              <Badge class="text-xs ml-1">Host</Badge>
+              <Badge class="text-xs ml-1">{t("Host")}</Badge>
             </Show>
             <Show when={p().status === PreGamePlayerStatus.Playing}>
               <Badge variant="info" class="text-xs">
-                游戏中
+                {t("In Game")}
               </Badge>
             </Show>
             <Show when={p().status === PreGamePlayerStatus.Disconnected}>
               <Badge variant="warning" class="text-xs">
-                离线
+                {t("Disconnected")}
               </Badge>
             </Show>
           </div>
@@ -120,7 +122,7 @@ const PlayerCard: Component<{
           type="button"
           class={`w-5 h-5 rounded border shrink-0 ${isSelf() && props.onChangeColor ? "cursor-pointer hover:ring-1 hover:ring-primary" : ""}`}
           style={{ "background-color": playerColorCss(p().tileColor), "border-color": "rgba(0,0,0,0.2)" }}
-          title={isSelf() ? "点击选择颜色" : undefined}
+          title={isSelf() ? t("Click to select color") : undefined}
           onClick={() => {
             if (isSelf() && props.onChangeColor) {
               setColorPickerOpen((v) => !v);
@@ -134,7 +136,7 @@ const PlayerCard: Component<{
         />
         <Show when={colorPickerOpen()}>
           <div class="absolute right-0 top-6 z-50 p-1.5 bg-base-200 pixel-border rounded shadow-lg">
-            <div class="text-xs font-medium mb-1 opacity-70">选择颜色</div>
+            <div class="text-xs font-medium mb-1 opacity-70">{t("Select Color")}</div>
             <div class="grid gap-1" style={{ "grid-template-columns": "repeat(4, 1.25rem)" }}>
               <For each={allColors()}>
                 {(c) => {
@@ -153,7 +155,7 @@ const PlayerCard: Component<{
                         "background-color": playerColorCss(c),
                         "border-color": isCurrent ? "white" : "rgba(0,0,0,0.2)",
                       }}
-                      title={isCurrent ? "当前颜色" : isUsed ? "已被占用" : "选择此颜色"}
+                      title={isCurrent ? t("Current Color") : isUsed ? t("Already taken") : t("Choose this color")}
                       onClick={() => {
                         if (isUsed && !isCurrent) return;
                         props.onChangeColor?.(c);
@@ -180,7 +182,7 @@ const PlayerCard: Component<{
         <div class="flex flex-col items-end">
           <Show when={!p().isHost}>
             <div class={`text-sm font-medium ${p().ready === 1 ? "text-success" : "text-error"}`}>
-              {p().ready === 1 ? "Ready" : "Not Ready"}
+              {p().ready === 1 ? t("Ready") : t("Not Ready")}
             </div>
           </Show>
 
@@ -192,7 +194,7 @@ const PlayerCard: Component<{
               outline={p().ready !== 1}
               onClick={() => props.onToggleReady(p().id, p().ready !== 1)}
             >
-              {p().ready === 1 ? "取消准备" : "准备"}
+              {p().ready === 1 ? t("Cancel Ready") : t("Ready")}
             </Button>
           </Show>
         </div>
@@ -203,7 +205,7 @@ const PlayerCard: Component<{
             <div class="flex gap-1">
               <Show when={props.onTransferHost}>
                 <Button size="xs" variant="warning" data-testid="transfer-host" onClick={() => props.onTransferHost?.(p().id)}>
-                  设为房主
+                  {t("Set as Host")}
                 </Button>
               </Show>
 
@@ -213,10 +215,10 @@ const PlayerCard: Component<{
                   variant="error"
                   data-testid="kick-player"
                   disabled={p().status !== PreGamePlayerStatus.Lobby}
-                  title={p().status !== PreGamePlayerStatus.Lobby ? "游戏中无法踢出该玩家" : "踢出该玩家"}
+                  title={p().status !== PreGamePlayerStatus.Lobby ? t("Cannot kick while in game") : t("Kick this player")}
                   onClick={() => props.onKick?.(p().id)}
                 >
-                  踢出
+                  {t("Kick")}
                 </Button>
               </Show>
             </div>
@@ -227,10 +229,10 @@ const PlayerCard: Component<{
                 class="select select-xs select-bordered mt-1"
                 value={p().teamId ?? ""}
                 onChange={(e) => props.onChangeTeam?.(p().id, e.currentTarget.value)}
-                aria-label="快速移队"
-                title="将玩家移入指定队伍"
+                aria-label={t("Move to team")}
+                title={t("Move player to team")}
               >
-                <option value="">未分组</option>
+                <option value="">{t("Ungrouped")}</option>
                 <For each={props.teams ?? []}>{(t) => <option value={t.id}>{t.name ?? t.id}</option>}</For>
               </select>
             </Show>
@@ -249,6 +251,7 @@ const TeamGroup: Component<{
   resolvedNames: Map<string, string>;
   usedColors: PlayerColor[];
 }> = (gp) => {
+  const { t } = useT();
   const [editing, setEditing] = createSignal(false);
   const [editName, setEditName] = createSignal(gp.team?.name ?? "");
   const isNoTeam = () => gp.team === null || gp.team.id === "no team";
@@ -285,17 +288,17 @@ const TeamGroup: Component<{
     // local safety: only allow delete if no members (client-side)
     if ((gp.members?.length ?? 0) > 0) {
       // UI-level guard; server is authoritative.
-      alertDialog("队伍非空，无法删除（请先移除队员或将其分配到其他队）");
+      alertDialog(t("Team cannot be deleted with members"));
       return;
     }
-    if (confirmDialog(`确定删除队伍 "${gp.team.name ?? gp.team.id}" 吗？`)) {
+    if (confirmDialog(t("Delete team {name}?", { name: gp.team.name ?? gp.team.id }))) {
       gp.props.onDeleteTeam(gp.team.id);
     }
   };
 
   const headerText = () => {
-    if (isNoTeam()) return "未分组玩家";
-    return gp.team?.name ? `${gp.team.name}` : `队伍 ${gp.team?.id}`;
+    if (isNoTeam()) return t("Ungrouped Players");
+    return gp.team?.name ? `${gp.team.name}` : `${t("Team")} ${gp.team?.id}`;
   };
 
   return (
@@ -313,8 +316,8 @@ const TeamGroup: Component<{
           }}
           title={
             gp.team
-              ? "点击加入该队（房主/玩家均可）。房主管理请使用右侧按钮进行重命名/删除。"
-              : "点击将自己设为未分组玩家"
+              ? t("Click to join team")
+              : t("Click to ungroup")
           }
         >
           {headerText()}
@@ -328,19 +331,19 @@ const TeamGroup: Component<{
               onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
             />
             <Button size="xs" onClick={submitRename}>
-              保存
+              {t("Save")}
             </Button>
             <Button size="xs" variant="ghost" onClick={() => setEditing(false)}>
-              取消
+              {t("Cancel")}
             </Button>
           </Show>
 
           <Show when={!editing() && gp.props.selfId === gp.props.hostId}>
             <Button size="xs" onClick={() => setEditing(true)}>
-              重命名
+              {t("Rename")}
             </Button>
             <Button size="xs" variant="error" onClick={tryDelete}>
-              删除
+              {t("Delete")}
             </Button>
           </Show>
         </div>
@@ -371,6 +374,7 @@ const TeamGroup: Component<{
 
 /* ---------------------- Main PlayerList ---------------------- */
 export const PlayerList: Component<PlayerListProps> = (props) => {
+  const { t } = useT();
   const resolvedNames = createMemo(() =>
     resolveDisplayNames(props.players.map((p) => ({ id: p.id, name: p.name, displayName: p.displayName }))),
   );
@@ -413,7 +417,7 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
   const createTeam = () => {
     const name = (newTeamName() ?? "").trim();
     if (!name) {
-      alertDialog("请输入队伍名");
+      alertDialog(t("Team name required"));
       return;
     }
     props.onCreateTeam?.(name);
@@ -430,12 +434,12 @@ export const PlayerList: Component<PlayerListProps> = (props) => {
         <div class="flex gap-2 items-center mb-2">
           <input
             class="input input-sm input-bordered"
-            placeholder="新队伍名称（仅房主）"
+            placeholder={t("New team name")}
             value={newTeamName()}
             onInput={(e) => setNewTeamName((e.target as HTMLInputElement).value)}
           />
           <Button size="sm" onClick={createTeam}>
-            新建队伍并加入
+            {t("Create team and join")}
           </Button>
         </div>
       </Show>

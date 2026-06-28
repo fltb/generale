@@ -5,31 +5,26 @@ import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { getGameInfoApi } from "~/api/gameApi";
 import { useGameListQuery } from "~/hooks/useGameListQuery";
 import { useLobbyRealtime } from "~/hooks/useLobbyRealtime";
+import { useT } from "~/i18n/useT";
 import { Alert, Badge, Button, Card, Modal, Spinner } from "~/ui";
 import CreateRoomModal from "./CreateRoomModal";
 import RoomFilter from "./RoomFilter";
 
 export function RoomList() {
+  const { t } = useT();
   const navigate = useNavigate();
 
-  // filter state (partial ListGamesQuery shape)
   const [filters, setFilters] = createSignal<Partial<ListGamesQuery>>({});
 
-  // default pagination / sorting (可扩展为分页控件)
   const limit = 50;
   const offset = 0;
 
-  // useGameListQuery expects an accessor
   const gamesQuery = useGameListQuery(() => filters(), { offset, limit });
 
-  // 订阅 lobby-games websocket 事件，按需把后端推送的 created/updated/deleted 事件
-  // 直接 patch 进 useGameListQuery 的缓存里，避免轮询刷新。
   useLobbyRealtime(() => filters(), { offset, limit });
 
-  // --- Create room modal state & mutation ---
   const [createOpen, setCreateOpen] = createSignal(false);
 
-  // detail modal state & query
   const [openId, setOpenId] = createSignal<string | null>(null);
   const detailQuery = useQuery(() => ({
     queryKey: ["game", openId()],
@@ -43,7 +38,6 @@ export function RoomList() {
     retry: false,
   }));
 
-  // connect demo state
   const [connecting, setConnecting] = createSignal(false);
   const [connectResult, setConnectResult] = createSignal<unknown>(null);
   const [connectError, setConnectError] = createSignal<string | null>(null);
@@ -66,35 +60,31 @@ export function RoomList() {
       navigate(`/game/${gameId}`);
     } catch (err: unknown) {
       console.error("prepareConnect failed", err);
-      setConnectError((err as Error)?.message ?? "连接准备失败");
+      setConnectError((err as Error)?.message ?? t("Failed to prepare connection"));
     } finally {
       setConnecting(false);
     }
   }
 
-  // derived list for rendering (gamesQuery.data is array from server)
   const gamesForRender = createMemo(() => gamesQuery.data ?? []);
 
   return (
     <div class="container mx-auto p-4">
       <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-2xl font-semibold">Active Rooms</h2>
+        <h2 class="text-2xl font-semibold">{t("Active Rooms")}</h2>
         <div class="flex items-center gap-2">
           <Button data-testid="create-room" size="sm" variant="secondary" onClick={() => setCreateOpen(true)}>
-            新建房间
+            {t("新建房间")}
           </Button>
           <Button size="sm" variant="primary" onClick={() => (gamesQuery.refetch ? gamesQuery.refetch() : null)}>
-            Refresh
+            {t("Refresh")}
           </Button>
         </div>
       </div>
 
-      {/* Filter area */}
       <RoomFilter
         value={filters()}
         onChange={(next) => {
-          // next is Partial<ListGamesQuery> where values are strings
-          // we directly set filters; useGameListQuery will pick up via queryKey
           setFilters(next);
         }}
       />
@@ -109,7 +99,7 @@ export function RoomList() {
         <Match when={gamesQuery.isError}>
           <Alert variant="error" class="shadow-lg">
             <div>
-              <span>载入房间列表失败: {gamesQuery.error?.message ?? "Unknown"}</span>
+              <span>{t("载入房间列表失败")}: {gamesQuery.error?.message ?? t("Unknown")}</span>
             </div>
           </Alert>
         </Match>
@@ -135,20 +125,20 @@ export function RoomList() {
 
                           <p class="text-sm text-muted">
                             <span class="mr-3">
-                              <strong>Host:</strong> {g.hostName ?? g.hostId ?? "未知"}
+                              <strong>{t("Host:")}</strong> {g.hostName ?? g.hostId ?? t("Unknown")}
                             </span>
                             <span class="mr-3">
-                              <strong>Mode:</strong> {g.type ?? "standard"}
+                              <strong>{t("Mode:")}</strong> {g.type ?? "standard"}
                             </span>
                             <span>
-                              <strong>Map:</strong>{" "}
+                              <strong>{t("Map:")}</strong>{" "}
                               {g.customMapName
                                 ? g.customMapName
                                 : typeof g.map === "string"
                                   ? g.map
                                   : g.map?.width
                                     ? `${g.map.width}×${g.map.height}`
-                                    : "—"}
+                                    : t("\u2014")}
                             </span>
                           </p>
                         </div>
@@ -163,7 +153,7 @@ export function RoomList() {
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                               >
-                                <title>players</title>
+                                <title>{t("players")}</title>
                                 <path d="M10 2a6 6 0 100 12 6 6 0 000-12z" />
                                 <path d="M2 18a8 8 0 0116 0H2z" />
                               </svg>
@@ -174,7 +164,7 @@ export function RoomList() {
                           </div>
                           <div class="mt-2">
                             <Show when={g.hasPassword}>
-                              <Badge variant="outline">Locked</Badge>
+                              <Badge variant="outline">{t("Locked")}</Badge>
                             </Show>
                           </div>
                         </div>
@@ -182,7 +172,7 @@ export function RoomList() {
 
                       <div class="card-actions justify-end mt-3">
                         <Button variant="ghost" size="sm" onClick={() => openDetails(g.id)}>
-                          Details
+                          {t("Details")}
                         </Button>
                         <Button
                           data-testid="join-room"
@@ -191,7 +181,7 @@ export function RoomList() {
                           class={isFull ? "btn-disabled" : ""}
                           onClick={() => handlePrepareConnect(g.id)}
                         >
-                          Join
+                          {t("Join")}
                         </Button>
                       </div>
                     </div>
@@ -203,25 +193,24 @@ export function RoomList() {
         </Match>
       </Switch>
 
-      {/* details modal */}
       <Show when={!!openId()}>
         <Modal boxClass="max-w-3xl">
           <div class="flex justify-between items-start">
-            <h3 class="font-bold text-lg">Room Details</h3>
+            <h3 class="font-bold text-lg">{t("Room Details")}</h3>
             <Button size="sm" variant="ghost" onClick={closeDetails}>
-              Close
+              {t("Close")}
             </Button>
           </div>
 
           <div class="mt-4">
             <Show when={detailQuery.isLoading}>
               <div class="flex items-center gap-2">
-                <Spinner /> Loading...
+                <Spinner /> {t("Loading...")}
               </div>
             </Show>
 
             <Show when={detailQuery.isError}>
-              <Alert variant="error">{detailQuery.error?.message ?? "Failed to load details"}</Alert>
+              <Alert variant="error">{detailQuery.error?.message ?? t("Failed to load details")}</Alert>
             </Show>
 
             <Show when={detailQuery.data}>
@@ -230,16 +219,16 @@ export function RoomList() {
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-2">
                       <p>
-                        <strong>ID:</strong> <span class="text-xs">{detail().id}</span>
+                        <strong>{t("ID:")}</strong> <span class="text-xs">{detail().id}</span>
                       </p>
                       <p>
-                        <strong>Host:</strong> {detail().hostName || detail().hostId || "—"}
+                        <strong>{t("Host:")}</strong> {detail().hostName || detail().hostId || t("\u2014")}
                       </p>
                       <p>
-                        <strong>Players:</strong> {detail().playerCount} / {detail().maxPlayers}
+                        <strong>{t("Players:")}</strong> {detail().playerCount} / {detail().maxPlayers}
                       </p>
                       <p>
-                        <strong>Status:</strong>
+                        <strong>{t("Status:")}</strong>
                         <span
                           classList={{
                             "text-success": detail().status === "lobby",
@@ -247,19 +236,19 @@ export function RoomList() {
                           }}
                         >
                           {detail().status === "lobby"
-                            ? "等待中"
+                            ? t("Waiting")
                             : detail().status === "in-progress"
-                              ? "游戏中"
+                              ? t("In Progress")
                               : detail().status}
                         </span>
                       </p>
                       <p>
-                        <strong>Password:</strong> {detail().hasPassword ? "🔒 是" : "公开"}
+                        <strong>{t("Password:")}</strong> {detail().hasPassword ? t("Yes") : t("Public")}
                       </p>
                     </div>
 
                     <div>
-                      <p class="font-semibold mb-1">玩家列表</p>
+                      <p class="font-semibold mb-1">{t("Player List")}</p>
                       <ul class="space-y-1">
                         <For each={detail().players ?? []}>
                           {(p) => (
@@ -267,7 +256,7 @@ export function RoomList() {
                               <span class="font-medium">{p.name}</span>
                               <Show when={p.isHost}>
                                 <Badge variant="neutral" class="badge-xs">
-                                  Host
+                                  {t("Host")}
                                 </Badge>
                               </Show>
                             </li>
@@ -284,12 +273,12 @@ export function RoomList() {
                       onClick={() => handlePrepareConnect(detail().id)}
                       disabled={connecting()}
                     >
-                      {connecting() ? "Preparing..." : "Prepare Connect"}
+                      {connecting() ? t("Preparing...") : t("Prepare Connect")}
                     </Button>
 
                     <Show when={connectResult()}>
                       <Badge variant="success">
-                        Ready — domains:{" "}
+                        {t("Ready")} &mdash; domains:{" "}
                         {(connectResult() as { domains?: { primary?: string } })?.domains?.primary ?? "n/a"}
                       </Badge>
                     </Show>
@@ -305,7 +294,6 @@ export function RoomList() {
         </Modal>
       </Show>
 
-      {/* Create Room Modal */}
       <Show when={createOpen()}>
         <CreateRoomModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={(id) => setOpenId(id)} />
       </Show>

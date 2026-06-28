@@ -9,6 +9,7 @@ import { useMutation, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, Show } from "solid-js";
 import type { ApiError } from "~/api/base";
 import { createGameApi } from "~/api/gameApi";
+import { useT } from "~/i18n/useT";
 import { MapSelector } from "~/components/map-editor/MapSelector";
 import { Alert, alertDialog, Button, Input, Modal, Select } from "~/ui";
 
@@ -18,6 +19,7 @@ export default function CreateRoomModal(props: {
   onCreated?: (id: string) => void;
   initialMapId?: string;
 }) {
+  const { t } = useT();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [roomName, setRoomName] = createSignal("");
@@ -48,7 +50,7 @@ export default function CreateRoomModal(props: {
     },
     onError: (err: unknown) => {
       console.error("create game failed", err);
-      alertDialog((err instanceof Error ? err.message : null) ?? "创建房间失败");
+      alertDialog((err instanceof Error ? err.message : null) ?? t("创建失败"));
     },
   }));
 
@@ -69,7 +71,7 @@ export default function CreateRoomModal(props: {
   function validateAndBuildPayload(): CreateGameReqBody | null {
     const name = roomName().trim();
     if (!name) {
-      alertDialog("请输入房间名字");
+      alertDialog(t("请输入房间名字"));
       return null;
     }
 
@@ -80,7 +82,7 @@ export default function CreateRoomModal(props: {
     if (maxPlayers() !== "") {
       const n = Number(maxPlayers());
       if (!Number.isInteger(n) || n < 2 || n > 8) {
-        alertDialog("maxPlayers 必须是 2 - 8 的整数");
+        alertDialog(t("maxPlayers 必须是 2 - 8 的整数"));
         return null;
       }
       settings.maxPlayers = n;
@@ -94,15 +96,15 @@ export default function CreateRoomModal(props: {
         const w = Number(customWidth());
         const h = Number(customHeight());
         if (!(w && h)) {
-          alertDialog("custom 模式需要输入宽度和高度，或选择自定义地图");
+          alertDialog(t("custom 模式需要输入宽度和高度，或选择自定义地图"));
           return null;
         }
         if (!(Number.isInteger(w) && Number.isInteger(h))) {
-          alertDialog("宽/高必须为整数");
+          alertDialog(t("宽/高必须为整数"));
           return null;
         }
         if (w < 10 || w > 500 || h < 10 || h > 500) {
-          alertDialog("宽/高必须在 10-500 之间");
+          alertDialog(t("宽/高必须在 10-500 之间"));
           return null;
         }
         settings.mapSize = { width: w, height: h };
@@ -143,16 +145,15 @@ export default function CreateRoomModal(props: {
     <Show when={props.open()}>
       <Modal boxClass="max-w-lg">
         <div class="flex justify-between items-start">
-          <h3 class="font-bold text-lg">新建房间</h3>
+          <h3 class="font-bold text-lg">{t("新建房间")}</h3>
           <Button size="sm" variant="ghost" onClick={() => props.onClose()}>
-            Close
+            {t("Close")}
           </Button>
         </div>
 
         <div class="mt-4 space-y-3">
-          {/* ==== 基本设置 ==== */}
           <label class="block" for="cr-name">
-            <span class="label-text">房间名</span>
+            <span class="label-text">{t("房间名")}</span>
             <Input
               data-testid="create-room-name"
               id="cr-name"
@@ -160,12 +161,12 @@ export default function CreateRoomModal(props: {
               class="w-full"
               value={roomName()}
               onInput={(e) => setRoomName(e.target.value)}
-              placeholder="例如：alice 的房间"
+              placeholder={t("例如：alice 的房间")}
             />
           </label>
 
           <label class="block" for="cr-password">
-            <span class="label-text">密码（可选）</span>
+            <span class="label-text">{t("密码（可选）")}</span>
             <Input
               data-testid="create-room-password"
               id="cr-password"
@@ -174,13 +175,13 @@ export default function CreateRoomModal(props: {
               type="password"
               value={password()}
               onInput={(e) => setPassword(e.target.value)}
-              placeholder="留空为公开房间"
+              placeholder={t("留空为公开房间")}
             />
           </label>
 
           <div class="grid grid-cols-2 gap-2">
             <label class="block" for="cr-mode">
-              <span class="label-text">模式</span>
+              <span class="label-text">{t("模式")}</span>
               <Select
                 id="cr-mode"
                 bordered
@@ -188,17 +189,17 @@ export default function CreateRoomModal(props: {
                 value={type()}
                 onChange={(e) => setType(e.target.value as "standard" | "custom")}
               >
-                <option value="standard">快速</option>
-                <option value="custom">自定义</option>
+                <option value="standard">{t("快速")}</option>
+                <option value="custom">{t("自定义")}</option>
               </Select>
             </label>
 
             <label class="block" for="cr-map-size">
-              <span class="label-text">地图大小</span>
+              <span class="label-text">{t("地图大小")}</span>
               <Show
                 when={type() === "standard"}
                 fallback={
-                  <div class="text-sm py-2 opacity-50">{customMapId() ? "由所选地图确定" : "在高级设置中配置"}</div>
+                  <div class="text-sm py-2 opacity-50">{customMapId() ? t("由所选地图确定") : t("在高级设置中配置")}</div>
                 }
               >
                 <Select
@@ -208,29 +209,28 @@ export default function CreateRoomModal(props: {
                   value={mapSizeStd()}
                   onChange={(e) => setMapSizeStd(e.target.value as "" | "small" | "medium" | "large")}
                 >
-                  <option value="">默认 (medium)</option>
-                  <option value="small">Small (10×10)</option>
-                  <option value="medium">Medium (20×20)</option>
-                  <option value="large">Large (40×40)</option>
+                  <option value="">{t("默认 (medium)")}</option>
+                  <option value="small">{t("Small (10×10)")}</option>
+                  <option value="medium">{t("Medium (20×20)")}</option>
+                  <option value="large">{t("Large (40×40)")}</option>
                 </Select>
               </Show>
             </label>
           </div>
 
-          {/* ==== 高级设置 ==== */}
           <button
             type="button"
             class="text-sm opacity-60 hover:opacity-100 flex items-center gap-1"
             onClick={() => setShowAdvanced((v) => !v)}
           >
-            <span>{showAdvanced() ? "▾" : "▸"}</span> 高级设置
+            <span>{showAdvanced() ? "▾" : "▸"}</span> {t("高级设置")}
           </button>
 
           <Show when={showAdvanced()}>
             <div class="space-y-3 pl-2 border-l-2 border-base-300">
               <div class="grid grid-cols-2 gap-2">
                 <label class="block" for="cr-max-players">
-                  <span class="label-text">最大玩家数</span>
+                  <span class="label-text">{t("最大玩家数")}</span>
                   <Input
                     id="cr-max-players"
                     type="number"
@@ -244,7 +244,7 @@ export default function CreateRoomModal(props: {
                   />
                 </label>
                 <label class="block" for="cr-team-mode">
-                  <span class="label-text">队伍模式</span>
+                  <span class="label-text">{t("队伍模式")}</span>
                   <Select
                     id="cr-team-mode"
                     bordered
@@ -252,14 +252,14 @@ export default function CreateRoomModal(props: {
                     value={teamMode()}
                     onChange={(e) => setTeamMode(e.target.value as "ffa" | "team")}
                   >
-                    <option value="ffa">单人 (FFA)</option>
-                    <option value="team">组队 (Team)</option>
+                    <option value="ffa">{t("单人 (FFA)")}</option>
+                    <option value="team">{t("组队 (Team)")}</option>
                   </Select>
                 </label>
               </div>
 
               <label class="block" for="cr-game-mode">
-                <span class="label-text">游戏玩法（可选）</span>
+                <span class="label-text">{t("游戏玩法（可选）")}</span>
                 <Select
                   id="cr-game-mode"
                   bordered
@@ -267,33 +267,33 @@ export default function CreateRoomModal(props: {
                   value={gameMode()}
                   onChange={(e) => setGameMode(e.target.value)}
                 >
-                  <option value="">默认</option>
-                  <option value="classic">Classic</option>
-                  <option value="blitz">Blitz</option>
-                  <option value="custom">Custom</option>
+                  <option value="">{t("默认")}</option>
+                  <option value="classic">{t("Classic")}</option>
+                  <option value="blitz">{t("Blitz")}</option>
+                  <option value="custom">{t("Custom")}</option>
                 </Select>
               </label>
 
               <Show when={type() === "custom"}>
                 <div class="border-t border-base-300 pt-2 space-y-3">
                   <div class="block">
-                    <span class="label-text">自定义地图</span>
+                    <span class="label-text">{t("自定义地图")}</span>
                     <span class="label-text-alt">
-                      是否使用地图工坊预设地图，使用后不可调整地图尺寸。
+                      {t("是否使用地图工坊预设地图，使用后不可调整地图尺寸。")}
                       <a href="/maps" target="_blank" class="link" rel="noopener">
-                        浏览地图工坊
+                        {t("浏览地图工坊")}
                       </a>
                     </span>
                     <MapSelector
                       value={customMapId()}
                       onChange={setCustomMapId}
-                      placeholder="留空使用随机生成（进房可调宽高/地形频率）"
+                      placeholder={t("留空使用随机生成（进房可调宽高/地形频率）")}
                     />
                   </div>
 
                   <div class="grid grid-cols-2 gap-2">
                     <label class="block" for="cr-width">
-                      <span class="label-text">宽</span>
+                      <span class="label-text">{t("宽")}</span>
                       <Input
                         id="cr-width"
                         type="number"
@@ -303,12 +303,12 @@ export default function CreateRoomModal(props: {
                         class="w-full"
                         value={customWidth() === "" ? "" : String(customWidth())}
                         onInput={(e) => setCustomWidth(e.target.value === "" ? "" : Number(e.target.value))}
-                        placeholder={customMapId() ? "由地图确定" : "10-500"}
+                        placeholder={customMapId() ? t("由地图确定") : "10-500"}
                         disabled={!!customMapId()}
                       />
                     </label>
                     <label class="block" for="cr-height">
-                      <span class="label-text">高</span>
+                      <span class="label-text">{t("高")}</span>
                       <Input
                         id="cr-height"
                         type="number"
@@ -318,7 +318,7 @@ export default function CreateRoomModal(props: {
                         class="w-full"
                         value={customHeight() === "" ? "" : String(customHeight())}
                         onInput={(e) => setCustomHeight(e.target.value === "" ? "" : Number(e.target.value))}
-                        placeholder={customMapId() ? "由地图确定" : "10-500"}
+                        placeholder={customMapId() ? t("由地图确定") : "10-500"}
                         disabled={!!customMapId()}
                       />
                     </label>
@@ -330,16 +330,16 @@ export default function CreateRoomModal(props: {
 
           <div class="flex justify-end gap-2 mt-2">
             <Button variant="ghost" onClick={() => props.onClose()}>
-              取消
+              {t("取消")}
             </Button>
             <Button data-testid="create-room-submit" variant="primary" onClick={submit} disabled={createMutation.isPending}>
-              {createMutation.isPending ? "创建中..." : "创建房间"}
+              {createMutation.isPending ? t("创建中...") : t("创建房间")}
             </Button>
           </div>
 
           <Show when={createMutation.isError}>
             <Alert variant="error" class="mt-2">
-              <div>{(createMutation.error as Error)?.message ?? "创建失败"}</div>
+              <div>{(createMutation.error as Error)?.message ?? t("创建失败")}</div>
             </Alert>
           </Show>
         </div>

@@ -1,7 +1,6 @@
-// src/components/chat/ChatPanel.tsx
-
 import { type ChatMessage, GamePhase, PreGamePlayerStatus, type PreGameRoomState } from "@generale/types";
 import { type Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { useT } from "~/i18n/useT";
 import { useChatSession } from "~/game/useChatSession";
 import { Badge, Button, Panel, Textarea } from "~/ui";
 
@@ -20,6 +19,7 @@ export interface ChatPanelProps {
 }
 
 export const ChatPanel: Component<ChatPanelProps> = (props) => {
+  const { t } = useT();
   const chat = useChatSession({
     domain: props.domain,
     userId: props.userId,
@@ -46,22 +46,21 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
     const phase = props.phase;
 
     if (status === PreGamePlayerStatus.Spectating) {
-      return { label: "旁观者", variant: "info" as const };
+      return { label: t("旁观者"), variant: "info" as const };
     }
     if (status === PreGamePlayerStatus.Playing) {
-      return { label: "游戏玩家", variant: "success" as const };
+      return { label: t("游戏玩家"), variant: "success" as const };
     }
     if (phase === GamePhase.INGAME) {
-      return { label: "大厅等待", variant: "warning" as const };
+      return { label: t("大厅等待"), variant: "warning" as const };
     }
-    return { label: "房间玩家", variant: "neutral" as const };
+    return { label: t("房间玩家"), variant: "neutral" as const };
   });
 
   const connectionBadge = createMemo(() =>
-    connected() ? { label: "在线", variant: "success" as const } : { label: "离线", variant: "outline" as const },
+    connected() ? { label: t("在线"), variant: "success" as const } : { label: t("离线"), variant: "outline" as const },
   );
 
-  // ---- send ----
   function doSend() {
     const val = input().trim();
     if (!val) return;
@@ -69,7 +68,6 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
     if (!chat.send(val)) return;
     setInput("");
 
-    // scroll to bottom after DOM update
     queueMicrotask(() => {
       if (listEl) {
         listEl.scrollTop = listEl.scrollHeight;
@@ -90,9 +88,8 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
     });
   }
 
-  // ---- auto scroll on new message ----
   createEffect(() => {
-    const current = messages(); // track
+    const current = messages();
     if (!listEl) return;
     const last = current[current.length - 1];
     if (!last) return;
@@ -102,7 +99,6 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
     }
   });
 
-  // ---- keyboard ----
   function onKey(e: KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -117,7 +113,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
       title={
         <div class="flex items-center justify-between gap-3">
           <div>
-            <div class="text-sm font-semibold">战局聊天</div>
+            <div class="text-sm font-semibold">{t("战局聊天")}</div>
           </div>
           <div class="flex shrink-0 items-center gap-2">
             <Badge variant={role().variant}>{role().label}</Badge>
@@ -129,10 +125,10 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
     >
       <div class="flex items-center gap-2">
         <Button size="xs" variant="ghost" disabled={connected()} onClick={connect}>
-          连接
+          {t("连接")}
         </Button>
         <Button size="xs" variant="ghost" disabled={!connected()} onClick={disconnect}>
-          断开
+          {t("断开")}
         </Button>
         <Button
           size="xs"
@@ -141,7 +137,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
           disabled={loadingHistory() || !hasMoreHistory() || messages().length === 0}
           onClick={loadMore}
         >
-          {loadingHistory() ? "加载中" : hasMoreHistory() ? "历史" : "已到顶"}
+          {loadingHistory() ? t("加载中") : hasMoreHistory() ? t("历史") : t("已到顶")}
         </Button>
       </div>
 
@@ -153,7 +149,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
       >
         <Show
           when={messages().length > 0}
-          fallback={<div class="flex h-full items-center justify-center text-sm opacity-60">暂无消息</div>}
+          fallback={<div class="flex h-full items-center justify-center text-sm opacity-60">{t("暂无消息")}</div>}
         >
           <div class="flex flex-col gap-2">
             <For each={messages()}>
@@ -168,7 +164,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
                     </div>
                     <Show when={m.scope === "team"}>
                       <Badge variant="success" class="badge-xs">
-                        小队
+                        {t("小队")}
                       </Badge>
                     </Show>
                     <Show when={chat.teamLabel(m)}>
@@ -205,7 +201,6 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
                       {(avatar) => <img src={avatar()} alt="" class="h-5 w-5 shrink-0 rounded object-cover" />}
                     </Show>
                     <div class="min-w-0 truncate font-medium">{chat.messageDisplayName(m)}</div>
-                    {/* <div class="shrink-0 text-xs opacity-50">#{m.playerId}</div> */}
                   </div>
                   <div class="ml-16 whitespace-pre-wrap wrap-break-word text-base-content">{m.content}</div>
                 </div>
@@ -221,7 +216,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
           class="textarea-sm min-h-16 flex-1 resize-none"
           placeholder={
             props.placeholder ??
-            (chat.canTeamChat() ? "输入消息，/team 小队聊天" : "输入消息，Enter 发送，Shift+Enter 换行")
+            (chat.canTeamChat() ? t("输入消息，/team 小队聊天") : t("输入消息，Enter 发送，Shift+Enter 换行"))
           }
           value={input()}
           maxLength={500}
@@ -230,7 +225,7 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
           onKeyDown={onKey}
         />
         <Button size="sm" variant="primary" disabled={!connected() || input().trim().length === 0} onClick={doSend}>
-          发送
+          {t("发送")}
         </Button>
       </div>
     </Panel>
