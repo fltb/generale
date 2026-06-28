@@ -6,8 +6,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
 import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
-import { Suspense } from "solid-js";
+import { createSignal, onMount, Suspense } from "solid-js";
 import { WebSocketProvider } from "./hooks/useWebsocket";
+import { I18nProvider } from "./i18n/I18nProvider";
 import CookieConsent from "./components/CookieConsent";
 import PlatformShell from "./components/platform/PlatformShell";
 import GeneraleLayout from "./components/game/GeneraleLayout";
@@ -131,7 +132,15 @@ if (IS_TEST_MODE) {
 }
 
 export default function App() {
+  const [locale, setLocale] = createSignal("en");
+
+  onMount(() => {
+    const navLang = navigator.language?.startsWith("zh") ? "zh-CN" : "en";
+    setLocale(navLang);
+  });
+
   return (
+    <I18nProvider locale={locale()}>
     <QueryClientProvider client={queryClient}>
       {/* MetaProvider must wrap anything that uses Title/useHead */}
       <MetaProvider>
@@ -182,5 +191,6 @@ export default function App() {
 
       <SolidQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
+    </I18nProvider>
   );
 }

@@ -1,6 +1,7 @@
 import en from "../locales/en.json";
 import zhCN from "../locales/zh-CN.json";
 import type { TranslationKey, TranslationDict } from "./types";
+export type { TranslationKey };
 
 const locales: Record<string, TranslationDict> = {
   en,
