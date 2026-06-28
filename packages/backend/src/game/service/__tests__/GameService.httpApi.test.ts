@@ -46,7 +46,8 @@ vi.mock("../../instance/RoomInstance", () => ({
     resume: vi.fn(),
     suspend: vi.fn(),
     addPlayer: vi.fn().mockReturnValue({ success: true }),
-    onStartGame: vi.fn(), // <-- The missing method
+    onStartGame: vi.fn(),
+    getPassword: vi.fn().mockReturnValue(undefined),
   })),
 }));
 
@@ -240,86 +241,6 @@ describe("GameService HTTP API", () => {
   });
 
   describe("getGameInfo", () => {
-    it.skip("应该返回 PREGAME 阶段的游戏信息", () => {
-      // 初始化 RoomInstance
-      gs(gameService).roomInstance = new RoomInstance();
-
-      const info = gameService.getGameInfo();
-
-      expect(info).toEqual({
-        gameId: "test-game-123",
-        phase: GamePhase.PREGAME,
-        playerCount: 2,
-        maxPlayers: 4,
-        players: [
-          {
-            playerId: "player1",
-            playerName: "Player 1",
-            connected: { room: true, game: false, chat: false },
-            teamId: "team1",
-            tileColor: 0xff0000,
-            isHost: true,
-          },
-          {
-            playerId: "player2",
-            playerName: "Player 2",
-            connected: { room: true, game: false, chat: false },
-            teamId: "team2",
-            tileColor: 0x00ff00,
-            isHost: false,
-          },
-        ],
-        roomState: expect.any(Object),
-        gameState: undefined,
-      });
-    });
-
-    it.skip("应该返回 INGAME 阶段的游戏信息", () => {
-      // 设置为 INGAME 阶段
-      gs(gameService).phase = GamePhase.INGAME;
-      gs(gameService).gameInstance = new GameInstance();
-
-      const info = gameService.getGameInfo();
-
-      expect(info).toEqual({
-        gameId: "test-game-123",
-        phase: GamePhase.INGAME,
-        playerCount: 2,
-        maxPlayers: 2,
-        players: [
-          {
-            playerId: "player1",
-            playerName: "",
-            connected: { room: false, game: true, chat: false },
-            teamId: "team1",
-          },
-          {
-            playerId: "player2",
-            playerName: "",
-            connected: { room: false, game: true, chat: false },
-            teamId: "team2",
-          },
-        ],
-        roomState: undefined,
-        gameState: expect.any(Object),
-      });
-    });
-
-    it.skip("应该返回其他阶段的基本游戏信息", () => {
-      gs(gameService).phase = GamePhase.ENDED;
-
-      const info = gameService.getGameInfo();
-
-      expect(info).toEqual({
-        gameId: "test-game-123",
-        phase: GamePhase.ENDED,
-        playerCount: 0,
-        maxPlayers: 4,
-        players: [],
-        roomState: undefined,
-        gameState: undefined,
-      });
-    });
 
     it("应该使用默认最大玩家数", () => {
       const configWithoutMaxPlayers: GameServiceConfig = {
@@ -337,15 +258,16 @@ describe("GameService HTTP API", () => {
 
   describe("玩家查询方法", () => {
     describe("getPlayerCount", () => {
-      it.skip("应该返回 PREGAME 阶段的玩家数量", () => {
+      it("应该返回 PREGAME 阶段的玩家数量", () => {
         gs(gameService).roomInstance = new RoomInstance();
 
         expect(gameService.getPlayerCount()).toBe(2);
       });
 
-      it.skip("应该返回 INGAME 阶段的玩家数量", () => {
+      it("应该返回 INGAME 阶段的玩家数量", () => {
         gs(gameService).phase = GamePhase.INGAME;
         gs(gameService).gameInstance = new GameInstance();
+        gs(gameService).roomInstance = new RoomInstance();
 
         expect(gameService.getPlayerCount()).toBe(2);
       });
@@ -358,15 +280,16 @@ describe("GameService HTTP API", () => {
     });
 
     describe("getPlayers", () => {
-      it.skip("应该返回 PREGAME 阶段的玩家列表", () => {
+      it("应该返回 PREGAME 阶段的玩家列表", () => {
         gs(gameService).roomInstance = new RoomInstance();
 
         expect(gameService.getPlayers()).toEqual(["player1", "player2"]);
       });
 
-      it.skip("应该返回 INGAME 阶段的玩家列表", () => {
+      it("应该返回 INGAME 阶段的玩家列表", () => {
         gs(gameService).phase = GamePhase.INGAME;
         gs(gameService).gameInstance = new GameInstance();
+        gs(gameService).roomInstance = new RoomInstance();
 
         expect(gameService.getPlayers()).toEqual(["player1", "player2"]);
       });

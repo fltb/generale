@@ -453,7 +453,7 @@ describe("Enhanced Multi-Step and Randomized Tests", () => {
       expect(newState.map.tiles[2][1].army).toBe(5 + movingArmy + 1);
     });
 
-    it.skip("4. 连续的移动指令队列会被逐个 tick 顺序执行", () => {
+    it("4. 连续的移动指令队列会被逐个 tick 顺序执行", () => {
       let state = createState(10, 10);
       state.players.p1 = {
         id: "p1",
@@ -519,7 +519,8 @@ describe("Enhanced Multi-Step and Randomized Tests", () => {
       res = tick(state, queues);
       expect(res.state.status).toBe(GameStatus.Playing);
       expect(res.state.map.tiles[1][3].ownerId).toBe(null); // 验证 tiles[y=1][x=3] 因为兵力不够所以失败
-      expect(res.queue.p1.length).toBe(0); // 后续操作都被放弃
+      // 失败 op 也被消费（只丢弃队头那一条），剩余后续 op 保留到下一 tick
+      expect(res.queue.p1.length).toBe(2);
     });
 
     it("5. 战争迷雾(mask)会因占领新地块而扩大视野", () => {
@@ -646,7 +647,7 @@ describe("Enhanced Multi-Step and Randomized Tests", () => {
   });
 });
 
-describe.skip("Randomized Multi-Step Fuzz Tests", () => {
+describe("Randomized Multi-Step Fuzz Tests", () => {
   for (let i = 0; i < 50; i++) {
     it(`Randomized Test Case #${i + 1}`, () => {
       let state = createRandomizedState(10, 10, [
@@ -731,7 +732,13 @@ describe.skip("Randomized Multi-Step Fuzz Tests", () => {
             const isVisible =
               originalTile.ownerId === testPlayer.id ||
               (testPlayer.teamId && state.players[originalTile.ownerId!]?.teamId === testPlayer.teamId) ||
-              isAdjacentToPlayer(state, testPlayer.id, { x, y });
+              isAdjacentToPlayer(state, testPlayer.id, { x, y }) ||
+              // mask() 的 markNeighborsVisible 会标记所有队友拥有的格子及 3×3 邻域，
+              // 因此需要把队友相邻也要算进去
+              (testPlayer.teamId &&
+                state.teams[testPlayer.teamId]?.memberIds.some(
+                  (mid) => mid !== testPlayer.id && isAdjacentToPlayer(state, mid, { x, y }),
+                ));
 
             if (isVisible) {
               expect(maskedTile.type).not.toBe(TileType.Fog);

@@ -13,7 +13,7 @@ vi.mock("../../../plugins/websocket", () => ({
 
 vi.mock("../../instance/RoomInstance", () => ({
   RoomInstance: vi.fn().mockImplementation(() => ({
-    getState: vi.fn().mockReturnValue({
+      getState: vi.fn().mockReturnValue({
       players: [
         { id: "player1", name: "Player 1", teamId: "team1", isHost: true, ready: false, tileColor: 0xff0000 },
         { id: "player2", name: "Player 2", teamId: "team2", isHost: false, ready: true, tileColor: 0x00ff00 },
@@ -27,6 +27,7 @@ vi.mock("../../instance/RoomInstance", () => ({
     broadcastGameEnded: vi.fn(),
     resume: vi.fn(),
     suspend: vi.fn(),
+    getPassword: vi.fn().mockReturnValue(undefined),
   })),
 }));
 
@@ -113,7 +114,7 @@ describe("GameService Lifecycle", () => {
   });
 
   describe("阶段转换", () => {
-    it("应该能从 PREGAME 转换到 INGAME", () => {
+    it("应该能从 PREGAME 转换到 INGAME", async () => {
       // 模拟 RoomInstance 存在
       gs(gameService).roomInstance = new RoomInstance(
         {
@@ -143,7 +144,7 @@ describe("GameService Lifecycle", () => {
         new Map(),
       );
 
-      gameService.startGame({
+      await gameService.startGame({
         gameId: "test-game-123",
         gameSetting: {
           speed: 1.0,
@@ -263,10 +264,10 @@ describe("GameService Lifecycle", () => {
   });
 
   describe("事件回调", () => {
-    it("应该触发游戏开始回调", () => {
+    it("应该触发游戏开始回调", async () => {
       const onStartCallback = vi.fn();
-      gameService.onGameStart(onStartCallback);
 
+      gameService.onGameStart(onStartCallback);
       // 模拟 RoomInstance 存在
       gs(gameService).roomInstance = new RoomInstance(
         {
@@ -296,7 +297,7 @@ describe("GameService Lifecycle", () => {
         new Map(),
       );
 
-      gameService.startGame({
+      await gameService.startGame({
         gameId: "test-game-123",
         gameSetting: {
           speed: 1.0,

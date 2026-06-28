@@ -36,3 +36,6 @@ AGENTS.md
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# Playwright test artifacts
+e2e/test-results/

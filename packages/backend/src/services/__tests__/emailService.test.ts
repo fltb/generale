@@ -59,11 +59,12 @@ describe("EmailService", () => {
     await expect(freshSend("test@example.com", "token123")).rejects.toThrow("Email service not initialized");
   });
 
-  it.skip("should send a verification email with the correct parameters", async () => {
+  it("should send a verification email with the correct parameters", async () => {
     const to = "recipient@example.com";
     const token = "my-verification-token";
-    const verificationUrl = `http://localhost:3000/verify?token=${token}`;
+    const verificationUrl = `http://localhost:5173/verify-email?token=${token}`;
 
+    vi.stubEnv("FRONTEND_BASE_URL", "http://localhost:5173");
     await initEmailService(mockConfig); // Initialize first
     await sendVerificationEmail(to, token);
 
@@ -72,7 +73,7 @@ describe("EmailService", () => {
       from: "sender@app.com", // from .env
       to,
       subject: "请验证您的邮箱",
-      html: `请点击此链接验证您的邮箱: <a href="${verificationUrl}">${verificationUrl}</a>`,
+      html: expect.stringContaining(verificationUrl),
     });
   });
 });

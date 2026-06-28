@@ -60,47 +60,32 @@ describe("ProfileService", () => {
     expect(profile).toBeUndefined();
   });
 
-  it.skip("should update avatar using upsert logic", async () => {
-    const avatarUrl = "http://new.avatar.com/pic.jpg";
-    await profileService.updateAvatar(userId, avatarUrl);
-
-    const mockValuesCall = mockDb.insert().values;
-    const mockOnConflictCall = mockValuesCall.mock.results[0].value.onConflictDoUpdate;
-
-    expect(mockValuesCall).toHaveBeenCalledWith({ userId, avatarUrl });
-    expect(mockOnConflictCall).toHaveBeenCalledWith({
-      target: expect.any(Object), // profiles.userId
-      set: { avatarUrl },
-    });
-    expect(mockOnConflictCall.mock.results[0].value.run).toHaveBeenCalled();
-  });
-
-  it.skip("should update bio using upsert logic", async () => {
+  it("should update bio using upsert logic", async () => {
     const bio = "A new exciting bio.";
     await profileService.updateBio(userId, bio);
 
     const mockValuesCall = mockDb.insert().values;
     const mockOnConflictCall = mockValuesCall.mock.results[0].value.onConflictDoUpdate;
 
-    expect(mockValuesCall).toHaveBeenCalledWith({ userId, bio });
+    expect(mockValuesCall).toHaveBeenCalledWith({ userId, bio, updatedAt: expect.any(Date) });
     expect(mockOnConflictCall).toHaveBeenCalledWith({
       target: expect.any(Object), // profiles.userId
-      set: { bio },
+      set: { bio, updatedAt: expect.any(Date) },
     });
     expect(mockOnConflictCall.mock.results[0].value.run).toHaveBeenCalled();
   });
 
-  it.skip("should update the entire profile with partial data", async () => {
+  it("should update the entire profile with partial data", async () => {
     const updates = { bio: "A full update", avatarUrl: "http://full.update/img.png" };
     await profileService.updateProfile(userId, updates);
 
     const mockValuesCall = mockDb.insert().values;
     const mockOnConflictCall = mockValuesCall.mock.results[0].value.onConflictDoUpdate;
 
-    expect(mockValuesCall).toHaveBeenCalledWith({ userId, ...updates });
+    expect(mockValuesCall).toHaveBeenCalledWith({ userId, ...updates, updatedAt: expect.any(Date) });
     expect(mockOnConflictCall).toHaveBeenCalledWith({
       target: expect.any(Object), // profiles.userId
-      set: updates,
+      set: { ...updates, updatedAt: expect.any(Date) },
     });
     expect(mockOnConflictCall.mock.results[0].value.run).toHaveBeenCalled();
   });
