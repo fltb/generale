@@ -3,11 +3,7 @@ import type { JSX } from "solid-js";
 /**
  * 通用头像组件。纯 <img> 的薄包装：
  *  - 处理圆形裁剪 + 固定尺寸 + object-cover
- *  - 不做颜色 / 首字母 fallback（后端在用户没上传时也会返回 default avatar URL，
- *    所以 src 永远存在；不要在前端再做一套占位逻辑）
- *
- * 用法：
- *   <Avatar src={user.avatarThumbUrl} size={32} alt={user.username} />
+ *  - 当 src 为空时自动使用 DiceBear Pixel Art 生成头像
  */
 export interface AvatarProps {
   src?: string;
