@@ -1,6 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 
+vi.mock("@solidjs/meta", () => ({ Title: () => null, Meta: () => null }));
+
+vi.mock("~/hooks/useAuth", () => ({ useAuth: () => ({ user: null }) }));
+
+vi.mock("@solidjs/router", () => ({
+  A: (props: any) => <a href={props.href}>{props.children}</a>,
+  useLocation: () => ({ pathname: "/maps" }),
+  useSearchParams: () => [() => ({}), vi.fn()],
+  useNavigate: () => vi.fn(),
+}));
+
 vi.mock("@tanstack/solid-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   useMutation: () => ({
@@ -9,12 +20,6 @@ vi.mock("@tanstack/solid-query", () => ({
     isError: false,
     error: null,
   }),
-}));
-
-vi.mock("@solidjs/router", () => ({
-  useSearchParams: () => [() => ({}), vi.fn()],
-  useNavigate: () => vi.fn(),
-  A: (p: any) => <a href={p.href}>{p.children}</a>,
 }));
 
 vi.mock("~/api/gameApi", () => ({

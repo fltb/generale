@@ -4,6 +4,7 @@ import { A, useSearchParams } from "@solidjs/router";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { deleteMapApi, forkMapApi, listMapsApi, mapThumbnailUrl, myMapsApi } from "~/api/mapApi";
 import CreateRoomModal from "~/components/roomlist/CreateRoomModal";
+import GeneraleLayout from "~/components/game/GeneraleLayout";
 import { Badge, Button, Card, Input, Select, Spinner, Tabs } from "~/ui";
 
 const SORT_OPTIONS = [
@@ -62,7 +63,7 @@ export default function MapsPage() {
   }
 
   return (
-    <>
+    <GeneraleLayout>
       <Title>Map Workshop — General E</Title>
       <Meta name="description" content="Browse, create, and share custom maps for General E." />
       <Meta property="og:title" content="Map Workshop — General E" />
@@ -181,7 +182,7 @@ export default function MapsPage() {
         }}
         initialMapId={openRoomMapId()}
       />
-    </>
+    </GeneraleLayout>
   );
 }
 

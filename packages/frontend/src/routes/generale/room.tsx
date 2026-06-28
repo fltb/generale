@@ -8,6 +8,7 @@ import ConnectedRoom from "~/components/room/ConnectedRoom";
 import { useRoomSession } from "~/game/useRoomSession";
 import bridge from "~/testBridge";
 import { Alert, Button, Card, Input } from "~/ui";
+import GeneraleLayout from "~/components/game/GeneraleLayout";
 
 const RoomRoute: Component = () => {
   const params = useParams<{ id?: string }>();
@@ -28,7 +29,8 @@ const RoomRoute: Component = () => {
   });
 
   return (
-    <main class="container mx-auto p-6">
+    <GeneraleLayout>
+      <main class="container mx-auto p-6">
       <Title>Game Room — General E</Title>
       <Meta name="description" content="Join or spectate a General E game room." />
       <Meta property="og:title" content="Game Room — General E" />
@@ -163,6 +165,7 @@ const RoomRoute: Component = () => {
         </div>
       </Show>
     </main>
+    </GeneraleLayout>
   );
 };
 
