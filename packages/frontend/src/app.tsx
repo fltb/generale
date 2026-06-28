@@ -4,11 +4,12 @@ import { Link, MetaProvider } from "@solidjs/meta";
 import { Route, Router } from "@solidjs/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
-import { AuthProvider } from "./hooks/useAuth";
+import { AuthProvider, useAuth } from "./hooks/useAuth";
 import "./index.css";
-import { createSignal, onMount, Suspense } from "solid-js";
+import { createEffect, createSignal, onMount, Suspense } from "solid-js";
 import { WebSocketProvider } from "./hooks/useWebsocket";
-import { I18nProvider } from "./i18n/I18nProvider";
+import { I18nProvider, useT } from "./i18n/I18nProvider";
+import { getSettingsApi } from "./api/settingsApi";
 import CookieConsent from "./components/CookieConsent";
 import PlatformShell from "./components/platform/PlatformShell";
 import GeneraleLayout from "./components/game/GeneraleLayout";
@@ -131,6 +132,22 @@ if (IS_TEST_MODE) {
   exposeTestBridge();
 }
 
+function LocaleSync() {
+  const auth = useAuth();
+  const { setLocale } = useT();
+
+  createEffect(() => {
+    const user = auth.user;
+    if (user) {
+      getSettingsApi().then((settings) => {
+        if (settings.locale) setLocale(settings.locale);
+      });
+    }
+  });
+
+  return null;
+}
+
 export default function App() {
   const [locale, setLocale] = createSignal("en");
 
@@ -146,6 +163,7 @@ export default function App() {
       <MetaProvider>
         <Link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <AuthProvider>
+          <LocaleSync />
           <WebSocketProvider url={defaultWsUrl} autoConnect={false}>
             <Router
               root={(props) => (
