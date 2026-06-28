@@ -1,4 +1,4 @@
-import { A } from "@solidjs/router";
+import { A, useLocation } from "@solidjs/router";
 import { createMemo, Show, type JSX } from "solid-js";
 import Avatar from "~/components/Avatar";
 import LogoIcon from "~/components/LogoIcon";
@@ -11,9 +11,9 @@ interface Props {
 
 export default function GeneraleLayout(props: Props) {
   const auth = useAuth();
-  const currentPath = createMemo(() => window.location.pathname);
-  const isRoomsActive = createMemo(() => currentPath() === "/generale" || currentPath().startsWith("/game/"));
-  const isMapsActive = createMemo(() => currentPath().startsWith("/maps"));
+  const location = useLocation();
+  const isRoomsActive = createMemo(() => location.pathname === "/generale" || location.pathname.startsWith("/game/"));
+  const isMapsActive = createMemo(() => location.pathname.startsWith("/maps"));
 
   return (
     <div>
