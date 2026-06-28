@@ -391,6 +391,7 @@
   "Reset your password": "Reset your password",
   "Reset your password email": "Reset your password email",
   "Reset your password.": "Reset your password.",
+  "Returning to room in 5 seconds…": "Returning to room in 5 seconds…",
   "Room": "Room",
   "Room Details": "Room Details",
   "Room Info": "Room Info",
@@ -607,9 +608,8 @@
   "—": "—",
   "← Back": "← Back",
   "← Back to Home": "← Back to Home",
+  "← Back to Map Workshop": "← Back to Map Workshop",
   "▲ {n} online · 2-8 players": "▲ {n} online · 2-8 players",
   "▶ Collapse": "▶ Collapse",
-  "◀ Players": "◀ Players",
-  "Returning to room in 5 seconds…": "Returning to room in 5 seconds…",
-  "← Back to Map Workshop": "← Back to Map Workshop"
+  "◀ Players": "◀ Players"
 }

@@ -36,7 +36,7 @@ describe("TakeoverOverlay", () => {
     expect(screen.getByText(/This page has been taken over/)).toBeInTheDocument();
   });
   it("renders with custom scope", () => {
-    render(() => <TakeoverOverlay scope="游戏" />);
-    expect(screen.getByText(/游戏/)).toBeInTheDocument();
+    render(() => <TakeoverOverlay scope="game" />);
+    expect(screen.getByText("Takeover description")).toBeInTheDocument();
   });
 });

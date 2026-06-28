@@ -391,6 +391,7 @@
   "Reset your password": "重置密码",
   "Reset your password email": "重置密码邮件",
   "Reset your password.": "重置你的密码。",
+  "Returning to room in 5 seconds…": "",
   "Room": "房间",
   "Room Details": "房间详情",
   "Room Info": "",
@@ -607,9 +608,8 @@
   "—": "—",
   "← Back": "← 返回",
   "← Back to Home": "← 返回首页",
+  "← Back to Map Workshop": "",
   "▲ {n} online · 2-8 players": "▲ {n} 在线 · 2-8 名玩家",
   "▶ Collapse": "",
-  "◀ Players": "",
-  "Returning to room in 5 seconds…": "",
-  "← Back to Map Workshop": ""
+  "◀ Players": ""
 }
