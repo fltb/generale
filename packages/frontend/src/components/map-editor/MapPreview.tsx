@@ -7,12 +7,14 @@ import { mapDetailApi } from "~/api/mapApi";
 import { MapTile } from "~/components/MapTile";
 import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
 import { createIconFactory } from "~/utils/faIconGraphic";
+import { useT } from "~/i18n/useT";
 
 const GRID_CELL = 24;
 
 const EMPTY_DISPLAY: Record<string, { tileColor: number; name: string }> = {};
 
 export default function MapPreview(props: { mapId: string }) {
+  const { t } = useT();
   const [tiles, setTiles] = createSignal<CustomMapTile[][]>([]);
   const [width, setWidth] = createSignal(0);
   const [height, setHeight] = createSignal(0);
@@ -82,7 +84,7 @@ export default function MapPreview(props: { mapId: string }) {
         ),
       );
     } catch (e: unknown) {
-      setError((e as Error).message || "加载失败");
+      setError((e as Error).message || t("加载失败"));
     } finally {
       setLoading(false);
     }
@@ -100,9 +102,9 @@ export default function MapPreview(props: { mapId: string }) {
     <div class="flex flex-col h-full">
       <div class="p-3 bg-base-200 text-sm flex items-center gap-3 shrink-0">
         <A href="/maps" class="opacity-50 hover:opacity-100">
-          ← 返回
+          {t("← 返回")}
         </A>
-        <span class="font-medium">{loading() ? "加载中..." : name() || "地图预览"}</span>
+        <span class="font-medium">{loading() ? t("加载中...") : name() || t("地图预览")}</span>
         {!loading() && (
           <span class="opacity-50 text-xs">
             {width()}×{height()}

@@ -3,6 +3,7 @@ import { A } from "@solidjs/router";
 import { type Component, createMemo, For, Show } from "solid-js";
 import Avatar from "~/components/Avatar";
 import { playerSummaries } from "~/game/selectors";
+import { useT } from "~/i18n/useT";
 import { resolveDisplayNames } from "~/utils/playerDisplay";
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export const PlayerList: Component<Props> = (props) => {
+  const { t } = useT();
   const summaries = createMemo(() =>
     playerSummaries(props.state?.(), {
       sortByArmy: props.sortByArmy,
@@ -29,7 +31,7 @@ export const PlayerList: Component<Props> = (props) => {
   return (
     <div class={props.compact ? "p-1.5" : "p-2 w-full max-w-sm"}>
       <Show when={!props.compact}>
-        <div class="font-semibold mb-2">玩家信息</div>
+        <div class="font-semibold mb-2">{t("玩家信息")}</div>
       </Show>
       <div class="flex flex-col gap-1.5">
         <For each={summaries()}>

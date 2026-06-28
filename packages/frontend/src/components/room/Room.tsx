@@ -9,6 +9,7 @@ import { type Component, Show } from "solid-js";
 import { makeEmptyRoom } from "~/game/defaults";
 import type { PregameController } from "~/game/usePreGameRoom";
 import { Alert, Button, Card, Panel, TakeoverOverlay } from "~/ui";
+import { useT } from "~/i18n/useT";
 import { PlayerList } from "./PlayerList";
 import { PreGameControls } from "./PreGameControls";
 import { PreGameMapSettingForm } from "./PreGameMapSettingForm";
@@ -32,6 +33,7 @@ export interface RoomWithSyncProps {
  */
 export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
   const ctrl = props.ctrl;
+  const { t } = useT();
 
   const room = ctrl.room;
   const selfId = ctrl.selfId;
@@ -49,13 +51,13 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
     <div style={wrapperStyle()} class="p-6" aria-hidden={props.visible === false}>
       {/* 被同 user 另一个 sub 接管：盖一层模态挡住操作 */}
       <Show when={ctrl.displaced()}>
-        <TakeoverOverlay scope="房间" dim={60} />
+        <TakeoverOverlay scope={t("房间")} dim={60} />
       </Show>
 
       <Show when={ctrl.notice()}>
         <Alert variant="info" class="shadow-lg">
           <div>
-            Notice:
+            {t("Notice:")}
             <span>{ctrl.notice()}</span>
           </div>
         </Alert>
@@ -65,21 +67,21 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         <Alert variant="info" class="shadow-sm mb-3">
           <div class="flex items-center justify-between w-full gap-3">
             <div>
-              <div class="font-medium">游戏进行中</div>
+              <div class="font-medium">{t("游戏进行中")}</div>
               <div class="text-sm opacity-70">
-                <Show when={ctrl.isLobby()} fallback={"你正在观战中。"}>
-                  你可以在大厅等待本局结束，或进入观战。
+                <Show when={ctrl.isLobby()} fallback={t("你正在观战中。")}>
+                  {t("你可以在大厅等待本局结束，或进入观战。")}
                 </Show>
               </div>
             </div>
             <Show when={ctrl.isLobby()}>
               <Button size="sm" variant="primary" onClick={ctrl.onEnterSpectate}>
-                进入观战
+                {t("进入观战")}
               </Button>
             </Show>
             <Show when={ctrl.isSpectating()}>
               <Button size="sm" variant="ghost" onClick={ctrl.onLeaveSpectate}>
-                退出观战
+                {t("退出观战")}
               </Button>
             </Show>
           </div>
@@ -89,7 +91,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
       <Card class="bg-base-200 p-4">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-lg font-semibold">房间信息</div>
+            <div class="text-lg font-semibold">{t("房间信息")}</div>
             <div data-testid="room-game-id" class="text-sm opacity-70">Game ID: {room()?.gameId}</div>
           </div>
           <div class="flex items-center gap-2">
@@ -101,21 +103,21 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
                   const pw = props.password;
                   const link = `${location.origin}/game/${encodeURIComponent(props.gameId)}${pw ? `?join=${encodeURIComponent(pw)}` : ""}`;
                   navigator.clipboard.writeText(link).then(() => {
-                    alert("邀请链接已复制到剪贴板");
+                    alert(t("邀请链接已复制到剪贴板"));
                   });
                 }}
               >
-                复制邀请链接
+                {t("复制邀请链接")}
               </Button>
             </Show>
             <div class="opacity-70 text-sm">
-              玩家上限 {room()?.playerLimit} · 队伍数 {room()?.teamCount}
+              {t("玩家上限")} {room()?.playerLimit} · {t("队伍数")} {room()?.teamCount}
             </div>
           </div>
         </div>
       </Card>
 
-      <Panel title="玩家列表">
+      <Panel title={t("玩家列表")}>
         <PlayerList
           players={room()?.players ?? []}
           selfId={selfId()}
@@ -143,7 +145,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         />
       </Panel>
 
-      <Panel title="房间设置" titleClass="text-lg font-semibold mb-2">
+      <Panel title={t("房间设置")} titleClass="text-lg font-semibold mb-2">
         <PreGameRoomStateFrom
           state={room()?.gameSetting ?? makeEmptyRoom().gameSetting}
           map={room()?.mapSetting ?? makeEmptyRoom().mapSetting}
@@ -151,7 +153,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         />
       </Panel>
 
-      <Panel title="房间模式">
+      <Panel title={t("房间模式")}>
         <div class="flex items-center gap-3 mb-3">
           <div class="btn-group">
             <Button
@@ -160,7 +162,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
               disabled={!isHost()}
               onClick={() => ctrl.onRoomTypeChange("standard")}
             >
-              Standard
+              {t("Standard")}
             </Button>
             <Button
               size="sm"
@@ -168,13 +170,13 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
               disabled={!isHost()}
               onClick={() => ctrl.onRoomTypeChange("custom")}
             >
-              Custom
+              {t("Custom")}
             </Button>
           </div>
           <span class="text-xs opacity-60">
             {(room()?.roomType ?? "standard") === "standard"
-              ? "仅可选 small / medium / large 预设"
-              : "可自定义地图尺寸、地形频率等"}
+              ? t("仅可选 small / medium / large 预设")
+              : t("可自定义地图尺寸、地形频率等")}
           </span>
         </div>
 
@@ -186,7 +188,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
               disabled={!isHost()}
               onClick={() => ctrl.onTeamModeChange("ffa")}
             >
-              单人
+              {t("单人")}
             </Button>
             <Button
               size="sm"
@@ -194,16 +196,16 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
               disabled={!isHost()}
               onClick={() => ctrl.onTeamModeChange("team")}
             >
-              组队
+              {t("组队")}
             </Button>
           </div>
           <span class="text-xs opacity-60">
-            {(room()?.teamMode ?? "ffa") === "ffa" ? "每人一队，前端隐藏队伍信息" : "可自由组队、换队、重命名"}
+            {(room()?.teamMode ?? "ffa") === "ffa" ? t("每人一队，前端隐藏队伍信息") : t("可自由组队、换队、重命名")}
           </span>
         </div>
       </Panel>
 
-      <Panel title="地图设置">
+      <Panel title={t("地图设置")}>
         <PreGameMapSettingForm
           setting={room()?.mapSetting ?? makeEmptyRoom().mapSetting}
           roomType={room()?.roomType ?? "standard"}
@@ -211,7 +213,7 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         />
       </Panel>
 
-      <Panel title="操作">
+      <Panel title={t("操作")}>
         <PreGameControls
           isHost={isHost()}
           started={room()?.started ?? false}

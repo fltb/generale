@@ -2,6 +2,7 @@ import type { Component } from "solid-js";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { listMapsApi, mapThumbnailUrl } from "~/api/mapApi";
 import { Button, Checkbox, Collapse, CollapseContent, CollapseTitle, Input, Spinner } from "~/ui";
+import { useT } from "~/i18n/useT";
 
 interface MapSelectorProps {
   value?: string;
@@ -10,6 +11,7 @@ interface MapSelectorProps {
 }
 
 export const MapSelector: Component<MapSelectorProps> = (props) => {
+  const { t } = useT();
   const [search, setSearch] = createSignal("");
 
   const [maps] = createResource(
@@ -32,7 +34,7 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
     <Collapse arrow class="border border-base-300 bg-base-100">
       <Checkbox />
       <CollapseTitle class="text-sm font-medium">
-        <Show when={selectedMap()} fallback={<span class="opacity-50 ml-6">{props.placeholder || "选择地图..."}</span>}>
+        <Show when={selectedMap()} fallback={<span class="opacity-50 ml-6">{props.placeholder || t("选择地图...")}</span>}>
           <span class="text ml-5">{selectedMap()?.name}</span>
           <span class="text-xs opacity-50 ml-2">
             {selectedMap()?.width}×{selectedMap()?.height}
@@ -44,12 +46,12 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
           <Input
             value={search()}
             onInput={(e) => setSearch(e.currentTarget.value)}
-            placeholder="搜索..."
+            placeholder={t("搜索...")}
             size="sm"
             class="flex-1"
           />
           <Button size="xs" variant="ghost" onClick={() => props.onChange("")}>
-            清除
+            {t("清除")}
           </Button>
         </div>
 
@@ -63,7 +65,7 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
         >
           <Show
             when={maps() && maps()?.length > 0}
-            fallback={<div class="text-center py-4 opacity-50 text-sm">暂无已发布的地图</div>}
+            fallback={<div class="text-center py-4 opacity-50 text-sm">{t("暂无已发布的地图")}</div>}
           >
             <div class="space-y-1 max-h-[180px] overflow-y-auto">
               <For each={maps()}>

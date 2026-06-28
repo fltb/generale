@@ -16,6 +16,7 @@ import { MapTile } from "~/components/MapTile";
 import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
 import { Button, Input } from "~/ui";
 import { createIconFactory } from "~/utils/faIconGraphic";
+import { useT } from "~/i18n/useT";
 
 const TILE_COLORS: Record<string, string> = {
   [TileType.Plain]: "#d1d5db",
@@ -54,9 +55,11 @@ interface MapEditorProps {
 }
 
 export default function MapEditor(props: MapEditorProps) {
+  const { t } = useT();
   const navigate = useNavigate();
   const [name, setName] = createSignal("");
   const [description, setDescription] = createSignal("");
+  const [messageType, setMessageType] = createSignal<"error" | "success">("success");
   const [width, setWidth] = createSignal(20);
   const [height, setHeight] = createSignal(20);
   const [tiles, setTiles] = createSignal<CustomMapTile[][]>([]);
@@ -174,8 +177,8 @@ export default function MapEditor(props: MapEditorProps) {
     if (!isPainting()) return;
     const cell = screenToWorld(e.globalX, e.globalY);
     if (!cell) return;
-    const t = tiles(),
-      cur = t[cell.y]?.[cell.x];
+    const tileGrid = tiles(),
+      cur = tileGrid[cell.y]?.[cell.x];
     const type = selectedType();
     const army = PASSABLE_TYPES.has(type) ? selectedArmy() : 0;
     if (!cur || cur.type !== type || cur.army !== army) paintCell(cell.x, cell.y);
@@ -210,8 +213,8 @@ export default function MapEditor(props: MapEditorProps) {
     setSaving(true);
     setMessage("");
     try {
-      const t = tiles();
-      const tileGrid = t.map((row) => row.map((cell) => ({ type: cell.type, army: cell.army })));
+      const tilesData = tiles();
+      const tileGrid = tilesData.map((row) => row.map((cell) => ({ type: cell.type, army: cell.army })));
       const base = { name: name(), description: description(), width: width(), height: height(), tiles: tileGrid };
       const editId = editingMapId();
       if (editId) {
@@ -227,10 +230,12 @@ export default function MapEditor(props: MapEditorProps) {
         if (!hasCustomThumbnail) await generatePreview();
         navigate("/maps?tab=my");
       } else {
-        setMessage("地图已保存");
+        setMessage(t("地图已保存"));
+        setMessageType("success");
       }
     } catch (e: unknown) {
-      setMessage(`保存失败: ${(e as Error).message}`);
+      setMessage(`${t("保存失败")}: ${(e as Error).message}`);
+      setMessageType("error");
     } finally {
       setSaving(false);
     }
@@ -239,7 +244,8 @@ export default function MapEditor(props: MapEditorProps) {
   async function generatePreview() {
     const id = editingMapId();
     if (!id) {
-      setMessage("请先保存地图");
+      setMessage(t("请先保存地图"));
+      setMessageType("error");
       return;
     }
     setThumbnailBusy(true);
@@ -323,14 +329,17 @@ export default function MapEditor(props: MapEditorProps) {
       app.destroy(true, { children: true });
 
       if (!blob) {
-        setMessage("生成预览失败");
+        setMessage(t("生成预览失败"));
+        setMessageType("error");
         return;
       }
       await uploadMapThumbnailApi(id, new File([blob], "preview.png", { type: "image/png" }));
       setThumbStamp(Date.now());
-      setMessage("预览图已生成");
+      setMessage(t("预览图已生成"));
+      setMessageType("success");
     } catch (e: unknown) {
-      setMessage(`预览失败: ${(e as Error).message}`);
+      setMessage(`${t("预览失败")}: ${(e as Error).message}`);
+      setMessageType("error");
     } finally {
       setThumbnailBusy(false);
     }
@@ -344,11 +353,13 @@ export default function MapEditor(props: MapEditorProps) {
     setThumbnailBusy(true);
     try {
       await uploadMapThumbnailApi(editId, file);
-      setMessage("封面上传成功");
+      setMessage(t("封面上传成功"));
+      setMessageType("success");
       hasCustomThumbnail = true;
       setThumbStamp(Date.now());
     } catch (e: unknown) {
-      setMessage(`上传失败: ${(e as Error).message}`);
+      setMessage(`${t("上传失败")}: ${(e as Error).message}`);
+      setMessageType("error");
     } finally {
       setThumbnailBusy(false);
     }
@@ -375,7 +386,8 @@ export default function MapEditor(props: MapEditorProps) {
       setHasDraft(!!d.hasDraft);
       hasCustomThumbnail = !!d.hasCustomThumbnail;
     } catch (e: unknown) {
-      setMessage(`加载失败: ${(e as Error).message}`);
+      setMessage(`${t("加载失败")}: ${(e as Error).message}`);
+      setMessageType("error");
     }
   }
 
@@ -386,9 +398,11 @@ export default function MapEditor(props: MapEditorProps) {
       await discardDraftApi(id);
       setHasDraft(false);
       await loadMap(id);
-      setMessage("草稿已放弃，已恢复已发布版本");
+      setMessage(t("草稿已放弃，已恢复已发布版本"));
+      setMessageType("success");
     } catch (e: unknown) {
-      setMessage(`放弃草稿失败: ${(e as Error).message}`);
+      setMessage(`${t("放弃草稿失败")}: ${(e as Error).message}`);
+      setMessageType("error");
     }
   }
 
@@ -422,26 +436,26 @@ export default function MapEditor(props: MapEditorProps) {
     <div class="flex h-full">
       <div class="w-56 bg-base-200 p-3 flex flex-col gap-2 shrink-0">
         <A href="/maps" class="text-xs opacity-50 hover:opacity-100 mb-1">
-          ← 返回地图工坊
+          {t("← 返回地图工坊")}
         </A>
 
         <div>
-          <div class="text-xs font-medium mb-0.5">地图名称</div>
-          <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder="输入地图名称" size="sm" />
+          <div class="text-xs font-medium mb-0.5">{t("地图名称")}</div>
+          <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder={t("输入地图名称")} size="sm" />
         </div>
         <div>
-          <div class="text-xs font-medium mb-0.5">描述</div>
+          <div class="text-xs font-medium mb-0.5">{t("描述")}</div>
           <Input
             value={description()}
             onInput={(e) => setDescription(e.currentTarget.value)}
-            placeholder="可选描述"
+            placeholder={t("可选描述")}
             size="sm"
           />
         </div>
 
         <div class="flex gap-2">
           <div class="flex-1">
-            <div class="text-xs font-medium mb-0.5">宽</div>
+            <div class="text-xs font-medium mb-0.5">{t("宽")}</div>
             <Input
               type="number"
               value={String(width())}
@@ -450,7 +464,7 @@ export default function MapEditor(props: MapEditorProps) {
             />
           </div>
           <div class="flex-1">
-            <div class="text-xs font-medium mb-0.5">高</div>
+            <div class="text-xs font-medium mb-0.5">{t("高")}</div>
             <Input
               type="number"
               value={String(height())}
@@ -461,34 +475,34 @@ export default function MapEditor(props: MapEditorProps) {
         </div>
 
         <div>
-          <div class="text-xs font-medium mb-0.5">地形类型</div>
+          <div class="text-xs font-medium mb-0.5">{t("地形类型")}</div>
           <div class="grid grid-cols-2 gap-1">
-            {TILE_TYPES.map((t) => (
+            {TILE_TYPES.map((tileType) => (
               <button
                 type="button"
                 class={`px-2 py-1 text-xs rounded border font-semibold cursor-pointer ${
-                  selectedType() === t
+                  selectedType() === tileType
                     ? "ring-2 ring-primary border-primary"
                     : "border-base-300 hover:border-base-content/30"
                 }`}
                 style={{
-                  "background-color": TILE_COLORS[t] ?? "#ccc",
+                  "background-color": TILE_COLORS[tileType] ?? "#ccc",
                   color: "#111",
                   "text-shadow": "0 0 2px rgba(255,255,255,0.6)",
                 }}
-                onClick={() => setSelectedType(t)}
+                onClick={() => setSelectedType(tileType)}
               >
-                {TILE_LABELS[t]}
+                {t(TILE_LABELS[tileType])}
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <div class="text-xs font-medium mb-0.5">兵力</div>
+          <div class="text-xs font-medium mb-0.5">{t("兵力")}</div>
           <Show
             when={PASSABLE_TYPES.has(selectedType())}
-            fallback={<div class="text-xs opacity-50">该地形不可驻兵</div>}
+            fallback={<div class="text-xs opacity-50">{t("该地形不可驻兵")}</div>}
           >
             <Input
               type="number"
@@ -501,22 +515,22 @@ export default function MapEditor(props: MapEditorProps) {
 
         <Show when={editingMapId()}>
           <div class="border-t border-base-300 pt-2 flex flex-col gap-2">
-            <div class="text-xs font-medium">封面图片</div>
+            <div class="text-xs font-medium">{t("封面图片")}</div>
 
             <Show when={mapThumbnailUrl(editingMapId() as string)}>
               <img
                 src={`${mapThumbnailUrl(editingMapId() as string)}?v=${thumbStamp()}`}
-                alt="预览"
+                alt={t("预览")}
                 class="w-full rounded border border-base-300"
               />
             </Show>
 
             <p class="text-[10px] leading-relaxed opacity-50">
-              自定义封面：上传一张本地图片作为地图展示封面。上传后会标记为自定义封面，后续发布不再自动覆盖。
+              {t("自定义封面：上传一张本地图片作为地图展示封面。上传后会标记为自定义封面，后续发布不再自动覆盖。")}
             </p>
             <label class="cursor-pointer">
               <span class={`btn btn-xs btn-ghost ${thumbnailBusy() ? "btn-disabled" : ""}`}>
-                {thumbnailBusy() ? "处理中..." : "上传自定义封面"}
+                {thumbnailBusy() ? t("处理中...") : t("上传自定义封面")}
               </span>
               <input
                 type="file"
@@ -528,41 +542,41 @@ export default function MapEditor(props: MapEditorProps) {
             </label>
 
             <p class="text-[10px] leading-relaxed opacity-50">
-              自动生成：根据当前地图格内容自动渲染一张预览图。适合没有自定义封面的地图，发布时会自动调用。
+              {t("自动生成：根据当前地图格内容自动渲染一张预览图。适合没有自定义封面的地图，发布时会自动调用。")}
             </p>
             <Button variant="ghost" size="xs" onClick={generatePreview} disabled={thumbnailBusy()}>
-              {thumbnailBusy() ? "生成中..." : "自动生成预览图"}
+              {thumbnailBusy() ? t("生成中...") : t("自动生成预览图")}
             </Button>
           </div>
         </Show>
 
         <div class="flex flex-col gap-1 text-xs opacity-50">
           <Show when={hasDraft()}>
-            <div class="text-warning opacity-100">正在编辑草稿 — 名称、描述等修改只保存到发布版</div>
+            <div class="text-warning opacity-100">{t("正在编辑草稿 — 名称、描述等修改只保存到发布版")}</div>
           </Show>
-          <div>缩放: {(viewScale() * 100).toFixed(0)}%</div>
+          <div>{t("缩放:")} {(viewScale() * 100).toFixed(0)}%</div>
           <div>
-            尺寸: {width()} × {height()}
+            {t("尺寸:")} {width()} × {height()}
           </div>
-          <div>Ctrl+Z 撤销 / Ctrl+Y 重做</div>
-          <div>中键拖动 / 滚轮缩放</div>
+          <div>{t("Ctrl+Z 撤销 / Ctrl+Y 重做")}</div>
+          <div>{t("中键拖动 / 滚轮缩放")}</div>
         </div>
 
         <div class="flex flex-col gap-2 mt-4 pt-2 border-t border-base-300">
           <Button variant="ghost" size="sm" onClick={() => save(false)} disabled={saving() || !name()}>
-            {saving() ? "保存中..." : "保存草稿"}
+            {saving() ? t("保存中...") : t("保存草稿")}
           </Button>
           <Show when={hasDraft()}>
             <Button variant="ghost" size="xs" onClick={discardDraft}>
-              放弃草稿
+              {t("放弃草稿")}
             </Button>
           </Show>
           <Button variant="primary" size="sm" onClick={() => save(true)} disabled={saving() || !name()}>
-            {saving() ? "发布中..." : "发布地图"}
+            {saving() ? t("发布中...") : t("发布地图")}
           </Button>
           {message() && (
             <div
-              class={`text-xs ${message().startsWith("保存失败") || message().startsWith("加载失败") ? "text-error" : "text-success"}`}
+              class={`text-xs ${messageType() === "error" ? "text-error" : "text-success"}`}
             >
               {message()}
             </div>

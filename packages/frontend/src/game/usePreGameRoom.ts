@@ -21,8 +21,11 @@ import {
   SyncedPreGameServerEventPayloadType,
   type SyncedPreGameState,
 } from "@generale/types";
+import { createT } from "@generale/i18n";
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { useSyncedState } from "~/hooks/useSyncedState";
+
+const t = createT("en");
 import { makeEmptyRoom } from "./defaults";
 import { applyPregameEventLocal } from "./pregameReducer";
 import { isGameInProgress } from "./selectors";
@@ -65,19 +68,19 @@ export function usePreGameRoom(params: UsePreGameRoomParams) {
   // handle custom events (and notify parent)
   function handleCustomEvent(evt: SyncedPreGameServerEventPayload) {
     try {
-      const t = evt.type;
-      switch (t) {
+      const evtType = evt.type;
+      switch (evtType) {
         case SyncedPreGameServerEventPayloadType.KICKED:
-          setNotice(evt.reason ?? "你已被踢出房间");
+          setNotice(evt.reason ?? t("你已被踢出房间"));
           setIsKicked(true);
           params.onStateUpdate?.({ event: evt });
           break;
         case SyncedPreGameServerEventPayloadType.DISBANDED:
-          setNotice(evt.reason ?? "房间已被解散");
+          setNotice(evt.reason ?? t("房间已被解散"));
           params.onStateUpdate?.({ event: evt });
           break;
         case SyncedPreGameServerEventPayloadType.GAME_STARTED:
-          setNotice("游戏已开始");
+          setNotice(t("游戏已开始"));
           // 当收到 GAME_STARTED 时，告知父组件 phase 已切为 INGAME（由服务器权威决定）
           params.onStateUpdate?.({ event: evt });
           break;
@@ -89,7 +92,7 @@ export function usePreGameRoom(params: UsePreGameRoomParams) {
           break;
         case SyncedPreGameServerEventPayloadType.START_REJECTED:
           // 显示原因（通常只由 host 收到），不需要向上传递
-          setNotice(evt.reason ?? "开始被拒绝，队伍或准备条件不满足");
+          setNotice(evt.reason ?? t("开始被拒绝，队伍或准备条件不满足"));
           break;
         case SyncedPreGameServerEventPayloadType.DISPLACED:
           // 同 user 的另一个 sub 已经接管 pregame 域。后续 server 事件都走那边，
@@ -121,7 +124,7 @@ export function usePreGameRoom(params: UsePreGameRoomParams) {
       } else if (code === 4003) {
         handleCustomEvent({
           type: SyncedPreGameServerEventPayloadType.KICKED,
-          reason: reason || "无法加入房间",
+          reason: reason || t("无法加入房间"),
         });
       }
     },
