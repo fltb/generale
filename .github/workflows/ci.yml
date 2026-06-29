@@ -73,7 +73,7 @@ jobs:
         run: |
           bun build --compile \
             ./packages/backend/src/index.ts \
-            --outfile ./generale-server/server
+            --outfile ./dist/server
 
       - name: Assemble deploy package
         run: |
