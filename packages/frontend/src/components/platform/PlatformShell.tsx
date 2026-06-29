@@ -45,10 +45,16 @@ export default function PlatformShell(props: { children?: JSX.Element }) {
               <span class="font-semibold text-base-content">{PLATFORM_NAME}</span>
             </A>
             <div class="flex items-center gap-4 text-sm">
-              <A href="/generale" class="border-b-2 border-transparent hover:border-primary text-base-content/70 hover:text-base-content">
+              <A
+                href="/generale"
+                class="border-b-2 border-transparent hover:border-primary text-base-content/70 hover:text-base-content"
+              >
                 Play
               </A>
-              <A href="/about" class="border-b-2 border-transparent hover:border-primary text-base-content/70 hover:text-base-content">
+              <A
+                href="/about"
+                class="border-b-2 border-transparent hover:border-primary text-base-content/70 hover:text-base-content"
+              >
                 About
               </A>
             </div>
@@ -93,7 +99,9 @@ export default function PlatformShell(props: { children?: JSX.Element }) {
                     alt={auth.user?.displayName || auth.user?.username || auth.user?.email}
                     size={28}
                   />
-                  <span class="text-sm">{auth.user?.displayName || auth.user?.username || auth.user?.email || "User"}</span>
+                  <span class="text-sm">
+                    {auth.user?.displayName || auth.user?.username || auth.user?.email || "User"}
+                  </span>
                 </button>
                 <div
                   id="nav-user-menu"

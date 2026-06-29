@@ -103,7 +103,7 @@ export class ProfileService {
 
     // 1) 探一下元数据，做维度上限校验（防解码炸弹）
     const meta = await new Bun.Image(input, { maxPixels: MAX_PIXELS }).metadata();
-    if (!meta.width || !meta.height) {
+    if (!(meta.width && meta.height)) {
       throw new Error("Invalid image: missing dimensions");
     }
     if (meta.width > 8000 || meta.height > 8000) {
@@ -168,7 +168,7 @@ export class ProfileService {
     await mkdir(DEFAULT_AVATAR_DIR, { recursive: true });
     const original = join(DEFAULT_AVATAR_DIR, "original.webp");
     const thumb = join(DEFAULT_AVATAR_DIR, "thumb.webp");
-    if (await Bun.file(original).exists() && await Bun.file(thumb).exists()) return;
+    if ((await Bun.file(original).exists()) && (await Bun.file(thumb).exists())) return;
     console.warn("[ProfileService] default avatar files missing, run generation script to create them");
   }
 }

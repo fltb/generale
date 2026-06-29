@@ -135,7 +135,7 @@ export const profileRoutes = new Elysia({ prefix: "/profile" })
   )
   .get(
     "/settings",
-    async ({ cookie: { sid }, set }) => {
+    ({ cookie: { sid }, set }) => {
       const sessionId = sid?.value;
       const userId = sessionId ? sessionService.get(sessionId)?.userId : undefined;
       if (!userId) {
