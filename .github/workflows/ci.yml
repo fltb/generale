@@ -37,6 +37,15 @@ jobs:
       - name: Tests
         run: bun run test
 
+      - name: Build
+        run: bun run build
+
+      - name: Compile backend binary
+        run: bun build --compile ./packages/backend/src/index.ts --outfile /tmp/generale-server
+
+      - name: Audit
+        run: bun audit --prod || true
+
       - name: Frontend build
         run: bun run --filter=frontend build
 
