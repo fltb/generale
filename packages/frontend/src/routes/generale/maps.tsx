@@ -150,7 +150,7 @@ export default function MapsPage() {
             }
           >
             <Show
-              when={maps() && maps()?.length > 0}
+              when={maps() != null && maps()!.length > 0}
               fallback={
                 <div class="text-center py-12 text-base-content/50">
                   {searchText() ? t("No matching maps found.") : t("No maps yet.")}

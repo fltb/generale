@@ -60,8 +60,6 @@ export class SubConnectorClient<CEvt = unknown, SEvt = unknown, Ctx extends WSOp
   }
 
   close(code?: number, reason?: string) {
-    this._explicitlyClosed = true;
-    this._closeInfo = { code, reason };
     this.manager.sendRaw({ domain: this.domain, type: "close", payload: { code, reason } });
     // locally mark closed
     this._triggerClose(code, reason);
@@ -72,15 +70,12 @@ export class SubConnectorClient<CEvt = unknown, SEvt = unknown, Ctx extends WSOp
   // internal triggers called by manager when receiving server-sent events
   _triggerOpen() {
     this._ready = true;
-    this._explicitlyClosed = false;
     this.openCallbacks.forEach((cb) => {
       cb();
     });
   }
   _triggerClose(code?: number, reason?: string) {
     this._ready = false;
-    this._explicitlyClosed = true;
-    this._closeInfo = { code, reason };
     this.closeCallbacks.forEach((cb) => {
       cb(code, reason);
     });
@@ -93,8 +88,6 @@ export class SubConnectorClient<CEvt = unknown, SEvt = unknown, Ctx extends WSOp
   }
   _triggerReconnect() {
     this._ready = true;
-    this._explicitlyClosed = false;
-    this._closeInfo = null;
     this.reconnectCallbacks.forEach((cb) => {
       cb();
     });

@@ -13,6 +13,7 @@
     "build": "bun run --filter=./packages/* build",
     "dev": "bun run --filter=./packages/* dev",
     "test": "bun run --filter=./packages/* test",
+    "typecheck": "bun run --filter=./packages/* typecheck",
     "lint": "bunx biome lint",
     "format": "bunx biome format --write",
     "check": "bunx biome check",

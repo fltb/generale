@@ -86,6 +86,7 @@ const OperationArrow: Component<{
     const dyn = Math.sign(dy);
 
     try {
+      if (!arrow) return null;
       arrow.x = mx + dxn * offset;
       arrow.y = my + dyn * offset;
       graphics.addChild(arrow);

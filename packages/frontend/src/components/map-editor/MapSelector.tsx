@@ -67,7 +67,7 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
           }
         >
           <Show
-            when={maps() && maps()?.length > 0}
+            when={maps() != null && maps()!.length > 0}
             fallback={<div class="text-center py-4 opacity-50 text-sm">{t("No published maps yet")}</div>}
           >
             <div class="space-y-1 max-h-[180px] overflow-y-auto">

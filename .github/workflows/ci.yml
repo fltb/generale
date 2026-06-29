@@ -31,8 +31,8 @@ jobs:
       - name: Biome check
         run: bun run ci:lint
 
-      - name: Backend typecheck
-        run: cd packages/backend && bun run typecheck
+      - name: Typecheck
+        run: bun run typecheck
 
       - name: Tests
         run: bun run test

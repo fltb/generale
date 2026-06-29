@@ -83,7 +83,7 @@ export const MapTile: Component<MapTileProps> = (props) => {
       const iconSize = Math.round(props.size * 0.6);
       const scaledIcon = props.iconFactory?.createScaledIcon(key, iconSize, DEFAULT_TILE_THEME.colors.tileIcon);
 
-      // 设置位置到瓦片中心
+      if (!scaledIcon) return null;
       scaledIcon.x = props.size / 2;
       scaledIcon.y = props.size / 2;
 
