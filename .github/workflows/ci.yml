@@ -34,8 +34,8 @@ jobs:
       - name: Backend typecheck
         run: cd packages/backend && bun run typecheck
 
-      - name: Backend tests
-        run: cd packages/backend && bun run test
+      - name: Tests
+        run: bun run test
 
       - name: Frontend build
         run: bun run --filter=frontend build
