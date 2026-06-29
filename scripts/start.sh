@@ -14,6 +14,7 @@ if [ -f .env ]; then
   set +a
 fi
 
+export NODE_ENV="${NODE_ENV:-production}"
 export PORT="${PORT:-3000}"
 export HOST="${HOST:-0.0.0.0}"
 export DB_FILE_NAME="${DB_FILE_NAME:-./data/generale.sqlite}"

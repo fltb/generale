@@ -19,46 +19,49 @@ type EmailConfig = {
 let transporter: nodemailer.Transporter;
 
 export async function initEmailServiceWithEnv() {
-  try {
-    const requiredVars = ["EMAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"];
+  const requiredVars = ["EMAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"];
 
-    for (const varName of requiredVars) {
-      if (!process.env[varName]) {
-        throw new Error(`${varName} is required in environment`);
-      }
+  for (const varName of requiredVars) {
+    if (!process.env[varName]) {
+      throw new Error(`${varName} is required in environment`);
     }
-
-    const EMAIL_FROM = process.env["EMAIL_FROM"] ?? "";
-    const SMTP_HOST = process.env["SMTP_HOST"] ?? "";
-    const SMTP_PORT = process.env["SMTP_PORT"] ?? "";
-    const SMTP_USER = process.env["SMTP_USER"] ?? "";
-    const SMTP_PASS = process.env["SMTP_PASS"] ?? "";
-
-    await initEmailService({
-      method: "smtp",
-      from: EMAIL_FROM,
-      smtp: {
-        host: SMTP_HOST,
-        port: parseInt(SMTP_PORT, 10),
-        secure: true,
-        auth: {
-          user: SMTP_USER,
-          pass: SMTP_PASS,
-        },
-      },
-      ...(process.env["HTTP_PROXY"] ? { proxy: process.env["HTTP_PROXY"] } : {}),
-    });
-
-    console.log("Email service init successfully via SMTP");
-  } catch (error) {
-    console.error("Failed to init email service:", error);
   }
+
+  const EMAIL_FROM = process.env["EMAIL_FROM"] ?? "";
+  const SMTP_HOST = process.env["SMTP_HOST"] ?? "";
+  const SMTP_PORT = process.env["SMTP_PORT"] ?? "";
+  const SMTP_USER = process.env["SMTP_USER"] ?? "";
+  const SMTP_PASS = process.env["SMTP_PASS"] ?? "";
+
+  await initEmailService({
+    method: "smtp",
+    from: EMAIL_FROM,
+    smtp: {
+      host: SMTP_HOST,
+      port: parseInt(SMTP_PORT, 10),
+      secure: true,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    },
+    ...(process.env["HTTP_PROXY"] ? { proxy: process.env["HTTP_PROXY"] } : {}),
+  });
+
+  console.log("Email service init successfully via SMTP");
 }
 
 export async function initEmailService(config: EmailConfig) {
   transporter = nodemailer.createTransport(config.smtp as unknown as Parameters<typeof nodemailer.createTransport>[0]);
 
-  await transporter.verify();
+  try {
+    await Promise.race([
+      transporter.verify(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+    ]);
+  } catch {
+    console.warn("[email] SMTP verification failed — email service may not work. Check your SMTP credentials.");
+  }
 }
 
 export async function sendVerificationEmail(email: string, token: string, locale = "en") {

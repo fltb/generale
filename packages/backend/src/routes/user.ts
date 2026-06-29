@@ -144,7 +144,7 @@ export const userRoutes = new Elysia()
           await sendVerificationEmail(email, code);
         } catch (err) {
           console.error("Failed to send verification email (overwrite-register):", email, err);
-          return { success: true, message: t("Updated user with new verification code") };
+          return { success: true, message: t("Failed to send verification email") };
         }
 
         return { success: true, message: t("Updated user with new info; verification email sent") };
