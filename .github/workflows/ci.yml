@@ -71,9 +71,10 @@ jobs:
 
       - name: Compile backend binary
         run: |
+          mkdir -p deploy/generale-server
           bun build --compile \
             ./packages/backend/src/index.ts \
-            --outfile ./generale-server/server
+            --outfile ./deploy/generale-server/server
 
       - name: Assemble deploy package
         run: |
@@ -84,7 +85,6 @@ jobs:
           cp packages/backend/.env.example deploy/generale-server/
           cp scripts/start.sh deploy/generale-server/
           chmod +x deploy/generale-server/start.sh
-          mv generale-server/server deploy/generale-server/server
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
