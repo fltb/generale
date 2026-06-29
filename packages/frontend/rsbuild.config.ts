@@ -32,6 +32,16 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
       },
+
+      "/robots.txt": {
+        target: BACKEND_TARGET,
+        changeOrigin: true,
+      },
+
+      "/sitemap.xml": {
+        target: BACKEND_TARGET,
+        changeOrigin: true,
+      },
     },
   },
 });

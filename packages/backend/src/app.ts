@@ -125,6 +125,24 @@ export async function createApp(opts: CreateAppOptions = {}) {
   // 前端静态文件 serve + SPA fallback（仅 production 模式或 FRONTEND_DIST 显式指定时启用）
   // 开发模式下 rsbuild dev server 自己处理
 
+  const publicUrl = process.env["PUBLIC_URL"] || "http://localhost:3000";
+
+  app.get("/robots.txt", () => {
+    return new Response(`User-agent: *\nAllow: /\nSitemap: ${publicUrl}/sitemap.xml\n`, {
+      headers: { "Content-Type": "text/plain" },
+    });
+  });
+
+  app.get("/sitemap.xml", () => {
+    const urls = ["/", "/generale", "/maps", "/terms", "/about"]
+      .map((path) => `  <url><loc>${publicUrl}${path}</loc></url>`)
+      .join("\n");
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
+      { headers: { "Content-Type": "application/xml" } },
+    );
+  });
+
   if (process.env["NODE_ENV"] === "production" || process.env["FRONTEND_DIST"]) {
     const dist = process.env["FRONTEND_DIST"] || "./frontend";
     app.use(staticPlugin({ assets: dist, prefix: "/", alwaysStatic: true }));
