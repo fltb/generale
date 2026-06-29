@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
   check:
@@ -47,7 +47,7 @@ jobs:
         run: bun audit --prod || true
 
   package:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
     needs: [check]
     runs-on: ubuntu-latest
     steps:
@@ -73,7 +73,7 @@ jobs:
         run: |
           bun build --compile \
             ./packages/backend/src/index.ts \
-            --outfile ./dist/server
+            --outfile ./generale-server/server
 
       - name: Assemble deploy package
         run: |
