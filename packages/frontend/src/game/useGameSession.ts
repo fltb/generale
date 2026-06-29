@@ -128,7 +128,7 @@ export function useGameSession(params: UseGameSessionParams) {
   // 测试桥：同步游戏状态和操作函数到全局 bridge
   createEffect(() => {
     const s = mergedState();
-    if (s && s.map && s.map.width > 0) {
+    if (s?.map && s.map.width > 0) {
       bridge.gameState = s;
     }
   });

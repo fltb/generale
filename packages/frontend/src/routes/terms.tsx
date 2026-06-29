@@ -7,9 +7,14 @@ export default function TermsPage() {
   const { t } = useT();
   return (
     <main class="max-w-3xl mx-auto px-6 py-10 text-sm text-base-content/80 leading-relaxed space-y-4">
-      <Title>{t("Terms of Service")} — {PLATFORM_NAME}</Title>
-      <Meta name="description" content={t("Terms of Service for {name}, an online multiplayer game platform.", { name: PLATFORM_NAME })} />
-      <Meta property="og:title" content={t("Terms of Service") + " — " + PLATFORM_NAME} />
+      <Title>
+        {t("Terms of Service")} — {PLATFORM_NAME}
+      </Title>
+      <Meta
+        name="description"
+        content={t("Terms of Service for {name}, an online multiplayer game platform.", { name: PLATFORM_NAME })}
+      />
+      <Meta property="og:title" content={`${t("Terms of Service")} — ${PLATFORM_NAME}`} />
       <Meta property="og:description" content={t("Terms of Service for {name}.", { name: PLATFORM_NAME })} />
       <h1 class="text-xl text-primary font-press-start mb-6">{t("Terms of Service")}</h1>
       <p class="text-xs text-base-content/50">{t("Last updated: June 29, 2026")}</p>
