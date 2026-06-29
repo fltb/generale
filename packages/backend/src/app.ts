@@ -121,9 +121,9 @@ export async function createApp(opts: CreateAppOptions = {}) {
         })
         .get("/", () => ({ message: "Generale Game Server", version: "1.0.0" }))
         .get("/health", () => ({ status: "ok", timestamp: new Date().toISOString() })),
-    )
-    // 前端静态文件 serve + SPA fallback（仅 production 模式或 FRONTEND_DIST 显式指定时启用）
-    // 开发模式下 rsbuild dev server 自己处理
+    );
+  // 前端静态文件 serve + SPA fallback（仅 production 模式或 FRONTEND_DIST 显式指定时启用）
+  // 开发模式下 rsbuild dev server 自己处理
 
   if (process.env["NODE_ENV"] === "production" || process.env["FRONTEND_DIST"]) {
     const dist = process.env["FRONTEND_DIST"] || "./frontend";

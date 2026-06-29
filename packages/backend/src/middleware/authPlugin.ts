@@ -10,7 +10,8 @@ import { sessionService } from "../services/sessionService";
 export const authPlugin = new Elysia({ name: "auth-plugin" })
   // Make session available downstream (may be undefined)
   .derive(({ request, cookie }) => {
-    const sid: string | undefined = cookie["sid"]?.value as string | undefined ?? request.headers.get("x-session-id") ?? undefined;
+    const sid: string | undefined =
+      (cookie["sid"]?.value as string | undefined) ?? request.headers.get("x-session-id") ?? undefined;
     const session = sessionService.get(sid);
     return { session } as { session: import("../services/sessionService").Session | undefined };
   })

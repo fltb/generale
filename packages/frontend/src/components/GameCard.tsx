@@ -26,7 +26,9 @@ const GameCard: Component<GameCardProps> = (props) => {
       </Show>
       <Show when={!props.comingSoon}>
         <A href={props.href} class="self-start">
-          <Button variant="primary" size="sm">{t("Play")}</Button>
+          <Button variant="primary" size="sm">
+            {t("Play")}
+          </Button>
         </A>
       </Show>
     </div>

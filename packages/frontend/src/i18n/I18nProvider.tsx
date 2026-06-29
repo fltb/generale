@@ -16,11 +16,7 @@ function resolve(str: string, params?: BaseTemplateArgs): string {
   return str.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? `{${k}}`));
 }
 
-export function I18nProvider(props: {
-  locale: string;
-  setLocale: (l: string) => void;
-  children: JSX.Element;
-}) {
+export function I18nProvider(props: { locale: string; setLocale: (l: string) => void; children: JSX.Element }) {
   const dict = createMemo((): Dict => {
     if (props.locale !== "zh-CN") return en;
     const merged: Dict = { ...en };

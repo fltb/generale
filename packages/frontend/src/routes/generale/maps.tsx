@@ -67,126 +67,128 @@ export default function MapsPage() {
 
   return (
     <ProtectedRoute>
-    <GeneraleLayout>
-      <Title>{t("Map Workshop")} — {t("General E")}</Title>
-      <Meta name="description" content={t("Browse, create, and share custom maps for General E.")} />
-      <Meta property="og:title" content={`${t("Map Workshop")} — ${t("General E")}`} />
-      <Meta property="og:description" content={t("Browse, create, and share custom maps for General E.")} />
-      <Meta property="og:image" content="/og-image.svg" />
-      <Meta property="og:type" content="website" />
-    <main class="container mx-auto p-6 max-w-6xl">
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold">{t("Map Workshop")}</h1>
-        <A href="/maps/editor">
-          <Button variant="primary" size="sm">
-            {t("Create map")}
-          </Button>
-        </A>
-      </div>
+      <GeneraleLayout>
+        <Title>
+          {t("Map Workshop")} — {t("General E")}
+        </Title>
+        <Meta name="description" content={t("Browse, create, and share custom maps for General E.")} />
+        <Meta property="og:title" content={`${t("Map Workshop")} — ${t("General E")}`} />
+        <Meta property="og:description" content={t("Browse, create, and share custom maps for General E.")} />
+        <Meta property="og:image" content="/og-image.svg" />
+        <Meta property="og:type" content="website" />
+        <main class="container mx-auto p-6 max-w-6xl">
+          <div class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-bold">{t("Map Workshop")}</h1>
+            <A href="/maps/editor">
+              <Button variant="primary" size="sm">
+                {t("Create map")}
+              </Button>
+            </A>
+          </div>
 
-      <Tabs bordered class="mb-4">
-        <A href="/maps" class={`tab ${tab() === "public" ? "tab-active" : ""}`}>
-          {t("Public maps")}
-        </A>
-        <A
-          href={`/maps?tab=my${searchText() ? `&search=${encodeURIComponent(searchText())}` : ""}${sortBy() !== "updated" ? `&sort=${sortBy()}` : ""}`}
-          class={`tab ${tab() === "my" ? "tab-active" : ""}`}
-        >
-          {t("My maps")}
-        </A>
-      </Tabs>
+          <Tabs bordered class="mb-4">
+            <A href="/maps" class={`tab ${tab() === "public" ? "tab-active" : ""}`}>
+              {t("Public maps")}
+            </A>
+            <A
+              href={`/maps?tab=my${searchText() ? `&search=${encodeURIComponent(searchText())}` : ""}${sortBy() !== "updated" ? `&sort=${sortBy()}` : ""}`}
+              class={`tab ${tab() === "my" ? "tab-active" : ""}`}
+            >
+              {t("My maps")}
+            </A>
+          </Tabs>
 
-      <div class="flex gap-2 mb-4">
-        <Input
-          value={searchInput()}
-          onInput={(e) => setSearchInput(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") doSearch();
-          }}
-          placeholder={t("Search by name or tag...")}
-          size="sm"
-          class="flex-1 max-w-xs"
-        />
-        <Button variant="ghost" size="sm" onClick={doSearch}>
-          {t("Search")}
-        </Button>
-        <Show when={searchText()}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearchInput("");
-              setSearchParams({ search: undefined, sort: sortBy() !== "updated" ? sortBy() : undefined });
-            }}
+          <div class="flex gap-2 mb-4">
+            <Input
+              value={searchInput()}
+              onInput={(e) => setSearchInput(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") doSearch();
+              }}
+              placeholder={t("Search by name or tag...")}
+              size="sm"
+              class="flex-1 max-w-xs"
+            />
+            <Button variant="ghost" size="sm" onClick={doSearch}>
+              {t("Search")}
+            </Button>
+            <Show when={searchText()}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchInput("");
+                  setSearchParams({ search: undefined, sort: sortBy() !== "updated" ? sortBy() : undefined });
+                }}
+              >
+                {t("Clear")}
+              </Button>
+            </Show>
+            <Select
+              bordered
+              size="sm"
+              value={sortBy()}
+              onChange={(e) =>
+                setSearchParams({
+                  sort: e.currentTarget.value !== "updated" ? e.currentTarget.value : undefined,
+                  search: searchText() || undefined,
+                })
+              }
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option value={o.value}>{o.label}</option>
+              ))}
+            </Select>
+          </div>
+
+          <Show
+            when={!maps.loading}
+            fallback={
+              <div class="flex justify-center py-12">
+                <Spinner />
+              </div>
+            }
           >
-            {t("Clear")}
-          </Button>
-        </Show>
-        <Select
-          bordered
-          size="sm"
-          value={sortBy()}
-          onChange={(e) =>
-            setSearchParams({
-              sort: e.currentTarget.value !== "updated" ? e.currentTarget.value : undefined,
-              search: searchText() || undefined,
-            })
-          }
-        >
-          {SORT_OPTIONS.map((o) => (
-            <option value={o.value}>{o.label}</option>
-          ))}
-        </Select>
-      </div>
-
-      <Show
-        when={!maps.loading}
-        fallback={
-          <div class="flex justify-center py-12">
-            <Spinner />
-          </div>
-        }
-      >
-        <Show
-          when={maps() && maps()?.length > 0}
-          fallback={
-            <div class="text-center py-12 text-base-content/50">
-              {searchText() ? t("No matching maps found.") : t("No maps yet.")}
-              <br />
-              <A href="/maps/editor" class="link link-primary">
-                {t("Create the first map")}
-              </A>
-            </div>
-          }
-        >
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <For each={maps()}>
-              {(m) => (
-                <MapCard
-                  map={m}
-                  onDelete={handleDelete}
-                  onFork={handleFork}
-                  isOwner={tab() === "my"}
-                  onOpenRoom={() => {
-                    setOpenRoomMapId(m.id);
-                    setCreateOpen(true);
-                  }}
-                />
-              )}
-            </For>
-          </div>
-        </Show>
-      </Show>
-    </main>
-      <CreateRoomModal
-        open={createOpen}
-        onClose={() => {
-          setCreateOpen(false);
-          setOpenRoomMapId(undefined);
-        }}
-        initialMapId={openRoomMapId()}
-      />
-    </GeneraleLayout>
+            <Show
+              when={maps() && maps()?.length > 0}
+              fallback={
+                <div class="text-center py-12 text-base-content/50">
+                  {searchText() ? t("No matching maps found.") : t("No maps yet.")}
+                  <br />
+                  <A href="/maps/editor" class="link link-primary">
+                    {t("Create the first map")}
+                  </A>
+                </div>
+              }
+            >
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <For each={maps()}>
+                  {(m) => (
+                    <MapCard
+                      map={m}
+                      onDelete={handleDelete}
+                      onFork={handleFork}
+                      isOwner={tab() === "my"}
+                      onOpenRoom={() => {
+                        setOpenRoomMapId(m.id);
+                        setCreateOpen(true);
+                      }}
+                    />
+                  )}
+                </For>
+              </div>
+            </Show>
+          </Show>
+        </main>
+        <CreateRoomModal
+          open={createOpen}
+          onClose={() => {
+            setCreateOpen(false);
+            setOpenRoomMapId(undefined);
+          }}
+          initialMapId={openRoomMapId()}
+        />
+      </GeneraleLayout>
     </ProtectedRoute>
   );
 }

@@ -99,7 +99,9 @@ export function RoomList() {
         <Match when={gamesQuery.isError}>
           <Alert variant="error" class="shadow-lg">
             <div>
-              <span>{t("Failed to load room list")}: {gamesQuery.error?.message ?? t("Unknown")}</span>
+              <span>
+                {t("Failed to load room list")}: {gamesQuery.error?.message ?? t("Unknown")}
+              </span>
             </div>
           </Alert>
         </Match>

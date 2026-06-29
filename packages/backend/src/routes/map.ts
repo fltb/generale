@@ -76,11 +76,9 @@ export const mapRoutes = new Elysia({ prefix: "/maps" })
       if (!session) return new Response(t("Unauthorized"), { status: 401 });
 
       const tiles = body.tiles;
-      if (tiles.length !== body.height)
-        return new Response(t("Server error"), { status: 400 });
+      if (tiles.length !== body.height) return new Response(t("Server error"), { status: 400 });
       for (const row of tiles) {
-        if (!Array.isArray(row) || row.length !== body.width)
-          return new Response(t("Server error"), { status: 400 });
+        if (!Array.isArray(row) || row.length !== body.width) return new Response(t("Server error"), { status: 400 });
       }
       if ((body.minPlayers ?? 0) > (body.maxPlayers ?? Infinity))
         return new Response(t("minPlayers > maxPlayers"), { status: 400 });
@@ -121,11 +119,9 @@ export const mapRoutes = new Elysia({ prefix: "/maps" })
 
       if (body.tiles !== undefined) {
         const tiles = body.tiles;
-        if (tiles.length !== meta.height)
-          return new Response(t("Server error"), { status: 400 });
+        if (tiles.length !== meta.height) return new Response(t("Server error"), { status: 400 });
         for (const row of tiles) {
-          if (!Array.isArray(row) || row.length !== meta.width)
-            return new Response(t("Server error"), { status: 400 });
+          if (!Array.isArray(row) || row.length !== meta.width) return new Response(t("Server error"), { status: 400 });
         }
         if (isPublishing) {
           await mapService.saveTiles(params.id, tiles as unknown as CustomMapTile[][]);

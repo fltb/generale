@@ -443,7 +443,12 @@ export default function MapEditor(props: MapEditorProps) {
 
         <div>
           <div class="text-xs font-medium mb-0.5">{t("Map Name")}</div>
-          <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder={t("Enter map name")} size="sm" />
+          <Input
+            value={name()}
+            onInput={(e) => setName(e.currentTarget.value)}
+            placeholder={t("Enter map name")}
+            size="sm"
+          />
         </div>
         <div>
           <div class="text-xs font-medium mb-0.5">{t("Description")}</div>
@@ -528,7 +533,9 @@ export default function MapEditor(props: MapEditorProps) {
             </Show>
 
             <p class="text-[10px] leading-relaxed opacity-50">
-              {t("Custom cover: Upload a local image as the map cover. Will be marked as custom and not overwritten on publish.")}
+              {t(
+                "Custom cover: Upload a local image as the map cover. Will be marked as custom and not overwritten on publish.",
+              )}
             </p>
             <label class="cursor-pointer">
               <span class={`btn btn-xs btn-ghost ${thumbnailBusy() ? "btn-disabled" : ""}`}>
@@ -544,7 +551,9 @@ export default function MapEditor(props: MapEditorProps) {
             </label>
 
             <p class="text-[10px] leading-relaxed opacity-50">
-              {t("Auto-generate: Render a preview from the current map content. Suitable for maps without a custom cover; called automatically on publish.")}
+              {t(
+                "Auto-generate: Render a preview from the current map content. Suitable for maps without a custom cover; called automatically on publish.",
+              )}
             </p>
             <Button variant="ghost" size="xs" onClick={generatePreview} disabled={thumbnailBusy()}>
               {thumbnailBusy() ? t("Generating…") : t("Auto-generate preview")}
@@ -554,9 +563,13 @@ export default function MapEditor(props: MapEditorProps) {
 
         <div class="flex flex-col gap-1 text-xs opacity-50">
           <Show when={hasDraft()}>
-            <div class="text-warning opacity-100">{t("Editing draft — only the published version saves name, description, etc.")}</div>
+            <div class="text-warning opacity-100">
+              {t("Editing draft — only the published version saves name, description, etc.")}
+            </div>
           </Show>
-          <div>{t("Zoom:")} {(viewScale() * 100).toFixed(0)}%</div>
+          <div>
+            {t("Zoom:")} {(viewScale() * 100).toFixed(0)}%
+          </div>
           <div>
             {t("Size:")} {width()} × {height()}
           </div>
@@ -577,11 +590,7 @@ export default function MapEditor(props: MapEditorProps) {
             {saving() ? t("Publishing…") : t("Publish Map")}
           </Button>
           {message() && (
-            <div
-              class={`text-xs ${messageType() === "error" ? "text-error" : "text-success"}`}
-            >
-              {message()}
-            </div>
+            <div class={`text-xs ${messageType() === "error" ? "text-error" : "text-success"}`}>{message()}</div>
           )}
         </div>
       </div>

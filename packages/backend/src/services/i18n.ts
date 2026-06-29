@@ -16,10 +16,7 @@ function parseAcceptLanguage(header: string): string[] {
     .filter((l): l is string => l !== null);
 }
 
-export function tForRequest(ctx: {
-  cookie?: unknown;
-  request?: { headers: Headers };
-}) {
+export function tForRequest(ctx: { cookie?: unknown; request?: { headers: Headers } }) {
   let locale: LocaleCode = "en";
   const c = ctx.cookie as { sid?: { value?: string } } | undefined;
 

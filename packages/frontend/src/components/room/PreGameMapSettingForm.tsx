@@ -143,7 +143,11 @@ export const PreGameMapSettingForm: Component<PreGameMapSettingFormProps> = (pro
           </div>
           <div class="flex items-end gap-2">
             <div class="flex-1">
-              <MapSelector value={currentMapId() ?? ""} onChange={selectCustomMap} placeholder={t("Select from map workshop...")} />
+              <MapSelector
+                value={currentMapId() ?? ""}
+                onChange={selectCustomMap}
+                placeholder={t("Select from map workshop...")}
+              />
             </div>
             <Button size="sm" variant="ghost" onClick={clearCustomMap}>
               {t("Clear")}

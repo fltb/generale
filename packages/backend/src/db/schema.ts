@@ -101,15 +101,17 @@ export const profiles = sqliteTable("profiles", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).default(sql`(CURRENT_TIMESTAMP)`),
 });
 
-export const userSettings = sqliteTable("user_settings", {
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id),
-  key: text("key").notNull(),
-  value: text("value").notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(CURRENT_TIMESTAMP)`),
-}, (table) => ({
-  pk: primaryKey({ columns: [table.userId, table.key] }),
-}));
+export const userSettings = sqliteTable(
+  "user_settings",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.key] }),
+  }),
+);

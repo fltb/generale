@@ -42,7 +42,9 @@ export default function PublicProfilePage() {
 
   return (
     <div class="container mx-auto p-6 max-w-2xl space-y-4">
-      <Title>{t("Player Profile")} — {t("General E")}</Title>
+      <Title>
+        {t("Player Profile")} — {t("General E")}
+      </Title>
       <Meta name="description" content={t("View player profile.")} />
       <Meta property="og:title" content={`${t("Player Profile")} — ${t("General E")}`} />
       <Meta property="og:description" content={t("View player profile.")} />
@@ -65,7 +67,8 @@ export default function PublicProfilePage() {
                 <div class="text-5xl">🤷</div>
                 <h1 class="text-2xl font-bold">{t("User not found")}</h1>
                 <p class="opacity-70">
-                  {t("No account found for")} <span class="font-mono bg-base-300 px-2 py-0.5 rounded">{params.userId}</span>
+                  {t("No account found for")}{" "}
+                  <span class="font-mono bg-base-300 px-2 py-0.5 rounded">{params.userId}</span>
                 </p>
                 <p class="text-sm opacity-60">{t("Check the username or ID for typos.")}</p>
                 <A href="/" class="btn btn-primary btn-sm">

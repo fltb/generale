@@ -24,7 +24,9 @@ export default function ForgotPasswordPage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
-      <Title>{t("Forgot Password")} — {t("General E")}</Title>
+      <Title>
+        {t("Forgot Password")} — {t("General E")}
+      </Title>
       <Meta name="description" content={t("Reset your password.")} />
       <Meta property="og:title" content={`${t("Forgot Password")} — ${t("General E")}`} />
       <Meta property="og:description" content={t("Reset your password.")} />
@@ -38,7 +40,9 @@ export default function ForgotPasswordPage() {
           <div class="space-y-4">
             <div class="alert alert-success">{mutation.data?.message ?? t("Reset link sent")}</div>
             <p class="text-sm opacity-70">
-              {t("Check your email (including spam) and click the link to set a new password. The link expires in 10 minutes.")}
+              {t(
+                "Check your email (including spam) and click the link to set a new password. The link expires in 10 minutes.",
+              )}
             </p>
             <div class="flex gap-2">
               <button type="button" class="btn btn-ghost btn-sm" onClick={() => nav("/login")}>
@@ -65,9 +69,9 @@ export default function ForgotPasswordPage() {
             <p class="text-error text-sm">{mutation.error?.message ?? t("Sending failed")}</p>
           </Show>
           <p class="mt-2 text-sm">
-              <A href="/login" class="link">
-                {t("Back to login")}
-              </A>
+            <A href="/login" class="link">
+              {t("Back to login")}
+            </A>
           </p>
         </form>
       </Show>

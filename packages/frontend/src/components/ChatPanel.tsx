@@ -58,7 +58,9 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
   });
 
   const connectionBadge = createMemo(() =>
-    connected() ? { label: t("Online"), variant: "success" as const } : { label: t("Offline"), variant: "outline" as const },
+    connected()
+      ? { label: t("Online"), variant: "success" as const }
+      : { label: t("Offline"), variant: "outline" as const },
   );
 
   function doSend() {
@@ -149,7 +151,9 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
       >
         <Show
           when={messages().length > 0}
-          fallback={<div class="flex h-full items-center justify-center text-sm opacity-60">{t("No messages yet")}</div>}
+          fallback={
+            <div class="flex h-full items-center justify-center text-sm opacity-60">{t("No messages yet")}</div>
+          }
         >
           <div class="flex flex-col gap-2">
             <For each={messages()}>
@@ -219,7 +223,9 @@ export const ChatPanel: Component<ChatPanelProps> = (props) => {
           class="textarea-sm min-h-16 flex-1 resize-none"
           placeholder={
             props.placeholder ??
-            (chat.canTeamChat() ? t("Type a message, /team for team chat") : t("Type a message, Enter to send, Shift+Enter for newline"))
+            (chat.canTeamChat()
+              ? t("Type a message, /team for team chat")
+              : t("Type a message, Enter to send, Shift+Enter for newline"))
           }
           value={input()}
           maxLength={500}

@@ -199,7 +199,9 @@ export default function CreateRoomModal(props: {
               <Show
                 when={type() === "standard"}
                 fallback={
-                  <div class="text-sm py-2 opacity-50">{customMapId() ? t("Determined by selected map") : t("Configure in advanced settings")}</div>
+                  <div class="text-sm py-2 opacity-50">
+                    {customMapId() ? t("Determined by selected map") : t("Configure in advanced settings")}
+                  </div>
                 }
               >
                 <Select
@@ -332,7 +334,12 @@ export default function CreateRoomModal(props: {
             <Button variant="ghost" onClick={() => props.onClose()}>
               {t("Cancel")}
             </Button>
-            <Button data-testid="create-room-submit" variant="primary" onClick={submit} disabled={createMutation.isPending}>
+            <Button
+              data-testid="create-room-submit"
+              variant="primary"
+              onClick={submit}
+              disabled={createMutation.isPending}
+            >
               {createMutation.isPending ? t("Creating...") : t("Create Room")}
             </Button>
           </div>

@@ -37,7 +37,9 @@ export default function VerifyEmailPage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
-      <Title>{t("Verify Email")} — {t("General E")}</Title>
+      <Title>
+        {t("Verify Email")} — {t("General E")}
+      </Title>
       <Meta name="description" content={t("Confirm your email address.")} />
       <Meta property="og:title" content={`${t("Verify Email")} — ${t("General E")}`} />
       <Meta property="og:description" content={t("Confirm your email address.")} />

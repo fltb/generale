@@ -21,10 +21,10 @@ export default function LoginPage() {
   const [regUsername, setRegUsername] = createSignal("");
   const [regPassword, setRegPassword] = createSignal("");
   const [regEmail, setRegEmail] = createSignal("");
-const [regMessage, setRegMessage] = createSignal("");
-const [regSent, setRegSent] = createSignal(false);
-const [regLoading, setRegLoading] = createSignal(false);
-const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
+  const [regMessage, setRegMessage] = createSignal("");
+  const [regSent, setRegSent] = createSignal(false);
+  const [regLoading, setRegLoading] = createSignal(false);
+  const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
 
   const handleLogin = async (e: Event) => {
     e.preventDefault();
@@ -73,7 +73,9 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
 
   return (
     <div class="p-4 max-w-md mx-auto">
-      <Title>{t("Login")} — {t("General E")}</Title>
+      <Title>
+        {t("Login")} — {t("General E")}
+      </Title>
       <Meta name="description" content={t("Sign in to your account.")} />
       <Meta property="og:title" content={`${t("Login")} — ${t("General E")}`} />
       <Meta property="og:description" content={t("Sign in to your account.")} />
@@ -145,9 +147,13 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
             when={!regSent()}
             fallback={
               <div class="space-y-3">
-                <div class="alert alert-success">{regMessage() || t("Verification link sent, please check your email")}</div>
+                <div class="alert alert-success">
+                  {regMessage() || t("Verification link sent, please check your email")}
+                </div>
                 <p class="text-sm opacity-70">
-                  {t("Check your email (including spam) and click the link to activate your account. The link expires in 10 minutes.")}
+                  {t(
+                    "Check your email (including spam) and click the link to activate your account. The link expires in 10 minutes.",
+                  )}
                 </p>
                 <div class="flex gap-2">
                   <button type="button" class="btn btn-ghost btn-sm" onClick={() => switchTo("login")}>
@@ -201,7 +207,12 @@ const [regAcceptedTerms, setRegAcceptedTerms] = createSignal(false);
                   onChange={(e) => setRegAcceptedTerms(e.currentTarget.checked)}
                   class="checkbox checkbox-xs mt-0.5"
                 />
-                <span>{t("I agree to the")} <A href="/terms" class="link">{t("Terms of Service")}</A></span>
+                <span>
+                  {t("I agree to the")}{" "}
+                  <A href="/terms" class="link">
+                    {t("Terms of Service")}
+                  </A>
+                </span>
               </label>
               <button type="submit" class="btn btn-primary" disabled={regLoading() || !regAcceptedTerms()}>
                 {regLoading() ? t("Submitting...") : t("Register")}

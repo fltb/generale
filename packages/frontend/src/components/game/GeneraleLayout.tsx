@@ -48,8 +48,21 @@ export default function GeneraleLayout(props: Props) {
       {/* Top nav */}
       <nav class="bg-base-100 border-b-2 border-base-300 px-6 flex items-center justify-between h-14 shrink-0">
         <div class="flex items-center gap-2">
-          <A href="/" class="text-base-content/40 hover:text-base-content flex items-center gap-1 px-1" aria-label="Back to Platform">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <A
+            href="/"
+            class="text-base-content/40 hover:text-base-content flex items-center gap-1 px-1"
+            aria-label="Back to Platform"
+          >
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
               <polyline points="9 22 9 12 15 12 15 22" />
             </svg>
@@ -100,7 +113,9 @@ export default function GeneraleLayout(props: Props) {
                   alt={auth.user?.displayName || auth.user?.username || auth.user?.email}
                   size={28}
                 />
-                <span class="text-sm max-w-[100px] truncate hidden sm:inline">{auth.user?.displayName || auth.user?.username || auth.user?.email || "User"}</span>
+                <span class="text-sm max-w-[100px] truncate hidden sm:inline">
+                  {auth.user?.displayName || auth.user?.username || auth.user?.email || "User"}
+                </span>
               </button>
               <div
                 id="game-nav-user-menu"
@@ -138,7 +153,16 @@ export default function GeneraleLayout(props: Props) {
                     : "text-base-content/60 hover:text-base-content hover:bg-base-300/50"
                 }`}
               >
-                <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg
+                  class="w-5 h-5 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
                   <rect x="3" y="3" width="7" height="7" rx="1" />
                   <rect x="14" y="3" width="7" height="7" rx="1" />
                   <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -154,7 +178,16 @@ export default function GeneraleLayout(props: Props) {
                     : "text-base-content/60 hover:text-base-content hover:bg-base-300/50"
                 }`}
               >
-                <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg
+                  class="w-5 h-5 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
                   <path d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.553-.894L9 7l6-3 5.447 2.724A1 1 0 0 1 21 7.618v10.764a1 1 0 0 1-1.553.894L15 17l-6 3z" />
                 </svg>
                 Maps
@@ -166,7 +199,16 @@ export default function GeneraleLayout(props: Props) {
                 href="/"
                 class="flex items-center gap-3 px-3 py-2 rounded text-sm text-base-content/40 hover:text-base-content hover:bg-base-300/50"
               >
-                <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg
+                  class="w-5 h-5 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
                   <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                   <polyline points="9 22 9 12 15 12 15 22" />
                 </svg>

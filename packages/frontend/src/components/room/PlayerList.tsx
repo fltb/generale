@@ -75,7 +75,10 @@ const PlayerCard: Component<{
   const allColors = () => Object.values(PlayerColor).filter((v) => typeof v === "number") as PlayerColor[];
 
   return (
-    <div data-player-id={p().id} class="flex items-center justify-between p-3 bg-base-200 rounded shadow-sm w-full sm:w-1/2 md:w-1/3 lg:w-1/4">
+    <div
+      data-player-id={p().id}
+      class="flex items-center justify-between p-3 bg-base-200 rounded shadow-sm w-full sm:w-1/2 md:w-1/3 lg:w-1/4"
+    >
       {/* Left: avatar + info */}
       <div class="flex items-center gap-3 overflow-hidden">
         <A
@@ -204,7 +207,12 @@ const PlayerCard: Component<{
           <div class="flex flex-col gap-1 ml-2 items-end">
             <div class="flex gap-1">
               <Show when={props.onTransferHost}>
-                <Button size="xs" variant="warning" data-testid="transfer-host" onClick={() => props.onTransferHost?.(p().id)}>
+                <Button
+                  size="xs"
+                  variant="warning"
+                  data-testid="transfer-host"
+                  onClick={() => props.onTransferHost?.(p().id)}
+                >
                   {t("Set as Host")}
                 </Button>
               </Show>
@@ -215,7 +223,9 @@ const PlayerCard: Component<{
                   variant="error"
                   data-testid="kick-player"
                   disabled={p().status !== PreGamePlayerStatus.Lobby}
-                  title={p().status !== PreGamePlayerStatus.Lobby ? t("Cannot kick while in game") : t("Kick this player")}
+                  title={
+                    p().status !== PreGamePlayerStatus.Lobby ? t("Cannot kick while in game") : t("Kick this player")
+                  }
                   onClick={() => props.onKick?.(p().id)}
                 >
                   {t("Kick")}
@@ -314,11 +324,7 @@ const TeamGroup: Component<{
               clickHeader();
             }
           }}
-          title={
-            gp.team
-              ? t("Click to join team")
-              : t("Click to ungroup")
-          }
+          title={gp.team ? t("Click to join team") : t("Click to ungroup")}
         >
           {headerText()}
         </button>

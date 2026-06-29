@@ -211,7 +211,9 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <Title>{t("Profile")} — {t("General E")}</Title>
+      <Title>
+        {t("Profile")} — {t("General E")}
+      </Title>
       <Meta name="description" content={t("Manage your profile and settings.")} />
       <Meta property="og:title" content={`${t("Profile")} — ${t("General E")}`} />
       <Meta property="og:description" content={t("Manage your profile and settings.")} />
@@ -300,7 +302,11 @@ export default function ProfilePage() {
                     {t("Username")}
                     <Show when={auth.user?.usernameChangedAt}>
                       <span class="text-xs opacity-60 ml-1">
-                        {t("(last changed: {date})", { date: auth.user?.usernameChangedAt ? new Date(auth.user.usernameChangedAt).toLocaleDateString() : "" })}
+                        {t("(last changed: {date})", {
+                          date: auth.user?.usernameChangedAt
+                            ? new Date(auth.user.usernameChangedAt).toLocaleDateString()
+                            : "",
+                        })}
                       </span>
                     </Show>
                   </span>
@@ -313,7 +319,9 @@ export default function ProfilePage() {
                     disabled={!usernameCanChange().can}
                   />
                   <Show when={!usernameCanChange().can}>
-                    <span class="label-text-alt text-warning">{t("{days} days until next change", { days: usernameCanChange().daysLeft })}</span>
+                    <span class="label-text-alt text-warning">
+                      {t("{days} days until next change", { days: usernameCanChange().daysLeft })}
+                    </span>
                   </Show>
                 </label>
                 <button

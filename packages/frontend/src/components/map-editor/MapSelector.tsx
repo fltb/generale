@@ -34,7 +34,10 @@ export const MapSelector: Component<MapSelectorProps> = (props) => {
     <Collapse arrow class="border border-base-300 bg-base-100">
       <Checkbox />
       <CollapseTitle class="text-sm font-medium">
-        <Show when={selectedMap()} fallback={<span class="opacity-50 ml-6">{props.placeholder || t("Select a map…")}</span>}>
+        <Show
+          when={selectedMap()}
+          fallback={<span class="opacity-50 ml-6">{props.placeholder || t("Select a map…")}</span>}
+        >
           <span class="text ml-5">{selectedMap()?.name}</span>
           <span class="text-xs opacity-50 ml-2">
             {selectedMap()?.width}×{selectedMap()?.height}

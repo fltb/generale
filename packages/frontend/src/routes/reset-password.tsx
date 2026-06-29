@@ -41,7 +41,9 @@ export default function ResetPasswordPage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
-      <Title>{t("Reset Password")} — {t("General E")}</Title>
+      <Title>
+        {t("Reset Password")} — {t("General E")}
+      </Title>
       <Meta name="description" content={t("Set a new password.")} />
       <Meta property="og:title" content={`${t("Reset Password")} — ${t("General E")}`} />
       <Meta property="og:description" content={t("Set a new password.")} />
@@ -49,7 +51,12 @@ export default function ResetPasswordPage() {
       <Meta property="og:type" content="website" />
       <h1 class="text-2xl mb-4">{t("Set New Password")}</h1>
 
-      <Show when={token()} fallback={<div class="alert alert-error">{t("Missing token in link, please restart the password reset process.")}</div>}>
+      <Show
+        when={token()}
+        fallback={
+          <div class="alert alert-error">{t("Missing token in link, please restart the password reset process.")}</div>
+        }
+      >
         <Show
           when={!mutation.isSuccess || mutation.data?.valid === false}
           fallback={

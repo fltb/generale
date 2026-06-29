@@ -110,9 +110,14 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
       </Show>
 
       {/* ---- HUD: 顶部信息栏 ---- */}
-      <div data-testid="game-hud" class="absolute top-0 left-0 right-0 flex items-center justify-between bg-base-200/70 backdrop-blur-sm px-3 py-2">
+      <div
+        data-testid="game-hud"
+        class="absolute top-0 left-0 right-0 flex items-center justify-between bg-base-200/70 backdrop-blur-sm px-3 py-2"
+      >
         <div class="flex items-center gap-3 text-sm">
-          <span data-testid="game-id" class="font-semibold tracking-wide">{props.gameId}</span>
+          <span data-testid="game-id" class="font-semibold tracking-wide">
+            {props.gameId}
+          </span>
           <span class="opacity-60">
             Tick <span class="font-mono">{mergedState()?.tick}</span>
           </span>
@@ -208,12 +213,16 @@ export const GameWithSync: Component<GameWithSyncProps> = (props) => {
 
           <Show when={endgameResult()?.winnerLabel}>
             <p class="mb-2 text-lg">
-              {t("Winner: ")}<span class="font-semibold">{endgameResult()?.winnerLabel}</span>
+              {t("Winner: ")}
+              <span class="font-semibold">{endgameResult()?.winnerLabel}</span>
             </p>
           </Show>
 
           <Show when={(endgameResult()?.loserLabels ?? []).length > 0}>
-            <p class="mb-4 text-sm opacity-80">{t("Losers: ")}{endgameResult()?.loserLabels.join(" / ")}</p>
+            <p class="mb-4 text-sm opacity-80">
+              {t("Losers: ")}
+              {endgameResult()?.loserLabels.join(" / ")}
+            </p>
           </Show>
 
           <p class="mb-4 opacity-70">{t("Returning to room in 5 seconds…")}</p>

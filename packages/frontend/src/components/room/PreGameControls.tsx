@@ -28,14 +28,25 @@ export const PreGameControls: Component<PreGameControlsProps> = (props) => {
               props.onReadyToggle(!props.ready);
             }}
             disabled={props.started}
-            title={props.started ? t("Game already started, cannot change ready status") : props.ready ? t("Cancel Ready") : t("Ready")}
+            title={
+              props.started
+                ? t("Game already started, cannot change ready status")
+                : props.ready
+                  ? t("Cancel Ready")
+                  : t("Ready")
+            }
           >
             {props.ready ? t("Cancel Ready") : t("Ready")}
           </Button>
         </Show>
 
         <Show when={props.isHost}>
-          <Button data-testid="start-game" variant="accent" onClick={() => props.onStartGame?.()} disabled={props.started}>
+          <Button
+            data-testid="start-game"
+            variant="accent"
+            onClick={() => props.onStartGame?.()}
+            disabled={props.started}
+          >
             {t("Start Game")}
           </Button>
         </Show>

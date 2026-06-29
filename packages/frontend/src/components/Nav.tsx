@@ -16,7 +16,10 @@ export default function Nav(): JSX.Element {
 
   const [open, setOpen] = createSignal(false);
 
-  const isGamePage = () => location.pathname.startsWith("/generale") || location.pathname.startsWith("/game/") || location.pathname.startsWith("/maps");
+  const isGamePage = () =>
+    location.pathname.startsWith("/generale") ||
+    location.pathname.startsWith("/game/") ||
+    location.pathname.startsWith("/maps");
 
   createEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -49,21 +52,33 @@ export default function Nav(): JSX.Element {
           </A>
 
           <Show when={!isGamePage()}>
-            <A href="/generale" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
+            <A
+              href="/generale"
+              class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content"
+            >
               {t("Play")}
             </A>
           </Show>
 
           <Show when={isGamePage()}>
-            <A href="/" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
+            <A
+              href="/"
+              class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content"
+            >
               {t("Platform")}
             </A>
-            <A href="/generale" class={`border-b-2 px-2 py-1 ${location.pathname === "/generale" ? "border-primary text-base-content" : "border-transparent text-base-content/70 hover:text-base-content"}`}>
+            <A
+              href="/generale"
+              class={`border-b-2 px-2 py-1 ${location.pathname === "/generale" ? "border-primary text-base-content" : "border-transparent text-base-content/70 hover:text-base-content"}`}
+            >
               {t("General E")}
             </A>
           </Show>
 
-          <A href="/about" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
+          <A
+            href="/about"
+            class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content"
+          >
             {t("About")}
           </A>
         </div>
@@ -71,7 +86,10 @@ export default function Nav(): JSX.Element {
         <div class="flex items-center gap-6">
           <MuteToggle />
 
-          <A href="/maps" class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content">
+          <A
+            href="/maps"
+            class="border-b-2 border-transparent hover:border-primary px-2 py-1 text-base-content/70 hover:text-base-content"
+          >
             {t("Map Workshop")}
           </A>
 

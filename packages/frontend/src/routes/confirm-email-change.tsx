@@ -45,7 +45,9 @@ export default function ConfirmEmailChangePage() {
 
   return (
     <div class="p-4 max-w-md mx-auto">
-      <Title>{t("Confirm Email Change")} — {t("General E")}</Title>
+      <Title>
+        {t("Confirm Email Change")} — {t("General E")}
+      </Title>
       <Meta name="description" content={t("Confirm your email change.")} />
       <Meta property="og:title" content={`${t("Confirm Email Change")} — ${t("General E")}`} />
       <Meta property="og:description" content={t("Confirm your email change.")} />

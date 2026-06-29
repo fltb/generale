@@ -18,7 +18,10 @@ export default function CookieConsent() {
       <div class="fixed bottom-0 left-0 right-0 z-50 bg-base-100 border-t-2 border-base-300 px-6 py-3 flex items-center justify-between gap-4 text-sm">
         <p class="text-base-content/70">
           {t("Cookie consent text", { name: PLATFORM_NAME })}{" "}
-          <a href="/terms" class="text-primary hover:underline">{t("Learn more")}</a>.
+          <a href="/terms" class="text-primary hover:underline">
+            {t("Learn more")}
+          </a>
+          .
         </p>
         <button
           type="button"

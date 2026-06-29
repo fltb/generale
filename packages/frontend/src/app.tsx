@@ -43,11 +43,7 @@ const searchParams = new URLSearchParams(location.search);
 const IS_TEST_MODE = searchParams.has("__test__");
 
 function exposeTestBridge() {
-  const waitFor = (
-    condition: () => boolean,
-    timeoutMs: number,
-    pollMs = 100,
-  ): Promise<void> => {
+  const waitFor = (condition: () => boolean, timeoutMs: number, pollMs = 100): Promise<void> => {
     return new Promise((resolve, reject) => {
       const start = Date.now();
       const iv = setInterval(() => {
@@ -155,57 +151,57 @@ export default function App() {
 
   return (
     <I18nProvider locale={locale()} setLocale={setLocale}>
-    <QueryClientProvider client={queryClient}>
-      {/* MetaProvider must wrap anything that uses Title/useHead */}
-      <MetaProvider>
-        <Link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <AuthProvider>
-          <LocaleSync setLocale={setLocale} />
-          <WebSocketProvider url={defaultWsUrl} autoConnect={false}>
-            <Router
-              root={(props) => (
-                <>
-                <Suspense>{props.children}</Suspense>
-                <CookieConsent />
-                </>
-              )}
-            >
-              {/* Platform routes — wrapped in PlatformShell */}
-              <Route path="/" component={PlatformShell}>
-                <Route path="/" component={Home} />
-                <Route path="/test" component={Test} />
-                <Route path="/login" component={LoginPage} />
-                <Route path="/profile" component={ProfilePage} />
-                <Route path="/profile/:userId" component={PublicProfilePage} />
-                <Route path="/forgot-password" component={ForgotPasswordPage} />
-                <Route path="/reset-password" component={ResetPasswordPage} />
-                <Route path="/verify-email" component={VerifyEmailPage} />
-                <Route path="/confirm-email-change" component={ConfirmEmailChangePage} />
-                <Route path="/terms" component={TermsPage} />
-                <Route path="/about" component={AboutPage} />
-              </Route>
+      <QueryClientProvider client={queryClient}>
+        {/* MetaProvider must wrap anything that uses Title/useHead */}
+        <MetaProvider>
+          <Link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+          <AuthProvider>
+            <LocaleSync setLocale={setLocale} />
+            <WebSocketProvider url={defaultWsUrl} autoConnect={false}>
+              <Router
+                root={(props) => (
+                  <>
+                    <Suspense>{props.children}</Suspense>
+                    <CookieConsent />
+                  </>
+                )}
+              >
+                {/* Platform routes — wrapped in PlatformShell */}
+                <Route path="/" component={PlatformShell}>
+                  <Route path="/" component={Home} />
+                  <Route path="/test" component={Test} />
+                  <Route path="/login" component={LoginPage} />
+                  <Route path="/profile" component={ProfilePage} />
+                  <Route path="/profile/:userId" component={PublicProfilePage} />
+                  <Route path="/forgot-password" component={ForgotPasswordPage} />
+                  <Route path="/reset-password" component={ResetPasswordPage} />
+                  <Route path="/verify-email" component={VerifyEmailPage} />
+                  <Route path="/confirm-email-change" component={ConfirmEmailChangePage} />
+                  <Route path="/terms" component={TermsPage} />
+                  <Route path="/about" component={AboutPage} />
+                </Route>
 
-              {/* Generale Hub — wrapped in GeneraleLayout */}
-              <Route path="/generale" component={GeneraleLayout}>
-                <Route path="/" component={GeneraleHub} />
-              </Route>
+                {/* Generale Hub — wrapped in GeneraleLayout */}
+                <Route path="/generale" component={GeneraleLayout}>
+                  <Route path="/" component={GeneraleHub} />
+                </Route>
 
-              {/* Flat game routes */}
-              <Route path="/game/:id" component={RoomRoute} />
-              <Route path="/maps" component={MapsPage} />
-              <Route path="/maps/editor" component={MapEditorPage} />
-              <Route path="/maps/editor/:id" component={MapEditorPage} />
-              <Route path="/maps/preview/:id" component={MapPreviewPage} />
+                {/* Flat game routes */}
+                <Route path="/game/:id" component={RoomRoute} />
+                <Route path="/maps" component={MapsPage} />
+                <Route path="/maps/editor" component={MapEditorPage} />
+                <Route path="/maps/editor/:id" component={MapEditorPage} />
+                <Route path="/maps/preview/:id" component={MapPreviewPage} />
 
-              {/* Catch-all 404 */}
-              <Route path="*" component={NotfoundPage} />
-            </Router>
-          </WebSocketProvider>
-        </AuthProvider>
-      </MetaProvider>
+                {/* Catch-all 404 */}
+                <Route path="*" component={NotfoundPage} />
+              </Router>
+            </WebSocketProvider>
+          </AuthProvider>
+        </MetaProvider>
 
-      <SolidQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
+        <SolidQueryDevtools initialIsOpen={false} />
+      </QueryClientProvider>
     </I18nProvider>
   );
 }

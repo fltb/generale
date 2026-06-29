@@ -92,7 +92,9 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
         <div class="flex items-center justify-between">
           <div>
             <div class="text-lg font-semibold">{t("Room Info")}</div>
-            <div data-testid="room-game-id" class="text-sm opacity-70">Game ID: {room()?.gameId}</div>
+            <div data-testid="room-game-id" class="text-sm opacity-70">
+              Game ID: {room()?.gameId}
+            </div>
           </div>
           <div class="flex items-center gap-2">
             <Show when={isHost()}>
@@ -200,7 +202,9 @@ export const RoomWithSync: Component<RoomWithSyncProps> = (props) => {
             </Button>
           </div>
           <span class="text-xs opacity-60">
-            {(room()?.teamMode ?? "ffa") === "ffa" ? t("Each player is their own team; team info hidden from UI") : t("Free to form teams, switch teams, rename")}
+            {(room()?.teamMode ?? "ffa") === "ffa"
+              ? t("Each player is their own team; team info hidden from UI")
+              : t("Free to form teams, switch teams, rename")}
           </span>
         </div>
       </Panel>
