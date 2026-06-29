@@ -6,11 +6,13 @@ import LogoIcon from "~/components/LogoIcon";
 import { useAuth } from "~/hooks/useAuth";
 import { MuteToggle } from "~/ui";
 import { PLATFORM_NAME } from "~/config";
+import { useT } from "~/i18n/useT";
 
 export default function PlatformShell(props: { children?: JSX.Element }) {
   const auth = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = createSignal(false);
+  const { locale, setLocale } = useT();
 
   createEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -53,6 +55,24 @@ export default function PlatformShell(props: { children?: JSX.Element }) {
           </div>
           <div class="flex items-center gap-3">
             <MuteToggle />
+            <div class="flex items-center gap-1">
+              {[
+                { code: "en", label: "EN" },
+                { code: "zh-CN", label: "中文" },
+              ].map((lang) => (
+                <button
+                  type="button"
+                  onClick={() => setLocale(lang.code)}
+                  class={`px-2 py-1 text-xs rounded border ${
+                    locale() === lang.code
+                      ? "border-base-content/30 bg-base-300 text-base-content"
+                      : "border-base-300 hover:bg-base-300 text-base-content/40 hover:text-base-content"
+                  }`}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
             <Show
               when={auth.user}
               fallback={
