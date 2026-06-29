@@ -157,7 +157,10 @@ packages/frontend/src/
 - **Commit 信息必须用英文。**
 - **不自动 commit/push。** 展示 staged diff 后等用户确认。
 - **测试文件可能有陈旧类型错误** — `__tests__/` 目录下的错误如与改动无关可忽略。
-- **后端测试：** `npx vitest`（游戏场景测试最重要）
-- **前端测试：** 多为手动 UI 测试（SolidJS + PixiJS）
+- **后端测试：** `npx vitest`（游戏场景测试最重要）。已清理冗余脚本：保留 `test`、`test:watch`、`typecheck`。
+- **前端测试：** 多为手动 UI 测试（SolidJS + PixiJS）。前端新增 `typecheck` script。
+- **CI 流程：** `check` job: Install → Types check → Biome → Typecheck → Test → Build → Compile backend binary → Audit。`package` job: 编译 binary → assemble `generale-server/`（含 frontend dist + migrations + start.sh + .env.example）→ 上传 artifact。下载后解压一次即得 `generale-server/` 文件夹。
+- **SMTP：** 启动时 `transporter.verify()` 带 5s 超时，失败仅打 `console.warn` 不阻塞启动。缺 env 变量直接 crash server。
+- **Production 入口：** `scripts/start.sh` 设 `NODE_ENV=production`，通过 `PUBLIC_URL` env 控制 sitemap/robots/og:image 的域名。前端 `BASE_URL` 用 `location.origin` 自动获取。
 - **MapRender 必须在 mount/cleanup 时调用 `destroyGcCache`（现为 `iconFactory.destroy()`）** 防止跨游戏会话的 PixiJS GraphicsContext 污染。
 - **`resizeTo={window}`** 令 PixiJS canvas 铺满 viewport；HUD 覆盖层用 DOM `absolute` 定位。
