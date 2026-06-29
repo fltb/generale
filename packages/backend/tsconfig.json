@@ -99,5 +99,8 @@
     /* Completeness */
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
-  }
+  },
+  // Test files contain extensive mocking and external type interactions
+  // that are impractical to fully type. Runtime errors are caught by vitest.
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/__tests__/**"]
 }

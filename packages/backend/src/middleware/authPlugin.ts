@@ -18,9 +18,13 @@ export const authPlugin = new Elysia({ name: "auth-plugin" })
   // Guard helper to enforce authentication
   .guard(
     {
-      beforeHandle({ session, set }) {
-        if (!session) {
-          set.status = 401;
+      beforeHandle(ctx) {
+        const ctxAny = ctx as unknown as {
+          session: import("../services/sessionService").Session | undefined;
+          set: { status: number };
+        };
+        if (!ctxAny.session) {
+          ctxAny.set.status = 401;
           return { error: "Unauthorized" };
         }
         return;

@@ -171,6 +171,7 @@
   "Failed to load room list": "加载房间列表失败",
   "Failed to prepare connection": "连接准备失败",
   "File too large": "文件过大",
+  "No file": "未选择文件",
   "Fog": "迷雾",
   "For bug reports and feature requests, visit our {link} page.": "如遇到 bug 或有功能建议，请访问我们的 {link} 页面。",
   "Forbidden": "禁止访问",

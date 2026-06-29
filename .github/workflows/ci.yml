@@ -26,16 +26,16 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build types
-        run: cd packages/types && npx tsc -p tsconfig.json
+        run: cd packages/types && bun run build
 
       - name: Biome check
         run: bun run ci:lint
 
       - name: Backend typecheck
-        run: cd packages/backend && npx tsc --noEmit
+        run: cd packages/backend && bun run typecheck
 
       - name: Backend tests
-        run: cd packages/backend && npx vitest run
+        run: cd packages/backend && bun run test
 
       - name: Frontend build
         run: bun run --filter=frontend build
@@ -61,7 +61,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build types
-        run: cd packages/types && npx tsc -p tsconfig.json
+        run: cd packages/types && bun run build
 
       - name: Build frontend
         run: bun run --filter=frontend build

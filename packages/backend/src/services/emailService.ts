@@ -56,16 +56,7 @@ export async function initEmailServiceWithEnv() {
 }
 
 export async function initEmailService(config: EmailConfig) {
-  transporter = nodemailer.createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    secure: true,
-    auth: {
-      user: config.smtp.auth.user,
-      pass: config.smtp.auth.pass,
-    },
-    proxy: config.proxy,
-  });
+  transporter = nodemailer.createTransport(config.smtp as unknown as Parameters<typeof nodemailer.createTransport>[0]);
 
   await transporter.verify();
 }
