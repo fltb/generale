@@ -77,17 +77,16 @@ jobs:
 
       - name: Assemble deploy package
         run: |
-          mkdir -p dist/frontend dist/migrations dist/public/avatars/default
-          cp -r packages/frontend/dist/* dist/frontend/
-          cp -r packages/backend/drizzle/* dist/migrations/
-          cp -r packages/backend/public/avatars/default/* dist/public/avatars/default/
-          cp packages/backend/.env.example dist/.env.example
-          cp scripts/start.sh dist/
-          chmod +x dist/start.sh
-          tar czf generale-server.tar.gz -C dist .
+          mkdir -p generale-server/frontend generale-server/migrations generale-server/public/avatars/default
+          cp -r packages/frontend/dist/* generale-server/frontend/
+          cp -r packages/backend/drizzle/* generale-server/migrations/
+          cp -r packages/backend/public/avatars/default/* generale-server/public/avatars/default/
+          cp packages/backend/.env.example generale-server/
+          cp scripts/start.sh generale-server/
+          chmod +x generale-server/start.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: generale-server
-          path: generale-server.tar.gz
+          path: generale-server/
