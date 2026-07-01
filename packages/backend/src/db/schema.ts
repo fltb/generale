@@ -115,3 +115,27 @@ export const userSettings = sqliteTable(
     pk: primaryKey({ columns: [table.userId, table.key] }),
   }),
 );
+
+export const gameResults = sqliteTable("game_results", {
+  id: text("id").primaryKey(),
+  gameId: text("game_id").notNull(),
+  gameType: text("game_type").notNull(),
+  endedAt: integer("ended_at").notNull(),
+  durationMs: integer("duration_ms"),
+  participants: text("participants").notNull(),
+  stateSnapshot: text("state_snapshot"),
+});
+
+export const gameUserSettings = sqliteTable(
+  "game_user_settings",
+  {
+    userId: text("user_id").notNull(),
+    gameType: text("game_type").notNull(),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedAt: integer("updated_at"),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.gameType, table.key] }),
+  }),
+);
