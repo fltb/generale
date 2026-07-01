@@ -1,3 +1,4 @@
+export * from "./bomberman";
 export * from "./chat";
 export * from "./core-type";
 export * from "./game-type";
