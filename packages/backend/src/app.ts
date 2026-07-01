@@ -11,6 +11,7 @@ import { gameRoutes } from "./routes/game";
 import { mapRoutes } from "./routes/map";
 import { profileRoutes } from "./routes/profile";
 import { userRoutes } from "./routes/user";
+import { settingsRoutes } from "./routes/settings";
 import { bombermanRoutes } from "./games/bomberman/routes";
 import { initEmailServiceWithEnv } from "./services/emailService";
 import { ProfileService } from "./services/profileService";
@@ -66,6 +67,7 @@ export async function createApp(opts: CreateAppOptions = {}) {
         .use(profileRoutes)
         .use(gameRoutes)
         .use(mapRoutes)
+        .group("/settings", (s) => s.use(settingsRoutes))
         .group("/bomberman", (b) => b.use(bombermanRoutes))
         .use(
           swagger({
