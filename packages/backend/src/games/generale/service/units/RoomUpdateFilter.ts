@@ -1,11 +1,11 @@
 import type { GameId, PreGameRoomState } from "@generale/types";
-import type { RoomInstance } from "../../instance/RoomInstance";
+import type { GeneraleRoom } from "../../instance/GeneraleRoom";
 
 type EmitFn = (gameId: GameId) => void;
 
 /**
  * 房间状态变更过滤器。
- * 监听 RoomInstance.onStateChange，只在影响房间列表展示的字段变化时通知 GameServiceManager。
+ * 监听 GeneraleRoom.onStateChange，只在影响房间列表展示的字段变化时通知 GeneraleManager。
  */
 export class RoomUpdateFilter {
   private lastSnapshot?: PreGameRoomState;
@@ -17,7 +17,7 @@ export class RoomUpdateFilter {
     private readonly emit: EmitFn,
   ) {}
 
-  attach(roomInstance: RoomInstance) {
+  attach(roomInstance: GeneraleRoom) {
     this.lastSnapshot = structuredClone(roomInstance.getState());
 
     const significantChange = this.buildSignificantChangeFilter();

@@ -12,19 +12,19 @@ import {
   listGamesSuccessRespSchema,
 } from "@generale/types/dist/api";
 import { Elysia } from "elysia";
-import type { GameServiceConfig } from "../game/service/GameService";
-import { gameServiceManager } from "../game/service/GameServiceManager";
-import { sessionService } from "../services/sessionService";
-import { cookieScheme } from "./user";
-import { applyGameFilters, applyGameSort, paginateGames } from "./utils/gameListFilter";
-import { tForRequest } from "../services/i18n";
+import type { GeneraleServiceConfig } from "./service/GeneraleService";
+import { generaleManager } from "./service/GeneraleManager";
+import { sessionService } from "../../services/sessionService";
+import { cookieScheme } from "../../routes/user";
+import { applyGameFilters, applyGameSort, paginateGames } from "../../routes/utils/gameListFilter";
+import { tForRequest } from "../../services/i18n";
 
 export const gameRoutes = new Elysia({ prefix: "/game" })
   // Decorate with the actual singleton manager instance
-  .decorate("gameServiceManager", gameServiceManager)
+  .decorate("generaleManager", generaleManager)
   .post(
     "/create",
-    ({ body, gameServiceManager, set, cookie: { sid }, request }) => {
+    ({ body, generaleManager, set, cookie: { sid }, request }) => {
       const t = tForRequest({ cookie: { sid }, request });
       const session = sid?.value ? sessionService.get(sid.value) : undefined;
       if (!session) {
@@ -33,7 +33,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
       }
       const gameId = `game_${Date.now()}` as GameId;
 
-      let finalMapSize: GameServiceConfig["mapSize"] = "medium";
+      let finalMapSize: GeneraleServiceConfig["mapSize"] = "medium";
 
       if (body.gameSettings) {
         const settings = body.gameSettings;
@@ -45,7 +45,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
             finalMapSize = { width: Number(width), height: Number(height) };
           } else if (settings.customMapId) {
             // custom map selected, dimensions determined by the map
-            finalMapSize = { width: 20, height: 20 }; // placeholder, GameService will override from map data
+            finalMapSize = { width: 20, height: 20 }; // placeholder, GeneraleService will override from map data
           } else {
             set.status = 400;
             return { success: false, error: t("custom mode requires numeric mapSize or customMapId") };
@@ -67,10 +67,10 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
         ...(body.gameSettings?.type === "custom" && body.gameSettings.customMapId
           ? { customMapId: body.gameSettings.customMapId }
           : {}),
-      } as unknown as GameServiceConfig;
+      } as unknown as GeneraleServiceConfig;
 
       // create game
-      gameServiceManager.createGame(gameConfig);
+      generaleManager.createGame(gameConfig);
 
       return {
         success: true,
@@ -86,17 +86,17 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
   )
   .get(
     "/info/:gameId",
-    ({ params, gameServiceManager, set, request }) => {
+    ({ params, generaleManager, set, request }) => {
       const t = tForRequest({ request });
-      const gameService = gameServiceManager.getGame(params.gameId as GameId);
+      const generaleService = generaleManager.getGame(params.gameId as GameId);
 
-      if (!gameService) {
+      if (!generaleService) {
         set.status = 404;
         return { error: t("Game not found") };
       }
 
       // Call the instance method
-      const gameInfo = gameService.getGameInfo();
+      const gameInfo = generaleService.getGameInfo();
       return { success: true, data: gameInfo };
     },
     {
@@ -107,11 +107,11 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
   )
   .get(
     "/list",
-    ({ query, gameServiceManager }) => {
+    ({ query, generaleManager }) => {
       // Acquire active games and normalize to unified summary objects
-      const games: GameInfoSuccessResp["data"][] = gameServiceManager
+      const games: GameInfoSuccessResp["data"][] = generaleManager
         .getActiveGames()
-        .map((id) => gameServiceManager.getGame(id)?.getGameInfo())
+        .map((id) => generaleManager.getGame(id)?.getGameInfo())
         .filter((game) => !!game);
 
       let result = applyGameFilters(games, query);
@@ -139,7 +139,7 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
   )
   .get(
     "/connect/:gameId",
-    ({ params, gameServiceManager, set, cookie: { sid }, request }) => {
+    ({ params, generaleManager, set, cookie: { sid }, request }) => {
       const t = tForRequest({ cookie: { sid }, request });
       const { gameId } = params as { gameId: string };
       const session = sid?.value ? sessionService.get(sid.value) : undefined;
@@ -150,13 +150,13 @@ export const gameRoutes = new Elysia({ prefix: "/game" })
 
       const playerId = session.userId as PlayerId;
 
-      const gameService = gameServiceManager.getGame(gameId as GameId);
-      if (!gameService) {
+      const generaleService = generaleManager.getGame(gameId as GameId);
+      if (!generaleService) {
         set.status = 404;
         return { success: false, error: t("Game not found") };
       }
 
-      const result = gameService.prepareConnectionForPlayer(playerId);
+      const result = generaleService.prepareConnectionForPlayer(playerId);
 
       if (!result.success) {
         switch (result.reason) {

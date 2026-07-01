@@ -1,7 +1,7 @@
 import type { GameId, GameInfoSuccessResp, GamePhase } from "@generale/types";
-import { mapService } from "../../../services/mapService";
-import type { GameInstance } from "../../instance/GameInstance";
-import type { RoomInstance } from "../../instance/RoomInstance";
+import { mapService } from "../../../../services/mapService";
+import type { GeneraleGame } from "../../instance/GeneraleGame";
+import type { GeneraleRoom } from "../../instance/GeneraleRoom";
 
 export interface GameInfoInput {
   gameId: GameId;
@@ -10,8 +10,8 @@ export interface GameInfoInput {
   maxPlayers: number;
   roomType: "standard" | "custom";
   mapSizeConfig: { width: number; height: number } | "small" | "medium" | "large";
-  roomInstance: RoomInstance | null;
-  gameInstance: GameInstance | null;
+  roomInstance: GeneraleRoom | null;
+  gameInstance: GeneraleGame | null;
 }
 
 export function buildGameInfo(input: GameInfoInput): GameInfoSuccessResp["data"] {
@@ -66,8 +66,8 @@ function phaseToStatus(phase: GamePhase): "lobby" | "in-progress" | "finished" {
 
 function collectPlayers(
   phase: GamePhase,
-  roomInstance: RoomInstance | null,
-  gameInstance: GameInstance | null,
+  roomInstance: GeneraleRoom | null,
+  gameInstance: GeneraleGame | null,
   fallbackMax: number,
 ) {
   let players: Array<{ id: string; name: string; isHost: boolean }> = [];
@@ -105,7 +105,7 @@ function collectPlayers(
 
 function resolveMapField(
   phase: GamePhase,
-  roomInstance: RoomInstance | null,
+  roomInstance: GeneraleRoom | null,
   roomType: "standard" | "custom",
   mapSizeConfig: GameInfoInput["mapSizeConfig"],
 ) {

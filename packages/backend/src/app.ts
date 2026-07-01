@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { runMigrations } from "./db/migrate";
 import { authPlugin } from "./middleware/authPlugin";
 import { registerDomainHandler, websocketPlugin } from "./plugins/websocket";
-import { gameRoutes } from "./routes/game";
+import { gameRoutes } from "./games/generale/routes";
 import { mapRoutes } from "./routes/map";
 import { profileRoutes } from "./routes/profile";
 import { userRoutes } from "./routes/user";

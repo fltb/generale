@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { GameInstance } from "../GameInstance";
+import { GeneraleGame } from "../GeneraleGame";
 import type { GameState, PlayerId, TeamId } from "@generale/types";
 import { GameStatus, PlayerStatus, TileType, SyncedGameClientActionTypes } from "@generale/types";
 
@@ -87,44 +87,44 @@ function makeGameState(playerCount: number = 2): GameState {
   } as GameState;
 }
 
-describe("GameInstance", () => {
+describe("GeneraleGame", () => {
   it("creates with initial state", () => {
     const state = makeGameState(2);
-    const gi = new GameInstance(state, { playerDisplay: {} }, ["p1", "p2"]);
+    const gi = new GeneraleGame(state, { playerDisplay: {} }, ["p1", "p2"]);
     expect(gi.getState().status).toBe(GameStatus.Playing);
     gi.destroy();
   });
 
   it("addPlayer registers connector and canJoin returns success", () => {
-    const gi = new GameInstance(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
+    const gi = new GeneraleGame(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
     const r = gi.addPlayer({ id: "p1", name: "P1" }, mockConn("p1"));
     expect(r.success).toBe(true);
     gi.destroy();
   });
 
   it("addPlayer rejects unknown player", () => {
-    const gi = new GameInstance(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
+    const gi = new GeneraleGame(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
     const r = gi.addPlayer({ id: "unknown", name: "X" }, mockConn("unknown"));
     expect(r.success).toBe(false);
     gi.destroy();
   });
 
   it("addPlayer rejects destroyed instance", () => {
-    const gi = new GameInstance(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
+    const gi = new GeneraleGame(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
     gi.destroy();
     const r = gi.addPlayer({ id: "p1", name: "P1" }, mockConn("p1"));
     expect(r.success).toBe(false);
   });
 
   it("addSpectator works for non-player", () => {
-    const gi = new GameInstance(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
+    const gi = new GeneraleGame(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
     const r = gi.addSpectator({ id: "spec1", name: "Spec" }, mockConn("spec1"));
     expect(r.success).toBe(true);
     gi.destroy();
   });
 
   it("advance processes tick without error", () => {
-    const gi = new GameInstance(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
+    const gi = new GeneraleGame(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
     gi.addPlayer({ id: "p1", name: "P1" }, mockConn("p1"));
     gi.addPlayer({ id: "p2", name: "P2" }, mockConn("p2"));
     gi.advance();
@@ -135,7 +135,7 @@ describe("GameInstance", () => {
   it("surrender triggers end game callbacks", () => {
     return new Promise<void>((done) => {
       const state = makeGameState(2);
-      const gi = new GameInstance(state, { playerDisplay: {} }, ["p1", "p2"]);
+      const gi = new GeneraleGame(state, { playerDisplay: {} }, ["p1", "p2"]);
       gi.addPlayer({ id: "p1", name: "P1" }, mockConn("p1"));
       gi.addPlayer({ id: "p2", name: "P2" }, mockConn("p2"));
 
@@ -151,13 +151,13 @@ describe("GameInstance", () => {
   });
 
   it("canJoin returns success for existing player", () => {
-    const gi = new GameInstance(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
+    const gi = new GeneraleGame(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
     expect(gi.canJoin("p1").success).toBe(true);
     gi.destroy();
   });
 
   it("canJoin returns false for destroyed instance", () => {
-    const gi = new GameInstance(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
+    const gi = new GeneraleGame(makeGameState(2), { playerDisplay: {} }, ["p1", "p2"]);
     gi.destroy();
     expect(gi.canJoin("p1").success).toBe(false);
   });

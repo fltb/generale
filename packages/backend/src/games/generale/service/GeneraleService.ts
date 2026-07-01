@@ -24,24 +24,24 @@ import {
   type TeamCore,
   type TeamId,
 } from "@generale/types";
-import type { GameEndResult } from "../instance/GameInstance";
+import type { GameEndResult } from "../instance/GeneraleGame";
 import {
   type DomainHandler,
   registerDomainHandler,
   type SubConnector,
   unregisterDomainHandler,
-} from "../../plugins/websocket";
+} from "../../../plugins/websocket";
 import { generateMap } from "../core/map-gen";
-import { GameChatInstance } from "../instance/GameChatInstance";
-import { GameInstance, type GameInstanceSettings } from "../instance/GameInstance";
-import { RoomInstance } from "../instance/RoomInstance";
+import { GameChatInstance } from "../../../game/instance/GameChatInstance";
+import { GeneraleGame, type GeneraleGameSettings } from "../instance/GeneraleGame";
+import { GeneraleRoom } from "../instance/GeneraleRoom";
 import { buildGameInfo } from "./units/GameInfoPresenter";
 import { RoomUpdateFilter } from "./units/RoomUpdateFilter";
 
 /**
- * GameService 配置
+ * GeneraleService 配置
  */
-export type GameServiceConfig = {
+export type GeneraleServiceConfig = {
   gameId: GameId;
   roomName: string;
   maxPlayers?: number;
@@ -57,7 +57,7 @@ export type GameServiceConfig = {
   /** 可选：自定义地图 ID（从地图工坊选取），游戏开始时加载此地图 */
   customMapId?: string;
   // optional: raw incoming gameSettings (from create request). Prefer normalized mapSize in gameConfig.mapSizeNormalized below
-  gameSettings?: Partial<GameInstanceSettings>;
+  gameSettings?: Partial<GeneraleGameSettings>;
 } & (
   | {
       // discriminant if provided
@@ -83,20 +83,20 @@ export type ConnectionResult =
   | { success: false; reason: "NOT_AUTHORIZED" | "GAME_UNAVAILABLE" | "INVALID_STATE"; message: string };
 
 /**
- * GameService - 游戏总管理服务
+ * GeneraleService - 游戏总管理服务
  * 管理游戏的各个阶段和实例，协调 WebSocket sub-connector
  */
-export class GameService {
+export class GeneraleService {
   private gameId: GameId;
   private phase: GamePhase = GamePhase.PREGAME;
 
   // 各阶段实例
-  private roomInstance: RoomInstance | null = null;
-  private gameInstance: GameInstance | null = null;
+  private roomInstance: GeneraleRoom | null = null;
+  private gameInstance: GeneraleGame | null = null;
   private chatInstance: GameChatInstance;
 
   // 配置
-  private config: GameServiceConfig;
+  private config: GeneraleServiceConfig;
 
   private onGameStartCallback?: () => void;
   private onGameEndCallback?: (result: GameEndResult) => void;
@@ -105,7 +105,7 @@ export class GameService {
   private roomUpdateEmitter?: (gameId: GameId) => void;
   private roomUpdateFilter!: RoomUpdateFilter;
 
-  constructor(config: GameServiceConfig) {
+  constructor(config: GeneraleServiceConfig) {
     this.config = config;
     this.gameId = config.gameId;
 
@@ -173,14 +173,14 @@ export class GameService {
         return;
       }
 
-      // 初始化 RoomInstance（如果不存在）
+      // 初始化 GeneraleRoom（如果不存在）
       if (!this.roomInstance) {
         this.initializeRoom();
       }
 
-      // 将玩家添加到 RoomInstance
+      // 将玩家添加到 GeneraleRoom
       if (this.roomInstance) {
-        console.debug(`[GameService]: Adding player: ${userid} ${username} to roomInstance`);
+        console.debug(`[GeneraleService]: Adding player: ${userid} ${username} to roomInstance`);
         const result = this.roomInstance.addPlayer(
           {
             id: userid,
@@ -233,7 +233,7 @@ export class GameService {
         return;
       }
 
-      // 区分玩家 / 观战者：以 RoomInstance 中的 status 为准
+      // 区分玩家 / 观战者：以 GeneraleRoom 中的 status 为准
       const roomState = this.roomInstance?.getState();
       const playerEntry = roomState?.players.find((p) => p.id === userid);
       const isSpectator = playerEntry?.status === PreGamePlayerStatus.Spectating;
@@ -293,14 +293,14 @@ export class GameService {
 
   private initializeRoom(): void {
     const initialState = this.buildInitialRoomState();
-    this.roomInstance = new RoomInstance(initialState, new Map());
+    this.roomInstance = new GeneraleRoom(initialState, new Map());
     if (this.config.password) this.roomInstance.setPassword(this.config.password);
     if (this.config.creatorId) this.roomInstance.setCreatorId(this.config.creatorId);
     this.wireRoomInstance();
     this.phase = GamePhase.PREGAME;
     this.chatInstance.activeStageInstance = this.roomInstance;
     this.roomUpdateFilter.attach(this.roomInstance);
-    console.log(`[GameService ${this.gameId}] Room initialized`);
+    console.log(`[GeneraleService ${this.gameId}] Room initialized`);
   }
 
   private resolveMapDimensions(): { width: number; height: number; sizeLabel?: "small" | "medium" | "large" } {
@@ -366,7 +366,7 @@ export class GameService {
     try {
       this.roomUpdateEmitter?.(this.gameId);
     } catch (err) {
-      console.error("[GameService] emitRoomUpdated", err);
+      console.error("[GeneraleService] emitRoomUpdated", err);
     }
   }
 
@@ -379,11 +379,11 @@ export class GameService {
    */
   public async startGame(state: PreGameRoomState): Promise<void> {
     if (this.phase !== GamePhase.PREGAME || !this.roomInstance) {
-      console.error(`[GameService ${this.gameId}] Cannot start game from phase: ${this.phase}`);
+      console.error(`[GeneraleService ${this.gameId}] Cannot start game from phase: ${this.phase}`);
       return;
     }
 
-    console.log(`[GameService ${this.gameId}] Starting game...`);
+    console.log(`[GeneraleService ${this.gameId}] Starting game...`);
 
     // 直接使用传入的 Room 状态
     const roomState = structuredClone(state);
@@ -433,7 +433,7 @@ export class GameService {
     };
 
     // 分配专属颜色：假设玩家都有合法的颜色
-    const gameInstanceSettings: GameInstanceSettings = {
+    const gameInstanceSettings: GeneraleGameSettings = {
       playerDisplay: roomState.players.reduce(
         (acc, p) => {
           acc[p.id] = {
@@ -448,16 +448,16 @@ export class GameService {
       ),
     };
 
-    // 创建 GameInstance
+    // 创建 GeneraleGame
     const playerIds = Array.from(roomState.players.map((p) => p.id));
-    this.gameInstance = new GameInstance(initialGameState, gameInstanceSettings, playerIds);
+    this.gameInstance = new GeneraleGame(initialGameState, gameInstanceSettings, playerIds);
     this.phase = GamePhase.INGAME;
     this.gameInstance.onEndGame(this.endGame.bind(this));
     this.gameInstance.startTicking(state.gameSetting?.speed ?? 1.0);
     this.onGameStartCallback?.();
     this.emitRoomUpdated();
 
-    console.log(`[GameService ${this.gameId}] Game started with ${playerIds.length} players`);
+    console.log(`[GeneraleService ${this.gameId}] Game started with ${playerIds.length} players`);
   }
 
   public endGame(result?: GameEndResult): void {
@@ -465,11 +465,11 @@ export class GameService {
     this.gameInstance?.stopTicking();
 
     if (this.phase !== GamePhase.INGAME) {
-      console.error(`[GameService ${this.gameId}] Cannot end game from phase: ${this.phase}`);
+      console.error(`[GeneraleService ${this.gameId}] Cannot end game from phase: ${this.phase}`);
       return;
     }
 
-    console.log(`[GameService ${this.gameId}] Ending game...`, result);
+    console.log(`[GeneraleService ${this.gameId}] Ending game...`, result);
 
     // 调用结束回调（保留给上层使用，例如统计）
     if (result) this.onGameEndCallback?.(result);
@@ -479,7 +479,7 @@ export class GameService {
       try {
         this.gameInstance.destroy();
       } catch (err) {
-        console.warn(`[GameService ${this.gameId}] Error destroying gameInstance:`, err);
+        console.warn(`[GeneraleService ${this.gameId}] Error destroying gameInstance:`, err);
       }
       this.gameInstance = null;
     }
@@ -493,7 +493,7 @@ export class GameService {
       this.roomInstance.resume();
     } else {
       // 解散房间（降级方案）
-      console.error(`[GameService ${this.gameId}] Failed to build fallback room state, disbanding game`);
+      console.error(`[GeneraleService ${this.gameId}] Failed to build fallback room state, disbanding game`);
       this.disbandGame();
       return;
     }
@@ -512,20 +512,20 @@ export class GameService {
     this.emitRoomUpdated();
 
     console.log(
-      `[GameService ${this.gameId}] Game ended and room restored to room with ${this.roomInstance.getState().players.length} players`,
+      `[GeneraleService ${this.gameId}] Game ended and room restored to room with ${this.roomInstance.getState().players.length} players`,
     );
   }
 
   public forceDispose(): void {
     this.cleanupAndSetDisbanded();
-    console.log(`[GameService ${this.gameId}] Game force disposed`);
+    console.log(`[GeneraleService ${this.gameId}] Game force disposed`);
   }
 
   private disbandGame(): void {
     this.cleanupAndSetDisbanded();
     this.onDisbandCallback?.();
     this.emitRoomUpdated();
-    console.log(`[GameService ${this.gameId}] Game disbanded`);
+    console.log(`[GeneraleService ${this.gameId}] Game disbanded`);
   }
 
   private cleanupAndSetDisbanded(): void {
@@ -558,7 +558,7 @@ export class GameService {
 
   /**
    * 获取玩家数量。
-   * RoomInstance 全程存活，始终是玩家名册的权威数据源。
+   * GeneraleRoom 全程存活，始终是玩家名册的权威数据源。
    */
   public getPlayerCount(): number {
     return this.roomInstance?.getState().players.length ?? 0;

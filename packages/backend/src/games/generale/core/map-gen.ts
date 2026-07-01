@@ -1,5 +1,5 @@
 import { type GameMap, PreGameMapType, type PreGameRoomState, TileType } from "@generale/types";
-import { mapService } from "../../services/mapService";
+import { mapService } from "../../../services/mapService";
 
 /**
  * 生成游戏地图（异步，支持从地图工坊加载自定义地图）

@@ -1,17 +1,17 @@
 import { type GameId, GamePhase } from "@generale/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GameInstance } from "../../instance/GameInstance";
-import { RoomInstance } from "../../instance/RoomInstance";
-import { GameService, type GameServiceConfig } from "../GameService";
+import { GeneraleGame } from "../../instance/GameInstance";
+import { GeneraleRoom } from "../../instance/RoomInstance";
+import { GeneraleService, type GeneraleServiceConfig } from "../GeneraleService";
 
 // Mock dependencies
-vi.mock("../../plugins/websocket", () => ({
+vi.mock("../../../../plugins/websocket", () => ({
   registerDomainHandler: vi.fn(),
   unregisterDomainHandler: vi.fn(),
 }));
 
 vi.mock("../../instance/RoomInstance", () => ({
-  RoomInstance: vi.fn().mockImplementation(() => ({
+  GeneraleRoom: vi.fn().mockImplementation(() => ({
     getState: vi.fn().mockReturnValue({
       players: [
         {
@@ -52,7 +52,7 @@ vi.mock("../../instance/RoomInstance", () => ({
 }));
 
 vi.mock("../../instance/GameInstance", () => ({
-  GameInstance: vi.fn().mockImplementation(() => ({
+  GeneraleGame: vi.fn().mockImplementation(() => ({
     getState: vi.fn().mockReturnValue({
       players: {
         player1: { id: "player1", status: "Playing", army: 10, land: 5, teamId: "team1" },
@@ -76,19 +76,19 @@ vi.mock("../../instance/GameChatInstance", () => ({
   })),
 }));
 
-function gs(s: GameService) {
+function gs(s: GeneraleService) {
   return s as unknown as {
     disbandGame: () => void;
     phase: GamePhase;
-    gameInstance: GameInstance | null;
-    roomInstance: RoomInstance | null;
+    gameInstance: GeneraleGame | null;
+    roomInstance: GeneraleRoom | null;
     initializeRoom: () => void;
   };
 }
 
-describe("GameService HTTP API", () => {
-  let gameService: GameService;
-  let config: GameServiceConfig;
+describe("GeneraleService HTTP API", () => {
+  let generaleService: GeneraleService;
+  let config: GeneraleServiceConfig;
 
   beforeEach(() => {
     config = {
@@ -96,39 +96,39 @@ describe("GameService HTTP API", () => {
       maxPlayers: 4,
       chatMaxMessages: 100,
     };
-    gameService = new GameService(config);
+    generaleService = new GeneraleService(config);
   });
 
   afterEach(() => {
-    gs(gameService).disbandGame();
+    gs(generaleService).disbandGame();
     vi.clearAllMocks();
   });
 
   describe("constructor", () => {
-    it("应该创建新的 GameService 实例", () => {
-      const newConfig: GameServiceConfig = {
+    it("应该创建新的 GeneraleService 实例", () => {
+      const newConfig: GeneraleServiceConfig = {
         gameId: "api-game-456" as GameId,
         maxPlayers: 8,
       };
 
-      const newGameService = new GameService(newConfig);
+      const newGeneraleService = new GeneraleService(newConfig);
 
-      expect(newGameService).toBeInstanceOf(GameService);
-      expect(newGameService.getGameId()).toBe("api-game-456");
-      expect(newGameService.getPhase()).toBe(GamePhase.PREGAME);
+      expect(newGeneraleService).toBeInstanceOf(GeneraleService);
+      expect(newGeneraleService.getGameId()).toBe("api-game-456");
+      expect(newGeneraleService.getPhase()).toBe(GamePhase.PREGAME);
 
-      gs(newGameService).disbandGame();
+      gs(newGeneraleService).disbandGame();
     });
   });
 
-  // Add this new describe block inside the main 'GameService HTTP API' describe block
+  // Add this new describe block inside the main 'GeneraleService HTTP API' describe block
   describe("prepareConnectionForPlayer", () => {
     describe("when in PREGAME phase", () => {
       beforeEach(() => {
         // Set the game phase to PREGAME for these tests
-        gs(gameService).phase = GamePhase.PREGAME;
-        // The service needs an active RoomInstance to check player counts
-        gs(gameService).initializeRoom();
+        gs(generaleService).phase = GamePhase.PREGAME;
+        // The service needs an active GeneraleRoom to check player counts
+        gs(generaleService).initializeRoom();
       });
 
       it("should allow a new player to connect when the game is not full", () => {
@@ -136,7 +136,7 @@ describe("GameService HTTP API", () => {
         const playerId = "new-player-id" as PlayerId;
 
         // Act
-        const result = gameService.prepareConnectionForPlayer(playerId);
+        const result = generaleService.prepareConnectionForPlayer(playerId);
 
         // Assert
         expect(result.success).toBe(true);
@@ -151,11 +151,11 @@ describe("GameService HTTP API", () => {
 
       it("should deny connection when the game is full", () => {
         // Arrange: Mock the getPlayerCount to simulate a full game
-        vi.spyOn(gameService, "getPlayerCount").mockReturnValue(4);
+        vi.spyOn(generaleService, "getPlayerCount").mockReturnValue(4);
         const playerId = "another-new-player-id" as PlayerId;
 
         // Act
-        const result = gameService.prepareConnectionForPlayer(playerId);
+        const result = generaleService.prepareConnectionForPlayer(playerId);
 
         // Assert
         expect(result.success).toBe(false);
@@ -169,16 +169,16 @@ describe("GameService HTTP API", () => {
     describe("when in INGAME phase", () => {
       beforeEach(() => {
         // Set the game phase to INGAME and ensure an instance exists
-        gs(gameService).phase = GamePhase.INGAME;
-        gs(gameService).gameInstance = new GameInstance();
+        gs(generaleService).phase = GamePhase.INGAME;
+        gs(generaleService).gameInstance = new GeneraleGame();
       });
 
       it("should allow an existing player to reconnect", () => {
-        // Arrange: 'player1' exists in the mock GameInstance state
+        // Arrange: 'player1' exists in the mock GeneraleGame state
         const playerId = "player1" as PlayerId;
 
         // Act
-        const result = gameService.prepareConnectionForPlayer(playerId);
+        const result = generaleService.prepareConnectionForPlayer(playerId);
 
         // Assert
         expect(result.success).toBe(true);
@@ -192,11 +192,11 @@ describe("GameService HTTP API", () => {
       });
 
       it("should deny a non-existent player from connecting", () => {
-        // Arrange: 'non-existent-player' is not in the mock GameInstance state
+        // Arrange: 'non-existent-player' is not in the mock GeneraleGame state
         const playerId = "non-existent-player" as PlayerId;
 
         // Act
-        const result = gameService.prepareConnectionForPlayer(playerId);
+        const result = generaleService.prepareConnectionForPlayer(playerId);
 
         // Assert
         expect(result.success).toBe(true);
@@ -208,11 +208,11 @@ describe("GameService HTTP API", () => {
     describe("when in terminal phases (ENDED or DISBANDED)", () => {
       it("should deny connection when the game has ENDED", () => {
         // Arrange
-        gs(gameService).phase = GamePhase.ENDED;
+        gs(generaleService).phase = GamePhase.ENDED;
         const playerId = "any-player" as PlayerId;
 
         // Act
-        const result = gameService.prepareConnectionForPlayer(playerId);
+        const result = generaleService.prepareConnectionForPlayer(playerId);
 
         // Assert
         expect(result.success).toBe(false);
@@ -224,11 +224,11 @@ describe("GameService HTTP API", () => {
 
       it("should deny connection when the game is DISBANDED", () => {
         // Arrange
-        gs(gameService).phase = GamePhase.DISBANDED;
+        gs(generaleService).phase = GamePhase.DISBANDED;
         const playerId = "any-player" as PlayerId;
 
         // Act
-        const result = gameService.prepareConnectionForPlayer(playerId);
+        const result = generaleService.prepareConnectionForPlayer(playerId);
 
         // Assert
         expect(result.success).toBe(false);
@@ -243,10 +243,10 @@ describe("GameService HTTP API", () => {
   describe("getGameInfo", () => {
 
     it("应该使用默认最大玩家数", () => {
-      const configWithoutMaxPlayers: GameServiceConfig = {
+      const configWithoutMaxPlayers: GeneraleServiceConfig = {
         gameId: "test-game-456" as GameId,
       };
-      const serviceWithoutMaxPlayers = new GameService(configWithoutMaxPlayers);
+      const serviceWithoutMaxPlayers = new GeneraleService(configWithoutMaxPlayers);
 
       const info = serviceWithoutMaxPlayers.getGameInfo();
 
@@ -259,77 +259,77 @@ describe("GameService HTTP API", () => {
   describe("玩家查询方法", () => {
     describe("getPlayerCount", () => {
       it("应该返回 PREGAME 阶段的玩家数量", () => {
-        gs(gameService).roomInstance = new RoomInstance();
+        gs(generaleService).roomInstance = new GeneraleRoom();
 
-        expect(gameService.getPlayerCount()).toBe(2);
+        expect(generaleService.getPlayerCount()).toBe(2);
       });
 
       it("应该返回 INGAME 阶段的玩家数量", () => {
-        gs(gameService).phase = GamePhase.INGAME;
-        gs(gameService).gameInstance = new GameInstance();
-        gs(gameService).roomInstance = new RoomInstance();
+        gs(generaleService).phase = GamePhase.INGAME;
+        gs(generaleService).gameInstance = new GeneraleGame();
+        gs(generaleService).roomInstance = new GeneraleRoom();
 
-        expect(gameService.getPlayerCount()).toBe(2);
+        expect(generaleService.getPlayerCount()).toBe(2);
       });
 
       it("应该在其他阶段返回 0", () => {
-        gs(gameService).phase = GamePhase.ENDED;
+        gs(generaleService).phase = GamePhase.ENDED;
 
-        expect(gameService.getPlayerCount()).toBe(0);
+        expect(generaleService.getPlayerCount()).toBe(0);
       });
     });
 
     describe("getPlayers", () => {
       it("应该返回 PREGAME 阶段的玩家列表", () => {
-        gs(gameService).roomInstance = new RoomInstance();
+        gs(generaleService).roomInstance = new GeneraleRoom();
 
-        expect(gameService.getPlayers()).toEqual(["player1", "player2"]);
+        expect(generaleService.getPlayers()).toEqual(["player1", "player2"]);
       });
 
       it("应该返回 INGAME 阶段的玩家列表", () => {
-        gs(gameService).phase = GamePhase.INGAME;
-        gs(gameService).gameInstance = new GameInstance();
-        gs(gameService).roomInstance = new RoomInstance();
+        gs(generaleService).phase = GamePhase.INGAME;
+        gs(generaleService).gameInstance = new GeneraleGame();
+        gs(generaleService).roomInstance = new GeneraleRoom();
 
-        expect(gameService.getPlayers()).toEqual(["player1", "player2"]);
+        expect(generaleService.getPlayers()).toEqual(["player1", "player2"]);
       });
 
       it("应该在其他阶段返回空数组", () => {
-        gs(gameService).phase = GamePhase.ENDED;
+        gs(generaleService).phase = GamePhase.ENDED;
 
-        expect(gameService.getPlayers()).toEqual([]);
+        expect(generaleService.getPlayers()).toEqual([]);
       });
     });
 
     describe("hasPlayer", () => {
       it("应该在 PREGAME 阶段正确检查玩家存在", () => {
-        gs(gameService).roomInstance = new RoomInstance();
+        gs(generaleService).roomInstance = new GeneraleRoom();
 
-        expect(gameService.hasPlayer("player1")).toBe(true);
-        expect(gameService.hasPlayer("nonexistent")).toBe(false);
+        expect(generaleService.hasPlayer("player1")).toBe(true);
+        expect(generaleService.hasPlayer("nonexistent")).toBe(false);
       });
 
       it("应该在 INGAME 阶段正确检查玩家存在", () => {
-        gs(gameService).phase = GamePhase.INGAME;
-        gs(gameService).gameInstance = new GameInstance();
+        gs(generaleService).phase = GamePhase.INGAME;
+        gs(generaleService).gameInstance = new GeneraleGame();
 
-        expect(gameService.hasPlayer("player1")).toBe(true);
-        expect(gameService.hasPlayer("nonexistent")).toBe(false);
+        expect(generaleService.hasPlayer("player1")).toBe(true);
+        expect(generaleService.hasPlayer("nonexistent")).toBe(false);
       });
 
       it("应该在其他阶段返回 false", () => {
-        gs(gameService).phase = GamePhase.ENDED;
+        gs(generaleService).phase = GamePhase.ENDED;
 
-        expect(gameService.hasPlayer("player1")).toBe(false);
+        expect(generaleService.hasPlayer("player1")).toBe(false);
       });
     });
   });
 
   describe("getGameState", () => {
     it("应该返回完整的游戏状态信息", () => {
-      gs(gameService).roomInstance = new RoomInstance();
+      gs(generaleService).roomInstance = new GeneraleRoom();
 
-      const state = gameService.getGameState();
+      const state = generaleService.getGameState();
 
       expect(state).toEqual({
         gameId: "test-game-123",

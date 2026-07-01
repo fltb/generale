@@ -7,9 +7,9 @@ import {
   type LobbyMessage,
   LobbyServerMessageType,
 } from "@generale/types";
-import { registerDomainHandler, type WSContextBase } from "../../plugins/websocket";
-import { applyGameFilters, applyGameSort, paginateGames } from "../../routes/utils/gameListFilter";
-import { GameService, type GameServiceConfig } from "./GameService";
+import { registerDomainHandler, type WSContextBase } from "../../../plugins/websocket";
+import { applyGameFilters, applyGameSort, paginateGames } from "../../../routes/utils/gameListFilter";
+import { GeneraleService, type GeneraleServiceConfig } from "./GeneraleService";
 
 let GLOBAL_LOBBY_SEQ = 0;
 function nextSeq(): number {
@@ -55,19 +55,19 @@ function buildSnapshotForClient(allGames: GameInfoSuccessResp["data"][], ctxFilt
 }
 
 /**
- * GameService 管理器
+ * GeneraleService 管理器
  * 负责管理所有活跃的游戏实例
  */
-export class GameServiceManager {
-  private static instance: GameServiceManager;
-  private gameServices = new Map<GameId, GameService>();
+export class GeneraleManager {
+  private static instance: GeneraleManager;
+  private generaleServices = new Map<GameId, GeneraleService>();
   private roomCreatedCallbacks: Array<(gameId: GameId) => void> = [];
   private roomDeletedCallbacks: Array<(gameId: GameId) => void> = [];
   private roomUpdatedCallbacks: Array<(gameId: GameId) => void> = [];
 
   private constructor() {
     // register lobby domain handler so clients can subscribe to room events
-    // --- register domain handler inside GameServiceManager constructor ---
+    // --- register domain handler inside GeneraleManager constructor ---
     registerDomainHandler<LobbyClientEvent, LobbyMessage, { filters?: ListGamesQuery } & WSContextBase>(
       "lobby-games",
       (connector) => {
@@ -84,10 +84,10 @@ export class GameServiceManager {
         // store per-connector filters state so we can update it on set-filters events
         let clientFilters: ListGamesQuery | null = ctx.filters ?? null;
 
-        // convenience to get all current GameInfoRoute[] (summary/detailed as stored by GameService)
+        // convenience to get all current GameInfoRoute[] (summary/detailed as stored by GeneraleService)
         const getAllGames = (): GameInfoSuccessResp["data"][] => {
-          // this refers to GameServiceManager instance scope; if inside class ensure closure captures 'this'
-          const games: GameInfoSuccessResp["data"][] = Array.from(this.gameServices.values())
+          // this refers to GeneraleManager instance scope; if inside class ensure closure captures 'this'
+          const games: GameInfoSuccessResp["data"][] = Array.from(this.generaleServices.values())
             .map((g) => g.getGameInfo())
             .filter(Boolean);
           return games;
@@ -299,64 +299,64 @@ export class GameServiceManager {
     }
   }
 
-  /** External / internal caller can call this to mark a room updated (e.g. GameService) */
+  /** External / internal caller can call this to mark a room updated (e.g. GeneraleService) */
   public notifyRoomUpdated(gameId: GameId) {
     // quick guard: only emit if present
-    if (!this.gameServices.has(gameId)) return;
+    if (!this.generaleServices.has(gameId)) return;
     this.emitRoomUpdated(gameId);
   }
-  public static getInstance(): GameServiceManager {
-    if (!GameServiceManager.instance) {
-      GameServiceManager.instance = new GameServiceManager();
+  public static getInstance(): GeneraleManager {
+    if (!GeneraleManager.instance) {
+      GeneraleManager.instance = new GeneraleManager();
     }
-    return GameServiceManager.instance;
+    return GeneraleManager.instance;
   }
 
   /**
    * 创建新的游戏服务
    */
-  public createGame(config: GameServiceConfig): GameService {
-    if (this.gameServices.has(config.gameId)) {
+  public createGame(config: GeneraleServiceConfig): GeneraleService {
+    if (this.generaleServices.has(config.gameId)) {
       throw new Error(`Game ${config.gameId} already exists`);
     }
-    const gameService = new GameService(config);
+    const generaleService = new GeneraleService(config);
     // let the game service forward updates to the manager:
-    gameService.setRoomUpdateEmitter((id) => this.notifyRoomUpdated(id));
+    generaleService.setRoomUpdateEmitter((id) => this.notifyRoomUpdated(id));
 
-    this.gameServices.set(config.gameId, gameService);
+    this.generaleServices.set(config.gameId, generaleService);
 
     // existing cleanup callbacks...
-    gameService.onDisband(() => this.removeGame(config.gameId));
+    generaleService.onDisband(() => this.removeGame(config.gameId));
 
     // --- new: emit created event ---
     this.emitRoomCreated(config.gameId);
 
-    console.log(`[GameServiceManager] Created game: ${config.gameId}`);
-    return gameService;
+    console.log(`[GeneraleManager] Created game: ${config.gameId}`);
+    return generaleService;
   }
 
   /**
    * 获取游戏服务
    */
-  public getGame(gameId: GameId): GameService | undefined {
-    return this.gameServices.get(gameId);
+  public getGame(gameId: GameId): GeneraleService | undefined {
+    return this.generaleServices.get(gameId);
   }
 
   /**
    * 移除游戏服务
    */
   public removeGame(gameId: GameId): boolean {
-    const gameService = this.gameServices.get(gameId);
-    if (!gameService) return false;
+    const generaleService = this.generaleServices.get(gameId);
+    if (!generaleService) return false;
 
     // ensure game disbanded
-    gameService.forceDispose();
-    this.gameServices.delete(gameId);
+    generaleService.forceDispose();
+    this.generaleServices.delete(gameId);
 
     // --- new: emit deleted event ---
     this.emitRoomDeleted(gameId);
 
-    console.log(`[GameServiceManager] Removed game: ${gameId}`);
+    console.log(`[GeneraleManager] Removed game: ${gameId}`);
     return true;
   }
 
@@ -364,27 +364,27 @@ export class GameServiceManager {
    * 获取所有活跃游戏
    */
   public getActiveGames(): GameId[] {
-    return Array.from(this.gameServices.keys());
+    return Array.from(this.generaleServices.keys());
   }
 
   /**
    * 获取游戏数量
    */
   public getGameCount(): number {
-    return this.gameServices.size;
+    return this.generaleServices.size;
   }
 
   /**
    * 清理所有游戏
    */
   public cleanup(): void {
-    for (const [_gameId, gameService] of this.gameServices) {
-      gameService.forceDispose();
+    for (const [_gameId, generaleService] of this.generaleServices) {
+      generaleService.forceDispose();
     }
-    this.gameServices.clear();
-    console.log(`[GameServiceManager] All games cleaned up`);
+    this.generaleServices.clear();
+    console.log(`[GeneraleManager] All games cleaned up`);
   }
 }
 
 // 导出单例实例
-export const gameServiceManager = GameServiceManager.getInstance();
+export const generaleManager = GeneraleManager.getInstance();

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { GameServiceConfig } from "../GameService";
+import type { GeneraleServiceConfig } from "../GeneraleService";
 
-// Mock GameService module so the manager can create mock instances
+// Mock GeneraleService module so the manager can create mock instances
 const mockForceDispose = vi.fn();
 
-vi.mock("../GameService", () => {
+vi.mock("../GeneraleService", () => {
   return {
-    GameService: vi.fn().mockImplementation(function (this: any, config: GameServiceConfig) {
+    GeneraleService: vi.fn().mockImplementation(function (this: any, config: GeneraleServiceConfig) {
       this.config = config;
       this.gameId = config.gameId;
       this.forceDispose = mockForceDispose;
@@ -29,11 +29,11 @@ vi.mock("../GameService", () => {
   };
 });
 
-const { GameServiceManager, gameServiceManager } = await import("../GameServiceManager");
+const { GeneraleManager, generaleManager } = await import("../GeneraleManager");
 
 function resetSingleton() {
   // Reset the singleton by re-setting the private static instance
-  (GameServiceManager as any).instance = undefined;
+  (GeneraleManager as any).instance = undefined;
 }
 
 beforeEach(() => {
@@ -45,7 +45,7 @@ afterEach(() => {
   resetSingleton();
 });
 
-function makeConfig(id = "game-1"): GameServiceConfig & { type: "standard" } {
+function makeConfig(id = "game-1"): GeneraleServiceConfig & { type: "standard" } {
   return {
     gameId: id,
     roomName: `Room ${id}`,
@@ -56,15 +56,15 @@ function makeConfig(id = "game-1"): GameServiceConfig & { type: "standard" } {
   };
 }
 
-describe("GameServiceManager", () => {
+describe("GeneraleManager", () => {
   it("getInstance returns the same instance", () => {
-    const instance1 = GameServiceManager.getInstance();
-    const instance2 = GameServiceManager.getInstance();
+    const instance1 = GeneraleManager.getInstance();
+    const instance2 = GeneraleManager.getInstance();
     expect(instance1).toBe(instance2);
   });
 
-  it("createGame stores and returns a GameService", () => {
-    const mgr = GameServiceManager.getInstance();
+  it("createGame stores and returns a GeneraleService", () => {
+    const mgr = GeneraleManager.getInstance();
     const config = makeConfig();
     const gs = mgr.createGame(config);
     expect(gs).toBeDefined();
@@ -72,7 +72,7 @@ describe("GameServiceManager", () => {
   });
 
   it("getGame retrieves created game", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     mgr.createGame(makeConfig("g1"));
     const gs = mgr.getGame("g1");
     expect(gs).toBeDefined();
@@ -80,18 +80,18 @@ describe("GameServiceManager", () => {
   });
 
   it("getGame returns undefined for unknown game", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     expect(mgr.getGame("nonexistent")).toBeUndefined();
   });
 
   it("createGame throws on duplicate id", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     mgr.createGame(makeConfig("g1"));
     expect(() => mgr.createGame(makeConfig("g1"))).toThrow("already exists");
   });
 
   it("getActiveGames returns all game ids", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     mgr.createGame(makeConfig("g1"));
     mgr.createGame(makeConfig("g2"));
     const ids = mgr.getActiveGames();
@@ -101,7 +101,7 @@ describe("GameServiceManager", () => {
   });
 
   it("getGameCount returns correct count", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     expect(mgr.getGameCount()).toBe(0);
     mgr.createGame(makeConfig("g1"));
     expect(mgr.getGameCount()).toBe(1);
@@ -110,7 +110,7 @@ describe("GameServiceManager", () => {
   });
 
   it("removeGame removes and calls forceDispose", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     mgr.createGame(makeConfig("g1"));
     const removed = mgr.removeGame("g1");
     expect(removed).toBe(true);
@@ -119,12 +119,12 @@ describe("GameServiceManager", () => {
   });
 
   it("removeGame returns false for unknown game", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     expect(mgr.removeGame("nonexistent")).toBe(false);
   });
 
   it("cleanup removes all games", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     mgr.createGame(makeConfig("g1"));
     mgr.createGame(makeConfig("g2"));
     expect(mgr.getGameCount()).toBe(2);
@@ -133,7 +133,7 @@ describe("GameServiceManager", () => {
   });
 
   it("onRoomCreated callback fires on createGame", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     const cb = vi.fn();
     mgr.onRoomCreated(cb);
     mgr.createGame(makeConfig("g1"));
@@ -141,7 +141,7 @@ describe("GameServiceManager", () => {
   });
 
   it("onRoomDeleted callback fires on removeGame", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     mgr.createGame(makeConfig("g1"));
     const cb = vi.fn();
     mgr.onRoomDeleted(cb);
@@ -150,7 +150,7 @@ describe("GameServiceManager", () => {
   });
 
   it("onRoomUpdated callback fires on notifyRoomUpdated", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     mgr.createGame(makeConfig("g1"));
     const cb = vi.fn();
     mgr.onRoomUpdated(cb);
@@ -159,7 +159,7 @@ describe("GameServiceManager", () => {
   });
 
   it("notifyRoomUpdated does nothing for unknown game", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     const cb = vi.fn();
     mgr.onRoomUpdated(cb);
     mgr.notifyRoomUpdated("nonexistent");
@@ -167,7 +167,7 @@ describe("GameServiceManager", () => {
   });
 
   it("unsubscribe from onRoomCreated does not fire after unsub", () => {
-    const mgr = GameServiceManager.getInstance();
+    const mgr = GeneraleManager.getInstance();
     const cb = vi.fn();
     const unsub = mgr.onRoomCreated(cb);
     unsub();
@@ -176,6 +176,6 @@ describe("GameServiceManager", () => {
   });
 
   it("exported singleton is defined", () => {
-    expect(gameServiceManager).toBeDefined();
+    expect(generaleManager).toBeDefined();
   });
 });

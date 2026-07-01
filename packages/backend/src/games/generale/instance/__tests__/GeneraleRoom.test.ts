@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { RoomInstance } from "../RoomInstance";
+import { GeneraleRoom } from "../GeneraleRoom";
 import type { PreGameRoomState, PreGameRoomType, PreGameTeamMode } from "@generale/types";
 import { PreGamePlayerStatus, PlayerColor, PreGameMapType, TileType, SyncedPreGameClientActionTypes } from "@generale/types";
 
@@ -50,11 +50,11 @@ function freshState(): PreGameRoomState {
   };
 }
 
-describe("RoomInstance", () => {
-  let room: RoomInstance;
+describe("GeneraleRoom", () => {
+  let room: GeneraleRoom;
 
   beforeEach(() => {
-    room = new RoomInstance(freshState(), new Map([
+    room = new GeneraleRoom(freshState(), new Map([
       ["alice", mockConn()],
       ["bob", mockConn()],
       ["charlie", mockConn()],

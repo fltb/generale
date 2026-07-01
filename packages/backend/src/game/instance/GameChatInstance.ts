@@ -53,7 +53,7 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
       return { success: false, message: msg };
     }
 
-    // RoomInstance 尚未创建时（GameService 构造完成后、首个玩家触发 initializeRoom 前），
+    // GeneraleRoom 尚未创建时（GeneraleService 构造完成后、首个玩家触发 initializeRoom 前），
     // 放行任意玩家 —— 此时只能是在同一请求链路中打开 chat domain 的首个玩家。
     if (!this._activeStageInstance) return { success: true };
 
@@ -63,7 +63,7 @@ export class GameChatInstance implements IBaseInstance<ChatClientToServer, ChatS
   }
 
   /** 玩家加入 */
-  /** 动态添加玩家（用于 GameService） */
+  /** 动态添加玩家（用于 GeneraleService） */
   public addPlayer(
     user: { id: PlayerId; name: string },
     connector: ServerSyncConnector<ChatClientToServer, ChatServerToClient>,

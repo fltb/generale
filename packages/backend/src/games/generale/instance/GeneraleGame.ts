@@ -16,12 +16,12 @@ import {
 } from "@generale/types";
 import { mask, tick } from "../core";
 import { autoJudge, playerDefeatedBy, updateGameState } from "../core/game-utils";
-import { displaceConnector as displace } from "./connector-manager";
-import { StateSyncState } from "./state-sync";
+import { displaceConnector as displace } from "../../../game/instance/connector-manager";
+import { StateSyncState } from "../../../game/instance/state-sync";
 
 type GameServerConnector = ServerSyncConnector<SyncedGameClientActions, SyncedGameServerEvent>;
 
-export interface GameInstanceSettings {
+export interface GeneraleGameSettings {
   playerDisplay: SyncedGameState["playerDisplay"];
 }
 
@@ -33,7 +33,6 @@ export interface SyncEntry {
 /**
  * 管理多玩家游戏实例，自动根据差异推送全量或增量，并跟踪 confirmedOp
  */
-import type { IBaseInstance } from "./interface";
 
 export interface GameEndResult {
   winnerId: PlayerId;
@@ -41,10 +40,10 @@ export interface GameEndResult {
   [key: string]: unknown;
 }
 
-export class GameInstance implements IBaseInstance<SyncedGameClientActions, SyncedGameServerEvent> {
+export class GeneraleGame {
   private state: GameState;
   private version: number;
-  private settings: GameInstanceSettings;
+  private settings: GeneraleGameSettings;
   private connectors = new Map<PlayerId, GameServerConnector>();
   private syncData = new Map<PlayerId, SyncEntry>();
   private stateSync = new StateSyncState<SyncedGameState>();
@@ -75,7 +74,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
     }
   }
 
-  constructor(initialState: GameState, settings: GameInstanceSettings, playerIds: PlayerId[]) {
+  constructor(initialState: GameState, settings: GeneraleGameSettings, playerIds: PlayerId[]) {
     this.state = structuredClone(initialState);
     this.settings = settings;
     this.version = 0;
@@ -123,7 +122,7 @@ export class GameInstance implements IBaseInstance<SyncedGameClientActions, Sync
 
   public startTicking(speed: number, initialDelayMs = 5000) {
     this.stopTicking();
-    const minIntervalMs = Math.floor(1000 / GameInstance.MAX_TICKS_PER_SEC);
+    const minIntervalMs = Math.floor(1000 / GeneraleGame.MAX_TICKS_PER_SEC);
     const tickIntervalMs = Math.max(minIntervalMs, Math.floor(1000 / (speed || 1.0)));
     this.tickTimerId = setTimeout(() => this.tickLoop(tickIntervalMs), initialDelayMs);
   }

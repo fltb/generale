@@ -19,21 +19,21 @@ import {
   type SyncedPreGameState,
   type TeamId,
 } from "@generale/types";
-import { displaceConnector as displace } from "./connector-manager";
-import { StateSyncState } from "./state-sync";
+import { displaceConnector as displace } from "../../../game/instance/connector-manager";
+import { StateSyncState } from "../../../game/instance/state-sync";
 
 // 类型别名，便于引用
 export type RoomServerConnector = ServerSyncConnector<SyncedPreGameClientActions, SyncedPreGameServerEvent>;
 
 /**
- * RoomInstance - 游戏房间实例（持久存在）
+ * GeneraleRoom - 游戏房间实例（持久存在）
  * 负责房主、设置、准备、队伍、同步、玩家名册等管理。
  * 在 PREGAME 阶段承担完整交互；INGAME 期间 suspend 锁定，但保持连接和名册服务；
  * 游戏结束后 resume 恢复交互。始终是玩家信息和鉴权的唯一数据源。
  */
-import type { IBaseInstance, IRoomRoster } from "./interface";
 
-export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, SyncedPreGameServerEvent>, IRoomRoster {
+
+export class GeneraleRoom {
   private state: PreGameRoomState;
   /**
    * 处理客户端 action（带乐观编号幂等）
@@ -48,7 +48,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
 
   private bannedUntil: Map<PlayerId, number> = new Map();
   private DEFAULT_KICK_BAN_MS = 60 * 1000; // 1 minute, 可改
-  // RoomInstance: 增加 onDestroy 回调支持
+  // GeneraleRoom: 增加 onDestroy 回调支持
   private onDisbandCallbacks: Array<() => void> = [];
   private disbanded = false;
 
@@ -883,7 +883,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     }
     this.state.started = true;
 
-    // 先触发回调（GameService 加载地图、创建 GameInstance、开始 tick）
+    // 先触发回调（GeneraleService 加载地图、创建 GeneraleGame、开始 tick）
     try {
       for (const callback of this.onStartGameCallbacks) {
         await callback(this.state);
@@ -911,7 +911,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     // 游戏启动成功，锁定房间
     this.suspend();
 
-    // 回调完成后再广播 GAME_STARTED，确保 GameInstance 已就绪
+    // 回调完成后再广播 GAME_STARTED，确保 GeneraleGame 已就绪
     const startedAt = Date.now();
     for (const conn of this.connectors.values()) {
       conn.send({
@@ -927,7 +927,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
   /**
    * 在 pregame 域上广播 GAME_ENDED 事件。
    *
-   * GameService.endGame 会先调它再 resume()，这样客户端在 pregame state 翻位
+   * GeneraleService.endGame 会先调它再 resume()，这样客户端在 pregame state 翻位
    * （Playing/Spectating -> Lobby）之前就能收到"游戏刚结束"的信号，可以维持游戏
    * 结算 UI 不被立刻替换为房间页。
    *
@@ -1200,7 +1200,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     connector.onClientMessage((evt) => this.handleClientAction(pid, evt));
     connector.onClose(() => this.handleDisconnect(pid, connector));
   }
-  /** 动态添加玩家（用于 GameService） */
+  /** 动态添加玩家（用于 GeneraleService） */
   public addPlayer(
     user: { id: PlayerId; name: string; displayName?: string; avatarThumbUrl?: string; password?: string },
     connector: RoomServerConnector,
@@ -1299,7 +1299,7 @@ export class RoomInstance implements IBaseInstance<SyncedPreGameClientActions, S
     );
     return { success: true };
   }
-  /** 移除玩家（用于 GameService） */
+  /** 移除玩家（用于 GeneraleService） */
   public removePlayerById(playerId: PlayerId): void {
     this.removePlayer(playerId);
   }

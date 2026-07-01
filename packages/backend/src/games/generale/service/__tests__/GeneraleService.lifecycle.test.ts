@@ -1,18 +1,18 @@
 import { type GameId, GamePhase, GameStatus, PreGameMapType } from "@generale/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { registerDomainHandler, unregisterDomainHandler } from "../../../plugins/websocket";
-import { GameInstance } from "../../instance/GameInstance";
-import { RoomInstance } from "../../instance/RoomInstance";
-import { GameService, type GameServiceConfig } from "../GameService";
+import { registerDomainHandler, unregisterDomainHandler } from "../../../../plugins/websocket";
+import { GeneraleGame } from "../../instance/GeneraleGame";
+import { GeneraleRoom } from "../../instance/GeneraleRoom";
+import { GeneraleService, type GeneraleServiceConfig } from "../GeneraleService";
 
 // Mock dependencies
-vi.mock("../../../plugins/websocket", () => ({
+vi.mock("../../../../plugins/websocket", () => ({
   registerDomainHandler: vi.fn(),
   unregisterDomainHandler: vi.fn(),
 }));
 
 vi.mock("../../instance/RoomInstance", () => ({
-  RoomInstance: vi.fn().mockImplementation(() => ({
+  GeneraleRoom: vi.fn().mockImplementation(() => ({
       getState: vi.fn().mockReturnValue({
       players: [
         { id: "player1", name: "Player 1", teamId: "team1", isHost: true, ready: false, tileColor: 0xff0000 },
@@ -32,7 +32,7 @@ vi.mock("../../instance/RoomInstance", () => ({
 }));
 
 vi.mock("../../instance/GameInstance", () => ({
-  GameInstance: vi.fn().mockImplementation(() => ({
+  GeneraleGame: vi.fn().mockImplementation(() => ({
     getState: vi.fn().mockReturnValue({
       players: {
         player1: { id: "player1", status: "Playing", army: 10, land: 5, teamId: "team1" },
@@ -63,11 +63,11 @@ vi.mock("../../instance/GameChatInstance", () => ({
   })),
 }));
 
-function gs(s: GameService) {
+function gs(s: GeneraleService) {
   return s as unknown as {
     disbandGame: () => void;
-    roomInstance: RoomInstance | null;
-    gameInstance: GameInstance | null;
+    roomInstance: GeneraleRoom | null;
+    gameInstance: GeneraleGame | null;
     phase: GamePhase;
     chatInstance: { destroy: Function };
   };
@@ -81,9 +81,9 @@ vi.mock("../core/map-gen", () => ({
   }),
 }));
 
-describe("GameService Lifecycle", () => {
-  let gameService: GameService;
-  let config: GameServiceConfig;
+describe("GeneraleService Lifecycle", () => {
+  let generaleService: GeneraleService;
+  let config: GeneraleServiceConfig;
 
   beforeEach(() => {
     config = {
@@ -91,18 +91,18 @@ describe("GameService Lifecycle", () => {
       maxPlayers: 4,
       chatMaxMessages: 100,
     };
-    gameService = new GameService(config);
+    generaleService = new GeneraleService(config);
   });
 
   afterEach(() => {
-    gs(gameService).disbandGame();
+    gs(generaleService).disbandGame();
     vi.clearAllMocks();
   });
 
   describe("初始化", () => {
     it("应该以 PREGAME 阶段初始化", () => {
-      expect(gameService.getPhase()).toBe(GamePhase.PREGAME);
-      expect(gameService.getGameId()).toBe("test-game-123");
+      expect(generaleService.getPhase()).toBe(GamePhase.PREGAME);
+      expect(generaleService.getGameId()).toBe("test-game-123");
     });
 
     it("应该注册 WebSocket 域名处理器", () => {
@@ -115,8 +115,8 @@ describe("GameService Lifecycle", () => {
 
   describe("阶段转换", () => {
     it("应该能从 PREGAME 转换到 INGAME", async () => {
-      // 模拟 RoomInstance 存在
-      gs(gameService).roomInstance = new RoomInstance(
+      // 模拟 GeneraleRoom 存在
+      gs(generaleService).roomInstance = new GeneraleRoom(
         {
           gameId: "mock-game",
           hostId: "host",
@@ -144,7 +144,7 @@ describe("GameService Lifecycle", () => {
         new Map(),
       );
 
-      await gameService.startGame({
+      await generaleService.startGame({
         gameId: "test-game-123",
         gameSetting: {
           speed: 1.0,
@@ -169,15 +169,15 @@ describe("GameService Lifecycle", () => {
         started: false,
       });
 
-      expect(gameService.getPhase()).toBe(GamePhase.INGAME);
-      expect(gs(gameService).gameInstance).toBeTruthy();
-      expect(gs(gameService).roomInstance).toBeTruthy();
+      expect(generaleService.getPhase()).toBe(GamePhase.INGAME);
+      expect(gs(generaleService).gameInstance).toBeTruthy();
+      expect(gs(generaleService).roomInstance).toBeTruthy();
     });
 
     it("应该能从 INGAME 转换到 ENDED", () => {
       // 先转到 INGAME
-      gs(gameService).phase = GamePhase.INGAME;
-      gs(gameService).gameInstance = new GameInstance(
+      gs(generaleService).phase = GamePhase.INGAME;
+      gs(generaleService).gameInstance = new GeneraleGame(
         {
           status: GameStatus.Playing,
           tick: 0,
@@ -200,7 +200,7 @@ describe("GameService Lifecycle", () => {
         [],
       );
 
-      gs(gameService).roomInstance = gs(gameService).roomInstance = new RoomInstance(
+      gs(generaleService).roomInstance = gs(generaleService).roomInstance = new GeneraleRoom(
         {
           gameId: "mock-game",
           roomType: "standard",
@@ -228,24 +228,24 @@ describe("GameService Lifecycle", () => {
         new Map(),
       );
 
-      gameService.endGame({ winnerId: "player1", reason: "Victory" });
+      generaleService.endGame({ winnerId: "player1", reason: "Victory" });
 
-      expect(gameService.getPhase()).toBe(GamePhase.PREGAME);
-      expect(gs(gameService).gameInstance).toBeNull();
+      expect(generaleService.getPhase()).toBe(GamePhase.PREGAME);
+      expect(gs(generaleService).gameInstance).toBeNull();
     });
 
     it("应该能从任何阶段转换到 DISBANDED", () => {
-      gs(gameService).disbandGame();
+      gs(generaleService).disbandGame();
 
-      expect(gameService.getPhase()).toBe(GamePhase.DISBANDED);
-      expect(gs(gameService).roomInstance).toBeNull();
-      expect(gs(gameService).gameInstance).toBeNull();
+      expect(generaleService.getPhase()).toBe(GamePhase.DISBANDED);
+      expect(gs(generaleService).roomInstance).toBeNull();
+      expect(gs(generaleService).gameInstance).toBeNull();
     });
 
     it("不应该在错误阶段开始游戏", () => {
-      gs(gameService).phase = GamePhase.INGAME;
+      gs(generaleService).phase = GamePhase.INGAME;
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      gameService.startGame();
+      generaleService.startGame();
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
@@ -254,10 +254,10 @@ describe("GameService Lifecycle", () => {
       // 在 PREGAME 阶段尝试结束游戏应该不会抛错，但会记录错误
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      gameService.endGame();
+      generaleService.endGame();
 
       expect(consoleSpy).toHaveBeenCalled();
-      expect(gameService.getPhase()).toBe(GamePhase.PREGAME); // 阶段不变
+      expect(generaleService.getPhase()).toBe(GamePhase.PREGAME); // 阶段不变
 
       consoleSpy.mockRestore();
     });
@@ -267,9 +267,9 @@ describe("GameService Lifecycle", () => {
     it("应该触发游戏开始回调", async () => {
       const onStartCallback = vi.fn();
 
-      gameService.onGameStart(onStartCallback);
-      // 模拟 RoomInstance 存在
-      gs(gameService).roomInstance = new RoomInstance(
+      generaleService.onGameStart(onStartCallback);
+      // 模拟 GeneraleRoom 存在
+      gs(generaleService).roomInstance = new GeneraleRoom(
         {
           gameId: "mock-game",
           hostId: "host",
@@ -297,7 +297,7 @@ describe("GameService Lifecycle", () => {
         new Map(),
       );
 
-      await gameService.startGame({
+      await generaleService.startGame({
         gameId: "test-game-123",
         gameSetting: {
           speed: 1.0,
@@ -329,9 +329,9 @@ describe("GameService Lifecycle", () => {
       const onEndCallback = vi.fn();
       const result = { winnerId: "player1", reason: "Victory" };
 
-      gameService.onGameEnd(onEndCallback);
-      gs(gameService).phase = GamePhase.INGAME;
-      gs(gameService).gameInstance = new GameInstance(
+      generaleService.onGameEnd(onEndCallback);
+      gs(generaleService).phase = GamePhase.INGAME;
+      gs(generaleService).gameInstance = new GeneraleGame(
         {
           status: GameStatus.Playing,
           tick: 0,
@@ -354,16 +354,16 @@ describe("GameService Lifecycle", () => {
         [],
       );
 
-      gameService.endGame(result);
+      generaleService.endGame(result);
 
       expect(onEndCallback).toHaveBeenCalledWith(result);
     });
 
     it("应该触发游戏解散回调", () => {
       const onDisbandCallback = vi.fn();
-      gameService.onDisband(onDisbandCallback);
+      generaleService.onDisband(onDisbandCallback);
 
-      gs(gameService).disbandGame();
+      gs(generaleService).disbandGame();
 
       expect(onDisbandCallback).toHaveBeenCalled();
     });
@@ -373,7 +373,7 @@ describe("GameService Lifecycle", () => {
     it("解散时应该注销所有域名处理器", () => {
       // 直接使用上方 import 的 unregisterDomainHandler（已被 vi.mock）
 
-      gs(gameService).disbandGame();
+      gs(generaleService).disbandGame();
 
       expect(unregisterDomainHandler).toHaveBeenCalledWith("room-test-game-123");
       expect(unregisterDomainHandler).toHaveBeenCalledWith("game-test-game-123");
@@ -381,7 +381,7 @@ describe("GameService Lifecycle", () => {
     });
 
     it("解散时应该销毁所有实例", () => {
-      const roomInstance = new RoomInstance(
+      const roomInstance = new GeneraleRoom(
         {
           gameId: "mock-game",
           hostId: "host",
@@ -408,7 +408,7 @@ describe("GameService Lifecycle", () => {
         },
         new Map(),
       );
-      const gameInstance = new GameInstance(
+      const gameInstance = new GeneraleGame(
         {
           status: GameStatus.Playing,
           tick: 0,
@@ -430,12 +430,12 @@ describe("GameService Lifecycle", () => {
         { playerDisplay: {} },
         [],
       );
-      const chatInstance = gs(gameService).chatInstance;
+      const chatInstance = gs(generaleService).chatInstance;
 
-      gs(gameService).roomInstance = roomInstance;
-      gs(gameService).gameInstance = gameInstance;
+      gs(generaleService).roomInstance = roomInstance;
+      gs(generaleService).gameInstance = gameInstance;
 
-      gs(gameService).disbandGame();
+      gs(generaleService).disbandGame();
 
       expect(roomInstance.destroy).toHaveBeenCalled();
       expect(gameInstance.destroy).toHaveBeenCalled();
