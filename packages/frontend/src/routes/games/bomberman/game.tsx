@@ -1,6 +1,6 @@
-import { Application, P } from "solid-pixi";
+import { Application } from "solid-pixi";
 import { createSignal, createMemo } from "solid-js";
-import type { BombermanState } from "@generale/types";
+import type { BombermanState, BombermanOperation } from "@generale/types";
 import { useBombermanInput } from "./hooks/useBombermanInput";
 import { MapLayer } from "./components/MapLayer";
 import { EntityLayer } from "./components/EntityLayer";
@@ -10,7 +10,7 @@ import { Scoreboard } from "./components/Scoreboard";
 
 interface BombermanGameProps {
   initialState: BombermanState;
-  onAction: (op: any) => void;
+  onAction: (op: BombermanOperation) => void;
   onBackToRoom: () => void;
 }
 

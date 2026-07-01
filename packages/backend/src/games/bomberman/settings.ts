@@ -1,9 +1,15 @@
 import type { BombermanConfig, ItemType } from "@generale/types";
 
 const ALL_ITEMS: ItemType[] = [
-  "BOMB_UP", "FIRE_UP", "SPEED_UP",
-  "KICK", "GLOVE", "PUNCH",
-  "REMOTE", "PIERCE", "SPIRIT",
+  "BOMB_UP",
+  "FIRE_UP",
+  "SPEED_UP",
+  "KICK",
+  "GLOVE",
+  "PUNCH",
+  "REMOTE",
+  "PIERCE",
+  "SPIRIT",
 ];
 
 export function defaultBombermanConfig(): BombermanConfig {

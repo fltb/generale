@@ -4,7 +4,7 @@ import { cors } from "@elysiajs/cors";
 import { authPlugin } from "../../middleware/authPlugin";
 import { userRoutes } from "../../routes/user";
 import { profileRoutes } from "../../routes/profile";
-import { gameRoutes } from "../../routes/game";
+import { gameRoutes } from "../../games/generale/routes";
 import { mapRoutes } from "../../routes/map";
 import { pbkdf2Sync, randomBytes } from "node:crypto";
 

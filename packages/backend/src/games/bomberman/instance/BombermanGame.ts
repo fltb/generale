@@ -1,4 +1,4 @@
-import type { BombermanState, BombermanOperation, PlayerId, BombermanConfig } from "@generale/types";
+import type { BombermanState, BombermanOperation, BombermanPlayer, PlayerId, BombermanConfig } from "@generale/types";
 import { GameStatus } from "@generale/types";
 import { tick } from "../core/game";
 import { generateBombermanMap, getSpawnPositions } from "../core/map-gen";
@@ -23,11 +23,12 @@ export class BombermanGame {
     const map = generateBombermanMap(width, height);
     const spawns = getSpawnPositions(playerIds.length, width, height);
 
-    const players: Record<PlayerId, any> = {};
+    const players: Record<string, BombermanPlayer> = {};
     for (let i = 0; i < playerIds.length; i++) {
       const spawn = spawns[i]!;
-      players[playerIds[i]!] = {
-        playerId: playerIds[i],
+      const pid = playerIds[i]!;
+      players[pid] = {
+        playerId: pid,
         alive: true,
         x: spawn.x,
         y: spawn.y,
@@ -43,7 +44,7 @@ export class BombermanGame {
       status: GameStatus.Playing,
       tick: 0,
       map,
-      players: players as any,
+      players: players,
       bombs: [],
       explosions: [],
       items: [],
@@ -57,11 +58,14 @@ export class BombermanGame {
     this.state.players[playerId] = {
       playerId,
       alive: true,
-      x: 1, y: 1,
-      bombMax: 1, bombActive: 0,
-      blastRadius: 1, speed: 1,
+      x: 1,
+      y: 1,
+      bombMax: 1,
+      bombActive: 0,
+      blastRadius: 1,
+      speed: 1,
       items: [],
-    } as any;
+    };
     this.bots.push({ playerId, getAction });
     this.queues[playerId] = [];
   }
@@ -103,7 +107,7 @@ export class BombermanGame {
   }
 
   private triggerEnd(): void {
-    const alive = Object.values(this.state.players).filter((p: any) => p.alive);
+    const alive = Object.values(this.state.players).filter((p: BombermanPlayer) => p.alive);
     const result: BombermanGameEndResult = {
       winnerId: alive.length === 1 ? alive[0]!.playerId : null,
       reason: alive.length <= 1 ? "last_alive" : "timeout",

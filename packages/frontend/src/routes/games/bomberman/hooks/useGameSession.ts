@@ -1,6 +1,6 @@
-import type { BombermanState, BombermanOperation } from "@generale/types";
+import type { BombermanOperation } from "@generale/types";
 
-export function useBombermanGameSession(domain: string) {
+export function useBombermanGameSession() {
   // Simplified stub — connects to game domain via SubConnectorClient
   // Full implementation requires the actual WS connection manager
   function enqueueOp(_op: BombermanOperation) {

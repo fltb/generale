@@ -1,7 +1,7 @@
 import { type GameId, GamePhase } from "@generale/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GeneraleGame } from "../../instance/GameInstance";
-import { GeneraleRoom } from "../../instance/RoomInstance";
+import { GeneraleGame } from "../../instance/GeneraleGame";
+import { GeneraleRoom } from "../../instance/GeneraleRoom";
 import { GeneraleService, type GeneraleServiceConfig } from "../GeneraleService";
 
 // Mock dependencies
@@ -10,7 +10,7 @@ vi.mock("../../../../plugins/websocket", () => ({
   unregisterDomainHandler: vi.fn(),
 }));
 
-vi.mock("../../instance/RoomInstance", () => ({
+vi.mock("../../instance/GeneraleRoom", () => ({
   GeneraleRoom: vi.fn().mockImplementation(() => ({
     getState: vi.fn().mockReturnValue({
       players: [
@@ -51,7 +51,7 @@ vi.mock("../../instance/RoomInstance", () => ({
   })),
 }));
 
-vi.mock("../../instance/GameInstance", () => ({
+vi.mock("../../instance/GeneraleGame", () => ({
   GeneraleGame: vi.fn().mockImplementation(() => ({
     getState: vi.fn().mockReturnValue({
       players: {
@@ -69,7 +69,7 @@ vi.mock("../../instance/GameInstance", () => ({
   })),
 }));
 
-vi.mock("../../instance/GameChatInstance", () => ({
+vi.mock("../../../../game/instance/GameChatInstance", () => ({
   GameChatInstance: vi.fn().mockImplementation(() => ({
     destroy: vi.fn(),
     addPlayer: vi.fn().mockReturnValue({ success: true }),

@@ -1,11 +1,11 @@
-import { Elysia, t } from "elysia";
+import { type Elysia, t } from "elysia";
 import { db } from "../db/client";
 import { userSettings, gameUserSettings } from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import { sessionService } from "../services/sessionService";
 import { GLOBAL_SETTINGS_KEYS } from "@generale/types";
 
-function getUserId(cookie: any): string | null {
+function getUserId(cookie: { sid?: { value?: string } }): string | null {
   const sid = cookie?.sid?.value;
   if (!sid) return null;
   const session = sessionService.get(sid);
@@ -32,7 +32,7 @@ export function settingsRoutes(app: Elysia) {
         if (!userId) return { success: false, message: "Not authorized" };
         const now = new Date();
         for (const [key, value] of Object.entries(body as Record<string, string>)) {
-          if (!GLOBAL_SETTINGS_KEYS.includes(key as any)) continue;
+          if (!(GLOBAL_SETTINGS_KEYS as readonly string[]).includes(key)) continue;
           await db
             .insert(userSettings)
             .values({ userId, key, value: String(value), updatedAt: now })
@@ -51,12 +51,7 @@ export function settingsRoutes(app: Elysia) {
       const rows = await db
         .select({ key: gameUserSettings.key, value: gameUserSettings.value })
         .from(gameUserSettings)
-        .where(
-          and(
-            eq(gameUserSettings.userId, userId),
-            eq(gameUserSettings.gameType, params.gameType),
-          ),
-        );
+        .where(and(eq(gameUserSettings.userId, userId), eq(gameUserSettings.gameType, params.gameType)));
       const result: Record<string, string> = {};
       for (const r of rows) result[r.key] = r.value;
       return { success: true, data: result };

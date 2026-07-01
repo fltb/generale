@@ -78,8 +78,14 @@ export function generateBombermanMap(w: number, h: number): BombermanMap {
 
   // Remove soft walls blocking spawn exits if any remain
   for (const s of spawns) {
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      const nx = s.x + dx, ny = s.y + dy;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const nx = s.x + dx,
+        ny = s.y + dy;
       const tile = map.tiles[ny]?.[nx];
       if (tile && tile.type === "hard_wall") continue;
       if (tile && tile.type === "soft_wall") {
@@ -106,7 +112,12 @@ function bfsPath(
     const cell = queue.shift()!;
     if (cell.x === end.x && cell.y === end.y) return cell.path;
 
-    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
+    for (const [dx, dy] of [
+      [0, 1],
+      [0, -1],
+      [1, 0],
+      [-1, 0],
+    ] as const) {
       const nx = cell.x + dx;
       const ny = cell.y + dy;
       const key = `${nx},${ny}`;
@@ -130,7 +141,12 @@ export function validateConnectivity(map: BombermanMap, spawns: { x: number; y: 
 
   while (queue.length > 0) {
     const cell = queue.shift()!;
-    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
+    for (const [dx, dy] of [
+      [0, 1],
+      [0, -1],
+      [1, 0],
+      [-1, 0],
+    ] as const) {
       const nx = cell.x + dx;
       const ny = cell.y + dy;
       const key = `${nx},${ny}`;
@@ -148,7 +164,8 @@ export function validateConnectivity(map: BombermanMap, spawns: { x: number; y: 
     if (!visited.has(`${s.x},${s.y}`)) return false;
   }
 
-  let totalPassable = 0, reachable = 0;
+  let totalPassable = 0,
+    reachable = 0;
   for (let y = 0; y < map.height; y++) {
     const row = map.tiles[y]!;
     for (let x = 0; x < map.width; x++) {

@@ -11,7 +11,7 @@ vi.mock("../../../../plugins/websocket", () => ({
   unregisterDomainHandler: vi.fn(),
 }));
 
-vi.mock("../../instance/RoomInstance", () => ({
+vi.mock("../../instance/GeneraleRoom", () => ({
   GeneraleRoom: vi.fn().mockImplementation(() => ({
       getState: vi.fn().mockReturnValue({
       players: [
@@ -31,7 +31,7 @@ vi.mock("../../instance/RoomInstance", () => ({
   })),
 }));
 
-vi.mock("../../instance/GameInstance", () => ({
+vi.mock("../../instance/GeneraleGame", () => ({
   GeneraleGame: vi.fn().mockImplementation(() => ({
     getState: vi.fn().mockReturnValue({
       players: {
@@ -53,7 +53,7 @@ vi.mock("../../instance/GameInstance", () => ({
   })),
 }));
 
-vi.mock("../../instance/GameChatInstance", () => ({
+vi.mock("../../../../game/instance/GameChatInstance", () => ({
   GameChatInstance: vi.fn().mockImplementation(() => ({
     destroy: vi.fn(),
     addPlayer: vi.fn().mockReturnValue({ success: true }),

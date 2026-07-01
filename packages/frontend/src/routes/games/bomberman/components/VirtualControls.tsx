@@ -12,7 +12,10 @@ export function VirtualControls(props: VirtualControlsProps) {
         <button
           type="button"
           class="w-14 h-14 bg-gray-700/80 rounded text-white text-2xl active:bg-gray-500 select-none touch-none"
-          onTouchStart={(e) => { e.preventDefault(); props.onAction({ type: "MOVE", direction: "up" }); }}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            props.onAction({ type: "MOVE", direction: "up" });
+          }}
         >
           ▲
         </button>
@@ -20,7 +23,10 @@ export function VirtualControls(props: VirtualControlsProps) {
         <button
           type="button"
           class="w-14 h-14 bg-gray-700/80 rounded text-white text-2xl active:bg-gray-500 select-none touch-none"
-          onTouchStart={(e) => { e.preventDefault(); props.onAction({ type: "MOVE", direction: "left" }); }}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            props.onAction({ type: "MOVE", direction: "left" });
+          }}
         >
           ◀
         </button>
@@ -28,7 +34,10 @@ export function VirtualControls(props: VirtualControlsProps) {
         <button
           type="button"
           class="w-14 h-14 bg-gray-700/80 rounded text-white text-2xl active:bg-gray-500 select-none touch-none"
-          onTouchStart={(e) => { e.preventDefault(); props.onAction({ type: "MOVE", direction: "right" }); }}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            props.onAction({ type: "MOVE", direction: "right" });
+          }}
         >
           ▶
         </button>
@@ -36,7 +45,10 @@ export function VirtualControls(props: VirtualControlsProps) {
         <button
           type="button"
           class="w-14 h-14 bg-gray-700/80 rounded text-white text-2xl active:bg-gray-500 select-none touch-none"
-          onTouchStart={(e) => { e.preventDefault(); props.onAction({ type: "MOVE", direction: "down" }); }}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            props.onAction({ type: "MOVE", direction: "down" });
+          }}
         >
           ▼
         </button>
@@ -45,7 +57,10 @@ export function VirtualControls(props: VirtualControlsProps) {
       <button
         type="button"
         class="pointer-events-auto w-16 h-16 bg-red-600/80 rounded-full text-white text-2xl font-bold active:bg-red-400 select-none touch-none"
-        onTouchStart={(e) => { e.preventDefault(); props.onAction({ type: "PLACE_BOMB" }); }}
+        onTouchStart={(e) => {
+          e.preventDefault();
+          props.onAction({ type: "PLACE_BOMB" });
+        }}
       >
         💣
       </button>

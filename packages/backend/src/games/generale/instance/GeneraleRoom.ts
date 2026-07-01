@@ -32,7 +32,6 @@ export type RoomServerConnector = ServerSyncConnector<SyncedPreGameClientActions
  * 游戏结束后 resume 恢复交互。始终是玩家信息和鉴权的唯一数据源。
  */
 
-
 export class GeneraleRoom {
   private state: PreGameRoomState;
   /**

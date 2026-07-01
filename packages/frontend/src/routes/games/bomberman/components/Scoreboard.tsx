@@ -13,7 +13,9 @@ export function Scoreboard(props: ScoreboardProps) {
         <div class="space-y-2 mb-6">
           {sorted.map((p) => (
             <div class="flex justify-between text-white text-lg">
-              <span>#{p.rank} {p.name}</span>
+              <span>
+                #{p.rank} {p.name}
+              </span>
               <span class="text-gray-400">{p.score} pts</span>
             </div>
           ))}

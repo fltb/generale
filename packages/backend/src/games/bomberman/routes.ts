@@ -1,4 +1,4 @@
-import { Elysia, t } from "elysia";
+import { type Elysia, t } from "elysia";
 import { BombermanManager } from "./service/BombermanManager";
 import { authPlugin } from "../../middleware/authPlugin";
 

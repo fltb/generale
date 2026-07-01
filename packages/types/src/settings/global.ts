@@ -4,8 +4,4 @@ export interface GlobalSettings {
   soundMuted: boolean;
 }
 
-export const GLOBAL_SETTINGS_KEYS: readonly (keyof GlobalSettings)[] = [
-  "locale",
-  "theme",
-  "soundMuted",
-] as const;
+export const GLOBAL_SETTINGS_KEYS: readonly (keyof GlobalSettings)[] = ["locale", "theme", "soundMuted"] as const;

@@ -1,15 +1,6 @@
-import { GameStatus } from "../core-type";
+import type { GameStatus } from "../core-type";
 
-export type ItemType =
-  | "BOMB_UP"
-  | "FIRE_UP"
-  | "SPEED_UP"
-  | "KICK"
-  | "GLOVE"
-  | "PUNCH"
-  | "REMOTE"
-  | "PIERCE"
-  | "SPIRIT";
+export type ItemType = "BOMB_UP" | "FIRE_UP" | "SPEED_UP" | "KICK" | "GLOVE" | "PUNCH" | "REMOTE" | "PIERCE" | "SPIRIT";
 
 export interface BombermanTile {
   type: "empty" | "hard_wall" | "soft_wall";
