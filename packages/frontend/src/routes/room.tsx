@@ -1,1 +1,1 @@
-export { default } from "./generale/room";
+export { default } from "./games/generale/routes/room";

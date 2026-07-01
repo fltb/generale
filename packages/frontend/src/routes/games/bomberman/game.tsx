@@ -21,7 +21,7 @@ export function BombermanGame(props: BombermanGameProps) {
 
   return (
     <div class="relative w-full h-screen overflow-hidden bg-gray-900">
-      <div class="absolute inset-0" style={{ transform: "scale(2)", transformOrigin: "top left" }}>
+      <div class="absolute inset-0" style="transform:scale(2);transform-origin:top left">
         <Application resizeTo={window}>
           <MapLayer tiles={state().map.tiles} />
           <EntityLayer
