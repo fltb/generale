@@ -35,10 +35,10 @@ export default function Home() {
             href="/generale"
           />
           <GameCard
-            title={t("More Coming Soon")}
-            description={t("New multiplayer games are in development.")}
-            comingSoon
-            href=""
+            title={"Bomberman"}
+            description={"Arena battle — place bombs, destroy walls, and be the last one standing."}
+            meta={"2-4 players"}
+            href="/bomberman"
           />
         </div>
       </section>

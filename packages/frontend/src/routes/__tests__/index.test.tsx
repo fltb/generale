@@ -43,9 +43,9 @@ describe("Home route", () => {
     expect(screen.getByText("General E")).toBeInTheDocument();
   });
 
-  it("renders More Coming Soon GameCard", () => {
+  it("renders Bomberman GameCard", () => {
     render(() => <Home />);
-    expect(screen.getByText("More Coming Soon")).toBeInTheDocument();
+    expect(screen.getByText("Bomberman")).toBeInTheDocument();
   });
 
   it("renders footer text", () => {
