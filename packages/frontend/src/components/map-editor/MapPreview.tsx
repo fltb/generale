@@ -5,7 +5,7 @@ import { createSignal, onCleanup, onMount } from "solid-js";
 import * as P from "solid-pixi";
 import { mapDetailApi } from "~/api/mapApi";
 import { MapTile } from "~/components/MapTile";
-import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
+import { DEFAULT_TILE_THEME } from "~/routes/games/generale/hooks/render/tileTheme";
 import { createIconFactory } from "~/utils/faIconGraphic";
 import { useT } from "~/i18n/useT";
 

@@ -19,7 +19,7 @@ const mockChat = vi.hoisted(() => ({
   colorHex: vi.fn(),
 }));
 
-vi.mock("~/game/useChatSession", () => ({
+vi.mock("~/routes/games/generale/hooks/useChatSession", () => ({
   useChatSession: () => mockChat,
 }));
 

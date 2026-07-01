@@ -8,7 +8,7 @@
 import type { ListGamesQuery } from "@generale/types";
 import { useQuery } from "@tanstack/solid-query";
 import type { Accessor } from "solid-js";
-import { listGamesApi } from "~/api/gameApi";
+import { listGamesApi } from "~/routes/games/generale/api/gameApi";
 
 /**
  * 将前端友好的 filters（部分字段）转换为后端 `ListGamesQuery`（字符串形式）

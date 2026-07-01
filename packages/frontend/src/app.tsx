@@ -12,7 +12,7 @@ import { I18nProvider } from "./i18n/I18nProvider";
 import { getSettingsApi } from "./api/settingsApi";
 import CookieConsent from "./components/CookieConsent";
 import PlatformShell from "./components/platform/PlatformShell";
-import GeneraleLayout from "./components/game/GeneraleLayout";
+import GeneraleLayout from "./routes/games/generale/components/game/GeneraleLayout";
 import Home from "./routes";
 import LoginPage from "./routes/login";
 import ProfilePage from "./routes/profile";
@@ -24,13 +24,13 @@ import ConfirmEmailChangePage from "./routes/confirm-email-change";
 import TermsPage from "./routes/terms";
 import AboutPage from "./routes/about";
 import NotfoundPage from "./routes/[...404]";
-import GeneraleHub from "./routes/generale/index";
+import GeneraleHub from "./routes/games/generale/routes/index";
 import { BombermanHub } from "~/routes/games/bomberman/hub";
 import { BombermanRoom } from "~/routes/games/bomberman/room";
 import MapEditorPage from "./routes/map-editor";
 import MapPreviewPage from "./routes/map-preview";
 import MapsPage from "./routes/maps";
-import RoomRoute from "./routes/room";
+import RoomRoute from "./routes/games/generale/routes/room";
 import Test from "./routes/test";
 import bridge from "./testBridge";
 
@@ -193,8 +193,8 @@ export default function App() {
                 <Route path="/bomberman" component={BombermanHub} />
                 <Route path="/bomberman/room/:id" component={BombermanRoom} />
 
-                {/* Flat game routes */}
-                <Route path="/game/:id" component={RoomRoute} />
+                {/* Generale game routes */}
+                <Route path="/generale/room/:id" component={RoomRoute} />
                 <Route path="/maps" component={MapsPage} />
                 <Route path="/maps/editor" component={MapEditorPage} />
                 <Route path="/maps/editor/:id" component={MapEditorPage} />

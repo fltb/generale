@@ -1,1 +1,1 @@
-export { default } from "./generale/map-editor";
+export { default } from "./games/generale/routes/map-editor";

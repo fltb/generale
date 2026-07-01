@@ -3,7 +3,7 @@ import { TileType } from "@generale/types";
 import * as PIXI from "pixi.js";
 import { type Component, createEffect, createMemo, createSignal, Show } from "solid-js";
 import * as P from "solid-pixi";
-import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
+import { DEFAULT_TILE_THEME } from "~/routes/games/generale/hooks/render/tileTheme";
 import type { FaIconKey, IconFactory } from "~/utils/faIconGraphic";
 import { tileColorNumber } from "~/utils/playerColor";
 

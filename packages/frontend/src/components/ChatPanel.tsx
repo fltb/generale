@@ -1,7 +1,7 @@
 import { type ChatMessage, GamePhase, PreGamePlayerStatus, type PreGameRoomState } from "@generale/types";
 import { type Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { useT } from "~/i18n/useT";
-import { useChatSession } from "~/game/useChatSession";
+import { useChatSession } from "~/routes/games/generale/hooks/useChatSession";
 import { Badge, Button, Panel, Textarea } from "~/ui";
 
 export interface ChatPanelProps {

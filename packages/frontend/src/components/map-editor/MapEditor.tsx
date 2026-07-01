@@ -13,7 +13,7 @@ import {
   uploadMapThumbnailApi,
 } from "~/api/mapApi";
 import { MapTile } from "~/components/MapTile";
-import { DEFAULT_TILE_THEME } from "~/game/render/tileTheme";
+import { DEFAULT_TILE_THEME } from "~/routes/games/generale/hooks/render/tileTheme";
 import { Button, Input } from "~/ui";
 import { createIconFactory } from "~/utils/faIconGraphic";
 import { useT } from "~/i18n/useT";
